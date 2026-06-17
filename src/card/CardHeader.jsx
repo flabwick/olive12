@@ -1,3 +1,4 @@
+import { LocationButton } from './LocationButton'
 import './CardHeader.css'
 
 function ArrowUpIcon() {
@@ -120,6 +121,10 @@ export function CardHeader({
   onTitleClick,
   folded = false,
   hidden = false,
+  location = 'none',
+  folders = [],
+  onSaveToShelf,
+  onMoveToLibrary,
   onToggleFold,
   onToggleHide,
   onMoveUp,
@@ -127,6 +132,10 @@ export function CardHeader({
   onClose,
 }) {
   const hasRightControls = onMoveUp || onMoveDown || onToggleHide || onClose
+  const hasLocationButton =
+    (location === 'none' && onSaveToShelf) ||
+    (location === 'shelf' && onMoveToLibrary) ||
+    location === 'library'
 
   return (
     <div className="card-header">
@@ -163,6 +172,17 @@ export function CardHeader({
         >
           {title}
         </h3>
+      )}
+
+      {hasLocationButton && (
+        <div className="card-header__location">
+          <LocationButton
+            location={location}
+            folders={folders}
+            onSaveToShelf={onSaveToShelf}
+            onMoveToLibrary={onMoveToLibrary}
+          />
+        </div>
       )}
 
       {hasRightControls && (

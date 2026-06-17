@@ -155,19 +155,17 @@ describe('VaultView', () => {
       expect(screen.getByRole('button', { name: 'Move to Library' })).toBeInTheDocument()
     })
 
-    it('calls onMoveToLibrary with cardId and folderId when Library root is selected', async () => {
+    it('calls onMoveToLibrary with cardId and null when Move to Library is clicked', async () => {
       const onMoveToLibrary = vi.fn()
       render(
         <VaultView
           {...baseProps}
           view="shelf"
           shelfEntries={[shelfCard]}
-          folders={[]}
           onMoveToLibrary={onMoveToLibrary}
         />,
       )
       await userEvent.click(screen.getByRole('button', { name: 'Move to Library' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Library root' }))
       expect(onMoveToLibrary).toHaveBeenCalledWith('s1', null)
     })
 

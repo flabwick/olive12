@@ -133,4 +133,37 @@ describe('CardHeader', () => {
     await userEvent.type(screen.getByRole('textbox', { name: 'Card title' }), '!')
     expect(onTitleChange).toHaveBeenCalled()
   })
+
+  describe('location button', () => {
+    it('renders Save to Shelf button when location is none and onSaveToShelf is provided', () => {
+      render(<CardHeader title="A" location="none" onSaveToShelf={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Save to Shelf' })).toBeInTheDocument()
+    })
+
+    it('renders no location button when no callbacks are provided', () => {
+      render(<CardHeader title="A" location="none" />)
+      expect(screen.queryByRole('button', { name: 'Save to Shelf' })).not.toBeInTheDocument()
+    })
+
+    it('renders shelf ✓ button when location is shelf and onMoveToLibrary is provided', () => {
+      render(<CardHeader title="A" location="shelf" onMoveToLibrary={() => {}} />)
+      expect(
+        screen.getByRole('button', { name: 'Saved to Shelf — click to move to Library' }),
+      ).toBeInTheDocument()
+    })
+
+    it('renders disabled In Library button when location is library', () => {
+      render(<CardHeader title="A" location="library" />)
+      const btn = screen.getByRole('button', { name: 'In Library' })
+      expect(btn).toBeInTheDocument()
+      expect(btn).toBeDisabled()
+    })
+
+    it('calls onSaveToShelf when Save to Shelf is clicked', async () => {
+      const onSaveToShelf = vi.fn()
+      render(<CardHeader title="A" location="none" onSaveToShelf={onSaveToShelf} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
+      expect(onSaveToShelf).toHaveBeenCalledOnce()
+    })
+  })
 })

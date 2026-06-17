@@ -84,8 +84,7 @@ export function VaultView({
                 <ShelfRow
                   key={card.id}
                   card={card}
-                  folders={folders}
-                  onMoveToLibrary={onMoveToLibrary ? (folderId) => onMoveToLibrary(card.id, folderId) : undefined}
+                  onMoveToLibrary={onMoveToLibrary ? () => onMoveToLibrary(card.id, null) : undefined}
                 />
               ))}
             </div>
@@ -94,7 +93,7 @@ export function VaultView({
       )}
 
       {view === 'library' && (
-        <div className="vault-view__pane">
+        <div className="vault-view__pane vault-view__library-pane">
           <FolderTree
             folders={folders}
             cards={libraryEntries}

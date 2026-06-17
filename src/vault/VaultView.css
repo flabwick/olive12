@@ -65,6 +65,16 @@
   font-size: 0.9375rem;
 }
 
+.vault-view__shelf-list {
+  padding: 0.375rem 0;
+}
+
+.vault-view__library-pane {
+  background: #f5ede0;
+  flex: 1;
+  overflow-y: auto;
+}
+
 @media (prefers-color-scheme: dark) {
   .vault-view__nav {
     background: #1a1008;

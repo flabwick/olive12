@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CardHeader } from './CardHeader'
-import { LocationButton } from './LocationButton'
 import './Card.css'
 
 const MIN_BODY_HEIGHT = 40
@@ -115,11 +114,6 @@ export function Card({
     document.addEventListener('mouseup', onMouseUp)
   }
 
-  const hasLocationButton =
-    (location === 'none' && onSaveToShelf) ||
-    (location === 'shelf' && onMoveToLibrary) ||
-    location === 'library'
-
   return (
     <div
       className={`card${hiddenState ? ' card--hidden' : ''}`}
@@ -134,6 +128,10 @@ export function Card({
         onTitleClick={onUpdate ? () => startEditing('title') : undefined}
         folded={foldState}
         hidden={hiddenState}
+        location={location}
+        folders={folders}
+        onSaveToShelf={onSaveToShelf}
+        onMoveToLibrary={onMoveToLibrary}
         onToggleFold={onToggleFold}
         onToggleHide={onToggleHide}
         onMoveUp={onMoveUp}
@@ -178,16 +176,6 @@ export function Card({
             onMouseDown={startResize}
           />
         </>
-      )}
-      {hasLocationButton && (
-        <div className="card__footer">
-          <LocationButton
-            location={location}
-            folders={folders}
-            onSaveToShelf={onSaveToShelf}
-            onMoveToLibrary={onMoveToLibrary}
-          />
-        </div>
       )}
     </div>
   )

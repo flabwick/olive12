@@ -14,10 +14,6 @@ const card = {
   updatedAt: new Date('2024-03-15').getTime(),
 }
 
-const folders = [
-  { id: 'f1', name: 'Work', parentId: null, createdAt: 1, updatedAt: 1 },
-]
-
 describe('ShelfRow', () => {
   it('renders the card title', () => {
     render(<ShelfRow card={card} />)
@@ -44,34 +40,10 @@ describe('ShelfRow', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('clicking Move to Library opens the folder picker', async () => {
-    render(<ShelfRow card={card} folders={[]} onMoveToLibrary={() => {}} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Move to Library' }))
-    expect(screen.getByRole('dialog', { name: 'Move to Library' })).toBeInTheDocument()
-  })
-
-  it('selecting Library root calls onMoveToLibrary with null', async () => {
+  it('calls onMoveToLibrary when Move to Library button is clicked', async () => {
     const onMoveToLibrary = vi.fn()
-    render(<ShelfRow card={card} folders={[]} onMoveToLibrary={onMoveToLibrary} />)
+    render(<ShelfRow card={card} onMoveToLibrary={onMoveToLibrary} />)
     await userEvent.click(screen.getByRole('button', { name: 'Move to Library' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Library root' }))
-    expect(onMoveToLibrary).toHaveBeenCalledWith(null)
-  })
-
-  it('selecting a folder calls onMoveToLibrary with folderId', async () => {
-    const onMoveToLibrary = vi.fn()
-    render(<ShelfRow card={card} folders={folders} onMoveToLibrary={onMoveToLibrary} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Move to Library' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Work' }))
-    expect(onMoveToLibrary).toHaveBeenCalledWith('f1')
-  })
-
-  it('dismissing the overlay closes it without calling onMoveToLibrary', async () => {
-    const onMoveToLibrary = vi.fn()
-    render(<ShelfRow card={card} folders={[]} onMoveToLibrary={onMoveToLibrary} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Move to Library' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
-    expect(onMoveToLibrary).not.toHaveBeenCalled()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(onMoveToLibrary).toHaveBeenCalledOnce()
   })
 })
