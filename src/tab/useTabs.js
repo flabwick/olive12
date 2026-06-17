@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { deleteCard, getAllCards, putCard } from '../card/cardStorage'
 import { createCard, updateCardFields } from '../card/createCard'
+import { createFolder as makeFolderObject } from '../folder/createFolder'
+import { getAllFolders, putFolder } from '../folder/folderStorage'
 import {
   createTab,
   createTabCard,
@@ -17,12 +19,15 @@ export function useTabs() {
   const [tab, setTab] = useState(null)
   const [tabCards, setTabCards] = useState([])
   const [cardsById, setCardsById] = useState({})
+  const [folders, setFolders] = useState([])
 
   useEffect(() => {
     let active = true
 
     async function init() {
-      const [tabs, tcs, cards] = await Promise.all([getAllTabs(), getAllTabCards(), getAllCards()])
+      const [tabs, tcs, cards, fds] = await Promise.all([
+        getAllTabs(), getAllTabCards(), getAllCards(), getAllFolders(),
+      ])
       if (!active) return
 
       if (tabs.length === 0) {
@@ -38,6 +43,7 @@ export function useTabs() {
         setCardsById(Object.fromEntries(cards.map((c) => [c.id, c])))
       }
 
+      setFolders(fds)
       setIsReady(true)
     }
 
@@ -149,15 +155,22 @@ export function useTabs() {
   )
 
   const moveToLibrary = useCallback(
-    async (cardId) => {
+    async (cardId, folderId = null) => {
       const card = cardsById[cardId]
       if (!card) return
-      const updated = updateCardFields(card, { location: 'library' })
+      const updated = updateCardFields(card, { location: 'library', folderId })
       setCardsById((prev) => ({ ...prev, [cardId]: updated }))
       await putCard(updated)
     },
     [cardsById],
   )
+
+  const createFolder = useCallback(async ({ name = 'New folder', parentId = null } = {}) => {
+    const folder = makeFolderObject({ name, parentId })
+    setFolders((prev) => [...prev, folder])
+    await putFolder(folder)
+    return folder
+  }, [])
 
   const entries = tabCards
     .filter((tc) => tc.tabId === tab?.id)
@@ -178,5 +191,5 @@ export function useTabs() {
     .filter((c) => c.location === 'library')
     .sort((a, b) => b.updatedAt - a.updatedAt)
 
-  return { tab, isReady, entries, shelfEntries, libraryEntries, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide, saveToShelf, moveToLibrary }
+  return { tab, isReady, entries, shelfEntries, libraryEntries, folders, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide, saveToShelf, moveToLibrary, createFolder }
 }

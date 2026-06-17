@@ -1,0 +1,125 @@
+.folder-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.folder-picker {
+  background: #faf8f4;
+  border: 2px solid #3d2b1f;
+  border-radius: 0.5rem;
+  box-shadow: 4px 4px 0 #c8b89a;
+  min-width: 16rem;
+  max-width: 22rem;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.folder-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid #e0d4c0;
+  flex-shrink: 0;
+}
+
+.folder-picker__title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #2a1a0a;
+  letter-spacing: 0.03em;
+}
+
+.folder-picker__close {
+  background: transparent;
+  border: none;
+  color: #8a6848;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  line-height: 1;
+}
+
+.folder-picker__close:hover {
+  background: #e0d4c0;
+  color: #2a1a0a;
+}
+
+.folder-picker__list {
+  list-style: none;
+  margin: 0;
+  padding: 0.375rem 0;
+  overflow-y: auto;
+}
+
+.folder-picker__item {
+  display: block;
+}
+
+.folder-picker__option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0.375rem 0.75rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: #4a3020;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.folder-picker__option:hover {
+  background: #f0e8d8;
+}
+
+.folder-picker__option--root {
+  font-weight: 600;
+  color: #2a1a0a;
+}
+
+@media (prefers-color-scheme: dark) {
+  .folder-picker {
+    background: #1e1810;
+    border-color: #6a4e35;
+    box-shadow: 4px 4px 0 #3a2c1c;
+  }
+
+  .folder-picker__header {
+    border-bottom-color: #3a2c1c;
+  }
+
+  .folder-picker__title {
+    color: #f0d8b0;
+  }
+
+  .folder-picker__close {
+    color: #b8956a;
+  }
+
+  .folder-picker__close:hover {
+    background: #3a2c1c;
+    color: #f0d8b0;
+  }
+
+  .folder-picker__option {
+    color: #c8a87a;
+  }
+
+  .folder-picker__option:hover {
+    background: #2a1e10;
+  }
+
+  .folder-picker__option--root {
+    color: #f0d8b0;
+  }
+}

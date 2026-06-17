@@ -18,6 +18,7 @@ describe('createCard', () => {
       title: '',
       body: '',
       location: 'none',
+      folderId: null,
       createdAt: 1_700_000_000_000,
       updatedAt: 1_700_000_000_000,
     })
@@ -30,6 +31,7 @@ describe('createCard', () => {
       title: 'Notes',
       body: 'Buy milk',
       location: 'none',
+      folderId: null,
       createdAt: 1_700_000_000_000,
       updatedAt: 1_700_000_000_000,
     })
@@ -37,6 +39,10 @@ describe('createCard', () => {
 
   it('defaults location to "none"', () => {
     expect(createCard().location).toBe('none')
+  })
+
+  it('defaults folderId to null', () => {
+    expect(createCard().folderId).toBeNull()
   })
 
   it('assigns a unique id to each card', () => {
@@ -55,6 +61,7 @@ describe('updateCardFields', () => {
     title: 'Old title',
     body: 'Old body',
     location: 'none',
+    folderId: null,
     createdAt: 1_700_000_000_000,
     updatedAt: 1_700_000_000_000,
   }
@@ -100,10 +107,20 @@ describe('updateCardFields', () => {
     expect(updateCardFields(shelfCard, { location: 'library' }).location).toBe('library')
   })
 
+  it('preserves folderId when not provided', () => {
+    const card = { ...base, folderId: 'f1' }
+    expect(updateCardFields(card, { title: 'T' }).folderId).toBe('f1')
+  })
+
+  it('updates folderId', () => {
+    expect(updateCardFields(base, { folderId: 'f2' }).folderId).toBe('f2')
+  })
+
   it('does not mutate the original card', () => {
     updateCardFields(base, { title: 'New title', location: 'shelf' })
     expect(base.title).toBe('Old title')
     expect(base.location).toBe('none')
+    expect(base.folderId).toBeNull()
   })
 
   it('stamps updatedAt with Date.now()', () => {

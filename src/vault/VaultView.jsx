@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Card } from '../card/Card'
 import { Dock } from '../tab/Dock'
 import { Tab } from '../tab/Tab'
 import { TransientCard } from '../tab/TransientCard'
+import { FolderTree } from './FolderTree'
+import { ShelfRow } from './ShelfRow'
 import './VaultView.css'
 
 export function VaultView({
@@ -11,6 +12,7 @@ export function VaultView({
   tabEntries = [],
   shelfEntries = [],
   libraryEntries = [],
+  folders = [],
   onAddCard,
   onUpdateCard,
   onRemoveCard,
@@ -21,6 +23,7 @@ export function VaultView({
   onUnhide,
   onSaveToShelf,
   onMoveToLibrary,
+  onCreateFolder,
 }) {
   const [transientOpen, setTransientOpen] = useState(false)
 
@@ -50,6 +53,7 @@ export function VaultView({
         <div className="vault-view__pane">
           <Tab
             entries={tabEntries}
+            folders={folders}
             onReorder={onReorder}
             onUpdate={onUpdateCard}
             onRemove={onRemoveCard}
@@ -75,41 +79,27 @@ export function VaultView({
           {shelfEntries.length === 0 ? (
             <p className="vault-view__empty">Shelf is empty. Save some cards from your tab.</p>
           ) : (
-            <ul className="vault-view__list">
+            <div className="vault-view__shelf-list" role="list">
               {shelfEntries.map((card) => (
-                <li key={card.id} className="vault-view__item">
-                  <Card
-                    title={card.title}
-                    body={card.body}
-                    location={card.location}
-                    onUpdate={onUpdateCard ? (fields) => onUpdateCard(card.id, fields) : undefined}
-                    onMoveToLibrary={onMoveToLibrary ? () => onMoveToLibrary(card.id) : undefined}
-                  />
-                </li>
+                <ShelfRow
+                  key={card.id}
+                  card={card}
+                  folders={folders}
+                  onMoveToLibrary={onMoveToLibrary ? (folderId) => onMoveToLibrary(card.id, folderId) : undefined}
+                />
               ))}
-            </ul>
+            </div>
           )}
         </div>
       )}
 
       {view === 'library' && (
         <div className="vault-view__pane">
-          {libraryEntries.length === 0 ? (
-            <p className="vault-view__empty">{"Library is empty. Promote cards here when they're ready."}</p>
-          ) : (
-            <ul className="vault-view__list">
-              {libraryEntries.map((card) => (
-                <li key={card.id} className="vault-view__item">
-                  <Card
-                    title={card.title}
-                    body={card.body}
-                    location={card.location}
-                    onUpdate={onUpdateCard ? (fields) => onUpdateCard(card.id, fields) : undefined}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
+          <FolderTree
+            folders={folders}
+            cards={libraryEntries}
+            onCreateFolder={onCreateFolder}
+          />
         </div>
       )}
     </div>

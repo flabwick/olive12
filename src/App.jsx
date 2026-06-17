@@ -8,6 +8,7 @@ function App() {
     entries,
     shelfEntries,
     libraryEntries,
+    folders,
     addCard,
     updateCard,
     removeCard,
@@ -18,6 +19,7 @@ function App() {
     unhide,
     saveToShelf,
     moveToLibrary,
+    createFolder,
   } = useTabs()
   const [view, setView] = useState('tab')
 
@@ -29,6 +31,7 @@ function App() {
         tabEntries={entries}
         shelfEntries={shelfEntries}
         libraryEntries={libraryEntries}
+        folders={folders}
         onAddCard={addCard}
         onUpdateCard={updateCard}
         onRemoveCard={removeCard}
@@ -39,6 +42,7 @@ function App() {
         onUnhide={unhide}
         onSaveToShelf={saveToShelf}
         onMoveToLibrary={moveToLibrary}
+        onCreateFolder={createFolder}
       />
     </div>
   )

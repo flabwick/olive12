@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '../db/vaultDb'
 import { getAllCards } from '../card/cardStorage'
+import { getAllFolders } from '../folder/folderStorage'
 import { getAllTabCards, getAllTabs } from './tabStorage'
 import { useTabs } from './useTabs'
 
@@ -10,6 +11,7 @@ describe('useTabs', () => {
     await db.cards.clear()
     await db.tabs.clear()
     await db.tab_cards.clear()
+    await db.folders.clear()
   })
 
   afterEach(() => {
@@ -484,6 +486,93 @@ describe('useTabs', () => {
 
       expect(result.current.libraryEntries[0].id).toBe('card-a') // updatedAt 3000 > 1000 = most recent first
       expect(result.current.libraryEntries[1].id).toBe('card-b')
+    })
+  })
+
+  describe('folders', () => {
+    it('createFolder adds a folder to folders state', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid').mockReturnValueOnce('folder-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => {
+        await result.current.createFolder({ name: 'Work', parentId: null })
+      })
+
+      expect(result.current.folders).toHaveLength(1)
+      expect(result.current.folders[0].name).toBe('Work')
+      expect(result.current.folders[0].id).toBe('folder-uuid')
+    })
+
+    it('createFolder persists across remount', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid').mockReturnValueOnce('folder-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result, unmount } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.createFolder({ name: 'Work' }) })
+
+      unmount()
+      const { result: reloaded } = renderHook(() => useTabs())
+      await waitFor(() => expect(reloaded.current.isReady).toBe(true))
+
+      const stored = await getAllFolders()
+      expect(stored).toHaveLength(1)
+      expect(stored[0].name).toBe('Work')
+      expect(reloaded.current.folders).toHaveLength(1)
+    })
+
+    it('moveToLibrary with folderId sets folderId on the card', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+        .mockReturnValueOnce('folder-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+      await act(async () => { await result.current.createFolder({ name: 'Work' }) })
+      await act(async () => { await result.current.moveToLibrary('card-uuid', 'folder-uuid') })
+
+      expect(result.current.entries[0].card.folderId).toBe('folder-uuid')
+      expect(result.current.entries[0].card.location).toBe('library')
+    })
+
+    it('moveToLibrary with null folderId keeps folderId null', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid').mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+      await act(async () => { await result.current.moveToLibrary('card-uuid', null) })
+
+      expect(result.current.entries[0].card.folderId).toBeNull()
+    })
+
+    it('libraryEntries groups correctly by folderId', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-a')
+        .mockReturnValueOnce('card-b')
+        .mockReturnValueOnce('folder-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+      await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+      await act(async () => { await result.current.createFolder({ name: 'Work' }) })
+      await act(async () => { await result.current.moveToLibrary('card-a', 'folder-uuid') })
+      await act(async () => { await result.current.moveToLibrary('card-b', null) })
+
+      const inFolder = result.current.libraryEntries.find((c) => c.id === 'card-a')
+      const atRoot = result.current.libraryEntries.find((c) => c.id === 'card-b')
+      expect(inFolder.folderId).toBe('folder-uuid')
+      expect(atRoot.folderId).toBeNull()
     })
   })
 

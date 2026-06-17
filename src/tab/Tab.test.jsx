@@ -175,18 +175,19 @@ describe('Tab', () => {
       expect(onSaveToShelf).toHaveBeenCalledWith('card-1')
     })
 
-    it('renders Move to Library button when location is "shelf" and onMoveToLibrary is provided', () => {
+    it('renders shelf button when location is "shelf" and onMoveToLibrary is provided', () => {
       const entry = makeEntry({ card: { id: 'card-1', title: 'T', body: 'B', type: 'text', location: 'shelf' } })
       render(<Tab entries={[entry]} onMoveToLibrary={() => {}} />)
-      expect(screen.getByRole('button', { name: 'Move to Library' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Saved to Shelf — click to move to Library' })).toBeInTheDocument()
     })
 
-    it('calls onMoveToLibrary with the card id when clicked', async () => {
+    it('calls onMoveToLibrary with cardId and folderId when folder is selected from overlay', async () => {
       const onMoveToLibrary = vi.fn()
       const entry = makeEntry({ card: { id: 'card-1', title: 'T', body: 'B', type: 'text', location: 'shelf' } })
-      render(<Tab entries={[entry]} onMoveToLibrary={onMoveToLibrary} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Move to Library' }))
-      expect(onMoveToLibrary).toHaveBeenCalledWith('card-1')
+      render(<Tab entries={[entry]} folders={[]} onMoveToLibrary={onMoveToLibrary} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Saved to Shelf — click to move to Library' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Library root' }))
+      expect(onMoveToLibrary).toHaveBeenCalledWith('card-1', null)
     })
 
     it('renders no location buttons when callbacks are not provided', () => {

@@ -1,0 +1,154 @@
+.folder-tree {
+  font-size: 0.875rem;
+  color: #2a1a0a;
+}
+
+.folder-tree__toolbar {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #e8ddd0;
+}
+
+.folder-tree__new-root-folder {
+  font-size: 0.8125rem;
+  color: #8a6848;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.folder-tree__new-root-folder:hover {
+  color: #2a1a0a;
+}
+
+.folder-tree__root,
+.folder-tree__children {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.folder-tree__children {
+  padding-left: 1.25rem;
+}
+
+.folder-tree__folder {
+  user-select: none;
+}
+
+.folder-tree__folder-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  cursor: default;
+}
+
+.folder-tree__folder-row:hover {
+  background: #f5efe6;
+}
+
+.folder-tree__toggle {
+  width: 1rem;
+  height: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #8a6848;
+  font-size: 0.625rem;
+  flex-shrink: 0;
+}
+
+.folder-tree__toggle--empty {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
+}
+
+.folder-tree__folder-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.folder-tree__new-subfolder {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: #8a6848;
+  cursor: pointer;
+  font-size: 0.875rem;
+  padding: 0 0.25rem;
+}
+
+.folder-tree__folder-row:hover .folder-tree__new-subfolder {
+  opacity: 1;
+}
+
+.folder-tree__new-subfolder:hover {
+  color: #2a1a0a;
+}
+
+.folder-tree__card {
+  padding: 0.2rem 0.5rem 0.2rem 1.75rem;
+  color: #4a3020;
+  font-size: 0.8125rem;
+  border-radius: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-tree__card--root {
+  padding-left: 0.5rem;
+}
+
+.folder-tree__card:hover {
+  background: #f5efe6;
+}
+
+@media (prefers-color-scheme: dark) {
+  .folder-tree {
+    color: #f0d8b0;
+  }
+
+  .folder-tree__toolbar {
+    border-bottom-color: #2a1e10;
+  }
+
+  .folder-tree__new-root-folder {
+    color: #b8956a;
+  }
+
+  .folder-tree__new-root-folder:hover {
+    color: #f0d8b0;
+  }
+
+  .folder-tree__folder-row:hover {
+    background: #2a1e10;
+  }
+
+  .folder-tree__toggle {
+    color: #b8956a;
+  }
+
+  .folder-tree__new-subfolder {
+    color: #b8956a;
+  }
+
+  .folder-tree__new-subfolder:hover {
+    color: #f0d8b0;
+  }
+
+  .folder-tree__card {
+    color: #d0b890;
+  }
+
+  .folder-tree__card:hover {
+    background: #2a1e10;
+  }
+}

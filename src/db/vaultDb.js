@@ -7,3 +7,10 @@ db.version(1).stores({
   tabs: 'id',
   tab_cards: '[tabId+cardId], tabId',
 })
+
+db.version(2).stores({
+  cards: 'id',
+  tabs: 'id',
+  tab_cards: '[tabId+cardId], tabId',
+  folders: 'id',
+})

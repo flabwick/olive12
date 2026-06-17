@@ -18,7 +18,7 @@ const shelfCard = {
 
 const libraryCard = {
   id: 'l1', title: 'Library Card', body: 'Library body', type: 'text',
-  location: 'library', createdAt: 2, updatedAt: 2,
+  location: 'library', folderId: null, createdAt: 2, updatedAt: 2,
 }
 
 const baseProps = {
@@ -155,18 +155,20 @@ describe('VaultView', () => {
       expect(screen.getByRole('button', { name: 'Move to Library' })).toBeInTheDocument()
     })
 
-    it('calls onMoveToLibrary with the card id when Move to Library is clicked', async () => {
+    it('calls onMoveToLibrary with cardId and folderId when Library root is selected', async () => {
       const onMoveToLibrary = vi.fn()
       render(
         <VaultView
           {...baseProps}
           view="shelf"
           shelfEntries={[shelfCard]}
+          folders={[]}
           onMoveToLibrary={onMoveToLibrary}
         />,
       )
       await userEvent.click(screen.getByRole('button', { name: 'Move to Library' }))
-      expect(onMoveToLibrary).toHaveBeenCalledWith('s1')
+      await userEvent.click(screen.getByRole('button', { name: 'Library root' }))
+      expect(onMoveToLibrary).toHaveBeenCalledWith('s1', null)
     })
 
     it('does not show the Dock in shelf view', () => {
@@ -191,11 +193,9 @@ describe('VaultView', () => {
       expect(screen.queryByText('Shelf Card')).not.toBeInTheDocument()
     })
 
-    it('shows empty state message when library is empty', () => {
+    it('renders the library folder tree when view is library', () => {
       render(<VaultView {...baseProps} view="library" />)
-      expect(
-        screen.getByText("Library is empty. Promote cards here when they're ready."),
-      ).toBeInTheDocument()
+      expect(screen.getByRole('tree', { name: 'Library' })).toBeInTheDocument()
     })
 
     it('does not show the Dock in library view', () => {

@@ -5,11 +5,12 @@ export function createCard({ title = '', body = '' } = {}) {
     title,
     body,
     location: 'none',
+    folderId: null,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   }
 }
 
-export function updateCardFields(card, { title = card.title, body = card.body, location = card.location } = {}) {
-  return { ...card, title, body, location, updatedAt: Date.now() }
+export function updateCardFields(card, { title = card.title, body = card.body, location = card.location, folderId = card.folderId } = {}) {
+  return { ...card, title, body, location, folderId, updatedAt: Date.now() }
 }

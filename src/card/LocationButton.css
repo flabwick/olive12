@@ -1,0 +1,81 @@
+.location-btn-wrapper {
+  position: relative;
+}
+
+.location-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, transform 0.1s;
+  flex-shrink: 0;
+}
+
+.location-btn--add {
+  background: transparent;
+  border: 1.5px solid #c8b89a;
+  color: #8a6848;
+}
+
+.location-btn--add:hover {
+  background: #f0e8d8;
+  border-color: #8a6848;
+  color: #2a1a0a;
+  transform: scale(1.1);
+}
+
+.location-btn--shelf {
+  background: #c8a87a;
+  border: 1.5px solid #a88050;
+  color: #fff;
+}
+
+.location-btn--shelf:hover {
+  background: #a88050;
+  transform: scale(1.1);
+}
+
+.location-btn--library {
+  background: #7a9a6a;
+  border: 1.5px solid #5a7a4a;
+  color: #fff;
+  cursor: default;
+  opacity: 0.75;
+}
+
+.location-btn--library:disabled {
+  pointer-events: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .location-btn--add {
+    border-color: #4a3a28;
+    color: #b8956a;
+  }
+
+  .location-btn--add:hover {
+    background: #2a1e10;
+    border-color: #b8956a;
+    color: #f0d8b0;
+  }
+
+  .location-btn--shelf {
+    background: #8a6040;
+    border-color: #6a4828;
+  }
+
+  .location-btn--shelf:hover {
+    background: #6a4828;
+  }
+
+  .location-btn--library {
+    background: #4a6a3a;
+    border-color: #3a5a2a;
+  }
+}

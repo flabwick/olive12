@@ -75,12 +75,10 @@ describe('App', () => {
     ).toBeInTheDocument()
   })
 
-  it('clicking Library switches to library empty state', async () => {
+  it('clicking Library switches to library view', async () => {
     render(<App />)
     await waitFor(() => screen.getByRole('tab', { name: 'Library' }))
     await userEvent.click(screen.getByRole('tab', { name: 'Library' }))
-    expect(
-      screen.getByText("Library is empty. Promote cards here when they're ready."),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('tree', { name: 'Library' })).toBeInTheDocument()
   })
 })

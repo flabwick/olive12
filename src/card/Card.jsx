@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CardHeader } from './CardHeader'
+import { LocationButton } from './LocationButton'
 import './Card.css'
 
 const MIN_BODY_HEIGHT = 40
@@ -16,6 +17,7 @@ export function Card({
   foldState = false,
   hiddenState = false,
   location = 'none',
+  folders = [],
   onToggleFold,
   onToggleHide,
   onMoveUp,
@@ -113,16 +115,10 @@ export function Card({
     document.addEventListener('mouseup', onMouseUp)
   }
 
-  const locationButton =
-    location === 'none' && onSaveToShelf ? (
-      <button type="button" className="card__location-btn" onClick={onSaveToShelf}>
-        Save to Shelf
-      </button>
-    ) : location === 'shelf' && onMoveToLibrary ? (
-      <button type="button" className="card__location-btn" onClick={onMoveToLibrary}>
-        Move to Library
-      </button>
-    ) : null
+  const hasLocationButton =
+    (location === 'none' && onSaveToShelf) ||
+    (location === 'shelf' && onMoveToLibrary) ||
+    location === 'library'
 
   return (
     <div
@@ -183,7 +179,16 @@ export function Card({
           />
         </>
       )}
-      {locationButton && <div className="card__footer">{locationButton}</div>}
+      {hasLocationButton && (
+        <div className="card__footer">
+          <LocationButton
+            location={location}
+            folders={folders}
+            onSaveToShelf={onSaveToShelf}
+            onMoveToLibrary={onMoveToLibrary}
+          />
+        </div>
+      )}
     </div>
   )
 }
