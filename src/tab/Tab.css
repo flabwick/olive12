@@ -14,9 +14,11 @@
 }
 
 .tab__empty-message {
-  color: #8b7a6a;
   font-size: 0.875rem;
-  margin: 0;
+  font-style: italic;
+  color: var(--olive-text-muted, #8a6848);
+  padding: 2rem 0 1rem;
+  text-align: center;
 }
 
 .tab__item {

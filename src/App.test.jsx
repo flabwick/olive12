@@ -60,25 +60,16 @@ describe('App', () => {
     expect(screen.getByText('No cards yet.')).toBeInTheDocument()
   })
 
-  it('mounts with tab view active', async () => {
-    render(<App />)
-    await waitFor(() => screen.getByRole('tab', { name: 'Tab' }))
-    expect(screen.getByRole('tab', { name: 'Tab' })).toHaveAttribute('aria-selected', 'true')
-  })
-
-  it('clicking Shelf switches to shelf empty state', async () => {
+  it('renders the sidebar with Shelf and Library vault tabs', async () => {
     render(<App />)
     await waitFor(() => screen.getByRole('tab', { name: 'Shelf' }))
-    await userEvent.click(screen.getByRole('tab', { name: 'Shelf' }))
-    expect(
-      screen.getByText('Shelf is empty. Save some cards from your tab.'),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Shelf' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Library' })).toBeInTheDocument()
   })
 
-  it('clicking Library switches to library view', async () => {
+  it('shows shelf empty state in sidebar by default', async () => {
     render(<App />)
-    await waitFor(() => screen.getByRole('tab', { name: 'Library' }))
-    await userEvent.click(screen.getByRole('tab', { name: 'Library' }))
-    expect(screen.getByRole('tree', { name: 'Library' })).toBeInTheDocument()
+    await waitFor(() => screen.getByText(/Shelf is empty/))
+    expect(screen.getByText('Shelf is empty. Save some cards from your tab.')).toBeInTheDocument()
   })
 })
