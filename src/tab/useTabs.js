@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { loadCards, saveCards } from '../card/cardStorage'
-import { createCard } from '../card/createCard'
+import { createCard, updateCardFields } from '../card/createCard'
 import {
   createTab,
   createTabCard,
   nextPosition,
+  removeTabCard,
   reorderTabCard,
   setTabCardFold,
   setTabCardHidden,
@@ -91,6 +92,28 @@ export function useTabs() {
     }))
   }, [])
 
+  const removeCard = useCallback((cardId) => {
+    setState((prev) => {
+      const { [cardId]: _removed, ...rest } = prev.cardsById
+      return {
+        ...prev,
+        tabCards: removeTabCard(prev.tabCards, cardId),
+        cardsById: rest,
+      }
+    })
+  }, [])
+
+  const updateCard = useCallback((cardId, fields) => {
+    setState((prev) => {
+      const card = prev.cardsById[cardId]
+      if (!card) return prev
+      return {
+        ...prev,
+        cardsById: { ...prev.cardsById, [cardId]: updateCardFields(card, fields) },
+      }
+    })
+  }, [])
+
   const entries = state.tabCards
     .filter((tc) => tc.tabId === state.tab.id)
     .sort((a, b) => a.position - b.position)
@@ -102,5 +125,5 @@ export function useTabs() {
     }))
     .filter((entry) => entry.card !== undefined)
 
-  return { tab: state.tab, entries, addCard, reorder, fold, unfold, hide, unhide }
+  return { tab: state.tab, entries, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide }
 }

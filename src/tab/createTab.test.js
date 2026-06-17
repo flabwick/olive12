@@ -3,6 +3,7 @@ import {
   createTab,
   createTabCard,
   nextPosition,
+  removeTabCard,
   reorderTabCard,
   setTabCardFold,
   setTabCardHidden,
@@ -154,5 +155,38 @@ describe('setTabCardHidden', () => {
   it('does not mutate the input array', () => {
     setTabCardHidden(base, 'a', true)
     expect(base[0].hiddenState).toBe(false)
+  })
+})
+
+describe('removeTabCard', () => {
+  const base = [
+    { tabId: 't', cardId: 'a', position: 0, foldState: false, hiddenState: false },
+    { tabId: 't', cardId: 'b', position: 1, foldState: false, hiddenState: false },
+    { tabId: 't', cardId: 'c', position: 2, foldState: false, hiddenState: false },
+  ]
+
+  it('removes the matching tab_card', () => {
+    const result = removeTabCard(base, 'b')
+    expect(result.map((tc) => tc.cardId)).toEqual(['a', 'c'])
+  })
+
+  it('renumbers positions after removal', () => {
+    const result = removeTabCard(base, 'a')
+    expect(result.map((tc) => tc.position)).toEqual([0, 1])
+  })
+
+  it('returns the same array when cardId is not found', () => {
+    const result = removeTabCard(base, 'z')
+    expect(result).toEqual(base)
+  })
+
+  it('returns an empty array when the only card is removed', () => {
+    const single = [{ tabId: 't', cardId: 'a', position: 0, foldState: false, hiddenState: false }]
+    expect(removeTabCard(single, 'a')).toEqual([])
+  })
+
+  it('does not mutate the input array', () => {
+    removeTabCard(base, 'b')
+    expect(base).toHaveLength(3)
   })
 })

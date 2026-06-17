@@ -1,5 +1,41 @@
 import './CardHeader.css'
 
+function ArrowUpIcon() {
+  return (
+    <svg
+      viewBox="0 0 10 12"
+      width="8"
+      height="11"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 11V1M2 4l3-3 3 3" />
+    </svg>
+  )
+}
+
+function ArrowDownIcon() {
+  return (
+    <svg
+      viewBox="0 0 10 12"
+      width="8"
+      height="11"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 1v10M2 8l3 3 3-3" />
+    </svg>
+  )
+}
+
 function CaretIcon({ folded }) {
   return (
     <svg
@@ -59,20 +95,96 @@ function EyeIcon({ hidden }) {
   )
 }
 
-export function CardHeader({ title, folded = false, hidden = false, onToggleFold, onToggleHide }) {
+function CloseIcon() {
+  return (
+    <svg
+      viewBox="0 0 10 10"
+      width="10"
+      height="10"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="M1 1l8 8M9 1l-8 8" />
+    </svg>
+  )
+}
+
+export function CardHeader({
+  title,
+  editing = false,
+  onTitleChange,
+  inputRef,
+  onTitleClick,
+  folded = false,
+  hidden = false,
+  onToggleFold,
+  onToggleHide,
+  onMoveUp,
+  onMoveDown,
+  onClose,
+}) {
+  const hasRightControls = onMoveUp || onMoveDown || onToggleHide || onClose
+
   return (
     <div className="card-header">
-      <h3 className="card-header__title">{title}</h3>
-      {(onToggleFold || onToggleHide) && (
+      {onToggleFold && (
+        <button
+          type="button"
+          className="card-header__fold-toggle"
+          onClick={onToggleFold}
+          aria-label={folded ? 'Expand card' : 'Collapse card'}
+        >
+          <CaretIcon folded={folded} />
+        </button>
+      )}
+
+      {editing ? (
+        <input
+          ref={inputRef}
+          className="card-header__title-input"
+          value={title}
+          onChange={(e) => onTitleChange?.(e.target.value)}
+          aria-label="Card title"
+        />
+      ) : (
+        <h3
+          className={`card-header__title${onTitleClick ? ' card-header__title--editable' : ''}`}
+          onClick={onTitleClick}
+          tabIndex={onTitleClick ? 0 : undefined}
+          onKeyDown={onTitleClick ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              onTitleClick()
+            }
+          } : undefined}
+        >
+          {title}
+        </h3>
+      )}
+
+      {hasRightControls && (
         <div className="card-header__controls">
-          {onToggleFold && (
+          {onMoveUp && (
             <button
               type="button"
               className="card-header__control"
-              onClick={onToggleFold}
-              aria-label={folded ? 'Expand card' : 'Collapse card'}
+              onClick={onMoveUp}
+              aria-label="Move card up"
             >
-              <CaretIcon folded={folded} />
+              <ArrowUpIcon />
+            </button>
+          )}
+          {onMoveDown && (
+            <button
+              type="button"
+              className="card-header__control"
+              onClick={onMoveDown}
+              aria-label="Move card down"
+            >
+              <ArrowDownIcon />
             </button>
           )}
           {onToggleHide && (
@@ -83,6 +195,16 @@ export function CardHeader({ title, folded = false, hidden = false, onToggleFold
               aria-label={hidden ? 'Show card' : 'Dim card'}
             >
               <EyeIcon hidden={hidden} />
+            </button>
+          )}
+          {onClose && (
+            <button
+              type="button"
+              className="card-header__control card-header__control--close"
+              onClick={onClose}
+              aria-label="Remove card"
+            >
+              <CloseIcon />
             </button>
           )}
         </div>

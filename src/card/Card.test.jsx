@@ -15,7 +15,7 @@ describe('Card', () => {
     render(<Card title="List" body={'First line\nSecond line'} />)
 
     expect(screen.getByText(/First line/)).toHaveClass('card__body')
-    expect(screen.getByText((_, element) => element?.textContent === 'First line\nSecond line')).toBeInTheDocument()
+    expect(screen.getByText((_, element) => element?.tagName === 'P' && element?.textContent === 'First line\nSecond line')).toBeInTheDocument()
   })
 
   it('hides body when foldState is true', () => {
@@ -77,5 +77,137 @@ describe('Card', () => {
     render(<Card title="A" body="B" hiddenState={true} onToggleHide={() => {}} />)
 
     expect(screen.getByRole('button', { name: 'Show card' })).toBeInTheDocument()
+  })
+
+  it('renders Move card up button when onMoveUp is provided', () => {
+    render(<Card title="A" body="B" onMoveUp={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Move card up' })).toBeInTheDocument()
+  })
+
+  it('renders Move card down button when onMoveDown is provided', () => {
+    render(<Card title="A" body="B" onMoveDown={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Move card down' })).toBeInTheDocument()
+  })
+
+  it('calls onMoveUp when up button is clicked', async () => {
+    const onMoveUp = vi.fn()
+    render(<Card title="A" body="B" onMoveUp={onMoveUp} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Move card up' }))
+    expect(onMoveUp).toHaveBeenCalledOnce()
+  })
+
+  it('calls onMoveDown when down button is clicked', async () => {
+    const onMoveDown = vi.fn()
+    render(<Card title="A" body="B" onMoveDown={onMoveDown} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Move card down' }))
+    expect(onMoveDown).toHaveBeenCalledOnce()
+  })
+
+  it('renders Remove card button when onClose is provided', () => {
+    render(<Card title="A" body="B" onClose={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Remove card' })).toBeInTheDocument()
+  })
+
+  it('calls onClose when Remove card button is clicked', async () => {
+    const onClose = vi.fn()
+    render(<Card title="A" body="B" onClose={onClose} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  describe('resize handle', () => {
+    it('renders a resize handle when not folded', () => {
+      render(<Card title="T" body="B" />)
+      expect(screen.getByRole('separator', { name: 'Resize card' })).toBeInTheDocument()
+    })
+
+    it('does not render a resize handle when folded', () => {
+      render(<Card title="T" body="B" foldState={true} />)
+      expect(screen.queryByRole('separator', { name: 'Resize card' })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('inline editing', () => {
+    it('title heading is focusable when onUpdate is provided', () => {
+      render(<Card title="My title" body="B" onUpdate={() => {}} />)
+      expect(screen.getByRole('heading', { level: 3, name: 'My title' })).toHaveAttribute('tabindex', '0')
+    })
+
+    it('clicking the title enters edit mode', async () => {
+      render(<Card title="My title" body="B" onUpdate={() => {}} />)
+      await userEvent.click(screen.getByRole('heading', { level: 3, name: 'My title' }))
+      expect(screen.getByRole('textbox', { name: 'Card title' })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Card body' })).toBeInTheDocument()
+    })
+
+    it('title heading has no tabindex when onUpdate is not provided', () => {
+      render(<Card title="My title" body="B" />)
+      expect(screen.getByRole('heading', { level: 3, name: 'My title' })).not.toHaveAttribute('tabindex')
+    })
+
+    it('body acts as a button when onUpdate is provided', () => {
+      render(<Card title="T" body="B" onUpdate={() => {}} />)
+      expect(screen.getByRole('button', { name: 'B' })).toBeInTheDocument()
+    })
+
+    it('clicking the body enters edit mode', async () => {
+      render(<Card title="T" body="Body text" onUpdate={() => {}} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Body text' }))
+      expect(screen.getByRole('textbox', { name: 'Card body' })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Card title' })).toBeInTheDocument()
+    })
+
+    it('edit mode shows draft title and body values', async () => {
+      render(<Card title="My title" body="My body" onUpdate={() => {}} />)
+      await userEvent.click(screen.getByRole('button', { name: 'My body' }))
+      expect(screen.getByDisplayValue('My title')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('My body')).toBeInTheDocument()
+    })
+
+    it('calls onUpdate with new values when focus leaves the card', async () => {
+      const onUpdate = vi.fn()
+      render(
+        <div>
+          <Card title="T" body="Old body" onUpdate={onUpdate} />
+          <button type="button">Outside</button>
+        </div>,
+      )
+      await userEvent.click(screen.getByRole('button', { name: 'Old body' }))
+      const textarea = screen.getByRole('textbox', { name: 'Card body' })
+      await userEvent.clear(textarea)
+      await userEvent.type(textarea, 'New body')
+      await userEvent.click(screen.getByRole('button', { name: 'Outside' }))
+      expect(onUpdate).toHaveBeenCalledWith({ title: 'T', body: 'New body' })
+    })
+
+    it('does not call onUpdate when values are unchanged on blur', async () => {
+      const onUpdate = vi.fn()
+      render(
+        <div>
+          <Card title="T" body="B" onUpdate={onUpdate} />
+          <button type="button">Outside</button>
+        </div>,
+      )
+      await userEvent.click(screen.getByRole('button', { name: 'B' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Outside' }))
+      expect(onUpdate).not.toHaveBeenCalled()
+    })
+
+    it('pressing Escape cancels editing and restores original values', async () => {
+      render(<Card title="T" body="B" onUpdate={() => {}} />)
+      await userEvent.click(screen.getByRole('button', { name: 'B' }))
+      const textarea = screen.getByRole('textbox', { name: 'Card body' })
+      await userEvent.clear(textarea)
+      await userEvent.type(textarea, 'Changed')
+      await userEvent.keyboard('{Escape}')
+      expect(screen.queryByRole('textbox', { name: 'Card body' })).not.toBeInTheDocument()
+      expect(screen.getByText('B')).toBeInTheDocument()
+    })
+
+    it('body is not clickable without onUpdate', () => {
+      render(<Card title="T" body="B" />)
+      expect(screen.queryByRole('button', { name: 'B' })).not.toBeInTheDocument()
+      expect(screen.getByText('B')).toBeInTheDocument()
+    })
   })
 })

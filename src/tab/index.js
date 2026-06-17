@@ -1,4 +1,6 @@
 export { createTab, createTabCard, nextPosition, reorderTabCard, setTabCardFold, setTabCardHidden } from './createTab'
 export { loadTabCards, loadTabs, saveTabCards, saveTabs } from './tabStorage'
+export { Dock } from './Dock'
 export { Tab } from './Tab'
+export { TransientCard } from './TransientCard'
 export { useTabs } from './useTabs'

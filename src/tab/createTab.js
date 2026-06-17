@@ -35,3 +35,9 @@ export function setTabCardFold(tabCards, cardId, foldState) {
 export function setTabCardHidden(tabCards, cardId, hiddenState) {
   return tabCards.map((tc) => (tc.cardId === cardId ? { ...tc, hiddenState } : tc))
 }
+
+export function removeTabCard(tabCards, cardId) {
+  return tabCards
+    .filter((tc) => tc.cardId !== cardId)
+    .map((tc, i) => ({ ...tc, position: i }))
+}

@@ -1,44 +1,40 @@
 import { useState } from 'react'
+import { Dock } from './tab/Dock'
 import { Tab } from './tab/Tab'
+import { TransientCard } from './tab/TransientCard'
 import { useTabs } from './tab/useTabs'
 import './App.css'
 
 function App() {
-  const { entries, addCard, fold, unfold, hide, unhide } = useTabs()
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
+  const { entries, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide } = useTabs()
+  const [transientOpen, setTransientOpen] = useState(false)
 
-  function handleSubmit(event) {
-    event.preventDefault()
+  function handleAddCard({ title, body }) {
     addCard({ title, body })
-    setTitle('')
-    setBody('')
+    setTransientOpen(false)
   }
 
   return (
     <div className="app-shell">
-      <form className="app-shell__form" onSubmit={handleSubmit}>
-        <input
-          className="app-shell__input"
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          placeholder="Title"
-          aria-label="Title"
+      <div className="app-shell__feed">
+        <Tab
+          entries={entries}
+          onReorder={reorder}
+          onUpdate={updateCard}
+          onRemove={removeCard}
+          onFold={fold}
+          onUnfold={unfold}
+          onHide={hide}
+          onUnhide={unhide}
         />
-        <textarea
-          className="app-shell__textarea"
-          value={body}
-          onChange={(event) => setBody(event.target.value)}
-          placeholder="Body"
-          aria-label="Body"
-          rows={3}
-        />
-        <button className="app-shell__button" type="submit">
-          Add card
-        </button>
-      </form>
-
-      <Tab entries={entries} onFold={fold} onUnfold={unfold} onHide={hide} onUnhide={unhide} />
+        {transientOpen && (
+          <TransientCard
+            onSubmit={handleAddCard}
+            onDismiss={() => setTransientOpen(false)}
+          />
+        )}
+      </div>
+      <Dock onAdd={() => setTransientOpen(true)} addDisabled={transientOpen} />
     </div>
   )
 }

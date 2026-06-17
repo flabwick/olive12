@@ -1,7 +1,7 @@
 import { Card } from '../card/Card'
 import './Tab.css'
 
-export function Tab({ entries = [], onFold, onUnfold, onHide, onUnhide }) {
+export function Tab({ entries = [], onReorder, onUpdate, onRemove, onFold, onUnfold, onHide, onUnhide }) {
   if (entries.length === 0) {
     return (
       <div className="tab tab--empty">
@@ -12,7 +12,7 @@ export function Tab({ entries = [], onFold, onUnfold, onHide, onUnhide }) {
 
   return (
     <ul className="tab">
-      {entries.map((entry) => (
+      {entries.map((entry, index) => (
         <li key={entry.card.id} className="tab__item">
           <Card
             title={entry.card.title}
@@ -29,6 +29,14 @@ export function Tab({ entries = [], onFold, onUnfold, onHide, onUnhide }) {
                 ? () => onUnhide?.(entry.card.id)
                 : () => onHide?.(entry.card.id)
             }
+            onMoveUp={index > 0 ? () => onReorder?.(entry.card.id, entry.position - 1) : undefined}
+            onMoveDown={
+              index < entries.length - 1
+                ? () => onReorder?.(entry.card.id, entry.position + 1)
+                : undefined
+            }
+            onUpdate={onUpdate ? (fields) => onUpdate(entry.card.id, fields) : undefined}
+            onClose={onRemove ? () => onRemove(entry.card.id) : undefined}
           />
         </li>
       ))}

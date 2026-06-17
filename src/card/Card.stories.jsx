@@ -10,6 +10,9 @@ export default {
     hiddenState: false,
     onToggleFold: () => {},
     onToggleHide: () => {},
+    onMoveUp: () => {},
+    onMoveDown: () => {},
+    onUpdate: () => {},
   },
 }
 
@@ -45,11 +48,30 @@ export const Hidden = {
   },
 }
 
+export const FirstCard = {
+  args: {
+    title: 'First card',
+    body: 'No up arrow.',
+    onMoveUp: undefined,
+  },
+}
+
+export const LastCard = {
+  args: {
+    title: 'Last card',
+    body: 'No down arrow.',
+    onMoveDown: undefined,
+  },
+}
+
 export const NoControls = {
   args: {
     title: 'No controls',
-    body: 'Used without fold/hide callbacks.',
+    body: 'Used without callbacks.',
     onToggleFold: undefined,
     onToggleHide: undefined,
+    onMoveUp: undefined,
+    onMoveDown: undefined,
+    onUpdate: undefined,
   },
 }

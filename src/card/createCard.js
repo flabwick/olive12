@@ -8,3 +8,7 @@ export function createCard({ title = '', body = '' } = {}) {
     updatedAt: Date.now(),
   }
 }
+
+export function updateCardFields(card, { title = card.title, body = card.body } = {}) {
+  return { ...card, title, body, updatedAt: Date.now() }
+}

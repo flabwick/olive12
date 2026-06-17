@@ -7,8 +7,11 @@ export default {
     title: 'Meeting notes',
     folded: false,
     hidden: false,
+    editing: false,
     onToggleFold: () => {},
     onToggleHide: () => {},
+    onMoveUp: () => {},
+    onMoveDown: () => {},
   },
 }
 
@@ -28,10 +31,34 @@ export const Hidden = {
   },
 }
 
+export const FirstCard = {
+  args: {
+    title: 'First card — no up arrow',
+    onMoveUp: undefined,
+  },
+}
+
+export const LastCard = {
+  args: {
+    title: 'Last card — no down arrow',
+    onMoveDown: undefined,
+  },
+}
+
+export const Editing = {
+  args: {
+    title: 'Editable title',
+    editing: true,
+    onTitleChange: () => {},
+  },
+}
+
 export const NoControls = {
   args: {
     title: 'Title only, no controls',
     onToggleFold: undefined,
     onToggleHide: undefined,
+    onMoveUp: undefined,
+    onMoveDown: undefined,
   },
 }

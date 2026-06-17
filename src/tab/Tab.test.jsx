@@ -105,4 +105,78 @@ describe('Tab', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Show card' }))
     expect(onUnhide).toHaveBeenCalledWith('card-1')
   })
+
+  describe('reorder', () => {
+    const twoEntries = [
+      makeEntry({ card: { id: 'a', title: 'A', body: 'a', type: 'text' }, position: 0 }),
+      makeEntry({ card: { id: 'b', title: 'B', body: 'b', type: 'text' }, position: 1 }),
+    ]
+
+    it('first card has no Move up button', () => {
+      render(<Tab entries={twoEntries} onReorder={() => {}} />)
+      const upButtons = screen.queryAllByRole('button', { name: 'Move card up' })
+      // Only one up button (for the second card), not two
+      expect(upButtons).toHaveLength(1)
+    })
+
+    it('last card has no Move down button', () => {
+      render(<Tab entries={twoEntries} onReorder={() => {}} />)
+      const downButtons = screen.queryAllByRole('button', { name: 'Move card down' })
+      expect(downButtons).toHaveLength(1)
+    })
+
+    it('single card has no reorder buttons', () => {
+      render(<Tab entries={[makeEntry()]} onReorder={() => {}} />)
+      expect(screen.queryByRole('button', { name: 'Move card up' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Move card down' })).not.toBeInTheDocument()
+    })
+
+    it('calls onReorder with (cardId, position-1) when up is clicked on second card', async () => {
+      const onReorder = vi.fn()
+      render(<Tab entries={twoEntries} onReorder={onReorder} />)
+      const upButtons = screen.getAllByRole('button', { name: 'Move card up' })
+      await userEvent.click(upButtons[0])
+      expect(onReorder).toHaveBeenCalledWith('b', 0)
+    })
+
+    it('calls onReorder with (cardId, position+1) when down is clicked on first card', async () => {
+      const onReorder = vi.fn()
+      render(<Tab entries={twoEntries} onReorder={onReorder} />)
+      const downButtons = screen.getAllByRole('button', { name: 'Move card down' })
+      await userEvent.click(downButtons[0])
+      expect(onReorder).toHaveBeenCalledWith('a', 1)
+    })
+  })
+
+  describe('remove', () => {
+    it('renders Remove card button when onRemove is provided', () => {
+      render(<Tab entries={[makeEntry()]} onRemove={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Remove card' })).toBeInTheDocument()
+    })
+
+    it('calls onRemove with the card id when X is clicked', async () => {
+      const onRemove = vi.fn()
+      render(<Tab entries={[makeEntry()]} onRemove={onRemove} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
+      expect(onRemove).toHaveBeenCalledWith('card-1')
+    })
+  })
+
+  describe('inline update', () => {
+    it('passes onUpdate to each Card', async () => {
+      const onUpdate = vi.fn()
+      render(
+        <div>
+          <Tab entries={[makeEntry()]} onUpdate={onUpdate} />
+          <button type="button">Outside</button>
+        </div>,
+      )
+      await userEvent.click(screen.getByRole('button', { name: 'Body text' }))
+      const textarea = screen.getByRole('textbox', { name: 'Card body' })
+      await userEvent.clear(textarea)
+      await userEvent.type(textarea, 'Updated')
+      await userEvent.click(screen.getByRole('button', { name: 'Outside' }))
+      expect(onUpdate).toHaveBeenCalledWith('card-1', { title: 'Title', body: 'Updated' })
+    })
+  })
 })

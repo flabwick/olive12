@@ -27,10 +27,68 @@
   white-space: pre-wrap;
   margin: 0;
   padding: 0.75rem;
+  cursor: text;
+}
+
+.card__body--edit {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: inherit;
+  line-height: 1.6;
+  letter-spacing: inherit;
+  color: #6b5d54;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  cursor: text;
+}
+
+.card__resize-handle {
+  height: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ns-resize;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.card__resize-handle::after {
+  content: '';
+  display: block;
+  width: 2rem;
+  height: 2px;
+  background: #c8b89a;
+  border-radius: 1px;
+  opacity: 0.4;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.card__resize-handle:hover::after {
+  opacity: 1;
+  background: #a89070;
 }
 
 @media (prefers-color-scheme: dark) {
-  .card__body {
+  .card__resize-handle::after {
+    background: #4a3a28;
+  }
+
+  .card__resize-handle:hover::after {
+    background: #7a5a38;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .card__body,
+  .card__body--edit {
     color: #9e8e80;
   }
 }

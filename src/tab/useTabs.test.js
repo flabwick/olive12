@@ -236,6 +236,74 @@ describe('useTabs', () => {
     expect(reloaded.current.entries[0].hiddenState).toBe(false)
   })
 
+  it('removeCard removes the card from entries and persists', () => {
+    vi.restoreAllMocks()
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('tab-uuid')
+      .mockReturnValueOnce('card-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    const { result } = renderHook(() => useTabs())
+
+    act(() => {
+      result.current.addCard({ title: 'Temp', body: 'Gone' })
+    })
+
+    expect(result.current.entries).toHaveLength(1)
+
+    act(() => {
+      result.current.removeCard('card-uuid')
+    })
+
+    expect(result.current.entries).toHaveLength(0)
+  })
+
+  it('removeCard persists removal across remount', () => {
+    vi.restoreAllMocks()
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('tab-uuid')
+      .mockReturnValueOnce('card-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    const { result, unmount } = renderHook(() => useTabs())
+
+    act(() => {
+      result.current.addCard({ title: 'Temp', body: '' })
+    })
+    act(() => {
+      result.current.removeCard('card-uuid')
+    })
+
+    unmount()
+
+    const { result: reloaded } = renderHook(() => useTabs())
+    expect(reloaded.current.entries).toHaveLength(0)
+  })
+
+  it('updateCard updates title and body and persists', () => {
+    vi.restoreAllMocks()
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('tab-uuid')
+      .mockReturnValueOnce('card-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    const { result } = renderHook(() => useTabs())
+
+    act(() => {
+      result.current.addCard({ title: 'Original', body: 'Old body' })
+    })
+
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_001_000)
+
+    act(() => {
+      result.current.updateCard('card-uuid', { title: 'Updated', body: 'New body' })
+    })
+
+    expect(result.current.entries[0].card.title).toBe('Updated')
+    expect(result.current.entries[0].card.body).toBe('New body')
+    expect(result.current.entries[0].card.updatedAt).toBe(1_700_000_001_000)
+  })
+
   it('remount preserves fold state', () => {
     vi.restoreAllMocks()
     vi.spyOn(crypto, 'randomUUID')

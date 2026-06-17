@@ -1,41 +1,47 @@
 # Tabs — implementation
 
-This document describes what is built in the tabs slice (build13). It introduces the `tab` and `tab_card` data shapes, localStorage-backed storage, a React hook owning per-tab card order and fold/hidden state, a dumb `Tab` component, and wires one default tab into `App`.
+This document describes what is built in the tabs slice (build13 and subsequent extensions). It covers the `tab` and `tab_card` data shapes, localStorage-backed storage, a React hook owning per-tab card state, a dumb `Tab` component, and supporting UI (`Dock`, `TransientCard`).
 
 For the long-term vault design see [design.md](./design.md). For the card primitive this slice builds on, see [cards.md](./cards.md).
 
 ## Milestone
 
-A single default tab with ordered cards. Cards survive a browser refresh with their fold and hidden state intact.
+A single default tab with ordered, editable, removable cards. All state (order, fold, hidden, card content) survives a browser refresh.
 
 Flow:
 
 1. On first load, `useTabs` finds no stored tabs and auto-creates a "Main" tab, persisting it immediately.
-2. User adds a card via the form in `App`. `useTabs.addCard()` creates the card and a `tab_card` join entry, saves both.
-3. `Tab` renders the active tab's entries in position order. Folded cards show title only; hidden cards render at reduced opacity (`.card--hidden`) but remain in the DOM.
-4. On reload, `useTabs` rehydrates tabs, tab_cards, and cards from localStorage — order, fold, and hidden state are all restored.
+2. User clicks **+** in the Dock. A `TransientCard` appears at the bottom of the feed for typing title and body.
+3. On submit, `useTabs.addCard()` creates the card and a `tab_card` join entry and persists both.
+4. Cards are displayed in position order. Folded cards show title only; hidden cards render at reduced opacity (`.card--hidden`) but remain in the DOM.
+5. Clicking a card's title or body enters inline edit mode. Changes are committed on blur and persisted via `useTabs.updateCard()`.
+6. Drag the resize handle at the bottom of a card body to shrink or expand it (ephemeral, not persisted).
+7. On reload, `useTabs` rehydrates tabs, tab_cards, and cards from localStorage — order, fold, hidden, and content are all restored.
 
 ## File map
 
 ```
 src/
   tab/
-    createTab.js          # Tab + tab_card factories; pure helpers (nextPosition, reorderTabCard, setTabCardFold, setTabCardHidden)
+    createTab.js          # Tab + tab_card factories; pure helpers
     createTab.test.js     # [TEST] Unit tests for all pure functions
     tabStorage.js         # localStorage read/write for tabs and tab_cards (no React)
-    tabStorage.test.js    # [TEST] Round-trip, empty, and corrupt-data tests for both keys
-    useTabs.js            # React hook: auto-init default tab, owns ordered/filtered entries
-    useTabs.test.js       # [TEST] State-transition tests: mount, addCard, reorder, fold/unfold, hide/unhide, remount
-    Tab.jsx               # Dumb component: entries → ordered cards; passes fold/hide toggle callbacks into Card
-    Tab.css               # Styles scoped to Tab
-    Tab.test.jsx          # [TEST] Render, fold hides body, hidden card renders dimmed, button callbacks
-    Tab.stories.jsx       # [STORY] Empty, MultipleCardsInOrder, OneFolded, OneHidden (dimmed)
+    tabStorage.test.js    # [TEST] Round-trip, empty, and corrupt-data tests
+    useTabs.js            # React hook: auto-init default tab, owns all tab state
+    useTabs.test.js       # [TEST] State-transition tests
+    Tab.jsx               # Dumb component: entries → ordered, interactive cards
+    Tab.css
+    Tab.test.jsx          # [TEST]
+    Tab.stories.jsx       # [STORY]
+    Dock.jsx              # Sticky bottom bar with + button
+    Dock.css
+    Dock.test.jsx         # [TEST]
+    TransientCard.jsx     # Inline card creation form (appears at bottom of feed)
+    TransientCard.css
+    TransientCard.test.jsx # [TEST]
     index.js              # Barrel exports for the tab module
-  App.jsx                 # Modified: uses useTabs + Tab, replaces CardShell flat list
-  App.css                 # Modified: added .app-shell form styles
-  CardShell.jsx           # Unchanged (throwaway wiring from build12, kept until formally retired)
-  CardShell.css           # Unchanged
-  CardShell.test.jsx      # Unchanged
+  App.jsx                 # Composes useTabs + Tab + Dock + TransientCard
+  App.css
 ```
 
 ## Data models
@@ -75,6 +81,7 @@ All in `createTab.js`. Immutable — none mutate their inputs.
 | `reorderTabCard(tabCards, cardId, toPosition)` | Returns new array with card moved and all positions renumbered |
 | `setTabCardFold(tabCards, cardId, foldState)` | Returns new array with matching card's `foldState` updated |
 | `setTabCardHidden(tabCards, cardId, hiddenState)` | Returns new array with matching card's `hiddenState` updated |
+| `removeTabCard(tabCards, cardId)` | Returns new array with the matching entry removed and positions renumbered |
 
 ## Storage
 
@@ -91,68 +98,80 @@ Keys: `olive12:tabs` (tabs array) and `olive12:tab_cards` (tab_cards array).
 
 `useTabs()` returns:
 
-| Property  | Type       | Description |
-|-----------|------------|-------------|
-| `tab`     | `Tab`      | The active tab (always the first/only tab for now) |
-| `entries` | `Entry[]`  | Cards in position order for the active tab. Each entry: `{ card, position, foldState, hiddenState }` |
-| `addCard` | `function` | `({ title, body }) → card` — creates card + tab_card, appends to state, persists both |
-| `reorder` | `function` | `(cardId, toPosition)` — reorders entries and renumbers positions |
-| `fold`    | `function` | `(cardId)` — sets foldState to `true` |
-| `unfold`  | `function` | `(cardId)` — sets foldState to `false` |
-| `hide`    | `function` | `(cardId)` — sets hiddenState to `true` |
-| `unhide`  | `function` | `(cardId)` — sets hiddenState to `false` |
+| Property     | Type       | Description |
+|--------------|------------|-------------|
+| `tab`        | `Tab`      | The active tab (always the first/only tab for now) |
+| `entries`    | `Entry[]`  | Cards in position order. Each entry: `{ card, position, foldState, hiddenState }` |
+| `addCard`    | `function` | `({ title, body }) → card` — creates card + tab_card, persists both |
+| `updateCard` | `function` | `(cardId, { title, body })` — updates card fields via `updateCardFields`, persists |
+| `removeCard` | `function` | `(cardId)` — removes the tab_card entry and the card from state, persists both |
+| `reorder`    | `function` | `(cardId, toPosition)` — reorders entries and renumbers positions |
+| `fold`       | `function` | `(cardId)` — sets foldState to `true` |
+| `unfold`     | `function` | `(cardId)` — sets foldState to `false` |
+| `hide`       | `function` | `(cardId)` — sets hiddenState to `true` |
+| `unhide`     | `function` | `(cardId)` — sets hiddenState to `false` |
 
 On first mount with no stored tabs, `useTabs` auto-creates and persists a "Main" tab. Persistence runs in `useEffect`s watching the three state slices (`tab`, `tabCards`, `cardsById`).
 
-## Display component
+## Display component — Tab
 
-`Tab({ entries, onFold, onUnfold, onHide, onUnhide })` is read-only/presentational.
+`Tab({ entries, onReorder, onUpdate, onRemove, onFold, onUnfold, onHide, onUnhide })` is presentational.
 
-- Renders **all** entries (including hidden ones); hidden cards receive `hiddenState={true}` which applies `.card--hidden` opacity via `Card`.
-- Renders entries in the order received (sort by `position` is the caller's responsibility — `useTabs` pre-sorts before returning `entries`).
-- Passes `foldState`, `hiddenState`, and computed toggle callbacks (`onToggleFold`, `onToggleHide`) into each `Card`. Fold/hide controls now live inside `Card`'s `CardHeader`, not in `Tab` itself.
-- Toggle callbacks are computed inline: if the entry is currently folded, the caret calls `onUnfold`; otherwise `onFold`. Same pattern for hide/unhide.
-- Empty state: renders a `"No cards yet."` message.
+- Renders all entries in the order received (caller is responsible for sorting by `position` — `useTabs` pre-sorts).
+- Passes fold/hidden state, toggle callbacks, reorder callbacks, update callback, and close callback into each `Card`.
+- Toggle callbacks are computed inline (if folded → calls `onUnfold`; otherwise `onFold`; same pattern for hide/unhide).
+- Reorder: first card has no up button; last card has no down button; single card has neither.
+- Empty state: renders `"No cards yet."` message.
+
+## Dock
+
+`Dock({ onAdd, addDisabled })` is a sticky bottom bar (`position: sticky; bottom: 0`) containing a **+** button.
+
+- `onAdd` is called when + is clicked.
+- `addDisabled` disables the + button (set to `true` while a `TransientCard` is open to prevent multiple simultaneous forms).
+- Renders as `role="toolbar" aria-label="Tab actions"`.
+
+## TransientCard
+
+`TransientCard({ onSubmit, onDismiss })` is an inline card-creation form that appears at the bottom of the feed.
+
+- Shows a type picker row: **Text** is enabled; Process, Portal, Container are present but disabled (stubs for future slices).
+- Title and body inputs with labels.
+- **Add →** button calls `onSubmit({ title, body })`.
+- **Cancel** button calls `onDismiss()`.
+- `App` sets `transientOpen` state: `true` opens the TransientCard and disables the Dock +; `false` closes it on submit or dismiss.
 
 ## App wiring
 
-`App.jsx` owns the add-card form (title, body, submit) and mounts `<Tab />`. `CardShell` is no longer rendered by `App` but its file and tests are unchanged.
+`App.jsx` owns:
+- `useTabs()` — all card and tab state
+- `transientOpen` state — whether the TransientCard is showing
+- `<Tab />` — renders the feed
+- `<TransientCard />` — rendered below the feed when open
+- `<Dock />` — sticky at the bottom, disabled while TransientCard is open
 
-## Test coverage
-
-Run all unit tests:
-
-```bash
-npm run test:run -- --project unit
-```
-
-Run Storybook tests:
-
-```bash
-npm run test:run -- --project storybook
-```
+## Tests
 
 | File | What it covers |
 |------|----------------|
-| `createTab.test.js` | `createTab` defaults + custom, unique ids; `createTabCard` defaults; `nextPosition`; `reorderTabCard` (later, earlier, same, not-found, clamp); `setTabCardFold` (fold, unfold, immutability); `setTabCardHidden` (hide, unhide, immutability) |
-| `tabStorage.test.js` | `loadTabs` (empty, round-trip, invalid JSON, not-array); `loadTabCards` (same + fold/hidden round-trip) |
-| `useTabs.test.js` | Default tab created on first mount, existing state loaded on mount, `addCard` appends + persists, sequential positions, `reorder` changes order, `fold`/`unfold`, `hide`/`unhide`, remount restores state, remount preserves fold state |
-| `Tab.test.jsx` | Empty state message, renders title+body, folded hides body, hidden card renders with `.card--hidden` class, position order, Collapse/Expand/Dim/Show buttons present, onFold/onUnfold/onHide/onUnhide called with correct cardId |
-| `Tab.stories.jsx` | Empty, MultipleCardsInOrder, OneFolded, OneHidden (dimmed, not absent) |
-
-Tests added build13: 40 unit + 4 storybook. Tests added card header/fold/hide styling pass: +21 unit + 7 storybook. Grand total: 83 unit + 18 storybook.
+| `createTab.test.js` | `createTab` defaults + custom, unique ids; `createTabCard` defaults; `nextPosition`; `reorderTabCard` (later, earlier, same, not-found, clamp); `setTabCardFold`; `setTabCardHidden`; `removeTabCard` (removes entry, renumbers positions) |
+| `tabStorage.test.js` | `loadTabs`/`loadTabCards` (empty, round-trip, invalid JSON, not-array, fold/hidden round-trip) |
+| `useTabs.test.js` | Default tab on first mount, existing state loaded on mount, `addCard`, `updateCard`, `removeCard`, `reorder`, `fold`/`unfold`, `hide`/`unhide`, remount restores state |
+| `Tab.test.jsx` | Empty state, renders title+body, folded hides body, hidden card renders with `.card--hidden`, position order, Collapse/Expand/Dim/Show/Move/Remove buttons, callbacks called with correct cardId, `onUpdate` passed through |
+| `Dock.test.jsx` | Renders + button, calls onAdd, disabled state |
+| `TransientCard.test.jsx` | Form fields, submit calls onSubmit with values, cancel calls onDismiss, disabled type stubs |
+| `App.test.jsx` | + button opens TransientCard, disables dock while open, submit creates card and closes form, cancel closes without creating |
 
 ## Not built yet
 
 Explicitly out of scope — do not add without a new slice:
 
-- Multiple tabs, tab switching UI, tab creation/deletion UI
+- Multiple tabs, tab switching UI, tab creation/deletion
 - Smart tabs (`kind: 'smart'`)
-- Drag-and-drop reorder (position is set programmatically; UI drag comes later)
-- A dedicated "reveal hidden cards" panel or filter (dimmed cards are visible and can be un-dimmed via their eye button; a bulk-reveal or filtered view is not built)
-- Dock, shelf, library
+- Drag-and-drop reorder (position is set via up/down buttons; drag-to-reorder is a separate slice)
+- A "reveal hidden cards" panel or bulk-reveal filter
+- Shelf, library
 - Portal, process, container card types
 - Dexie or Supabase persistence
 - `user_id` / multi-user
-- Card editing or deletion
 - Rich text, embeds
