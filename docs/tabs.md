@@ -85,14 +85,15 @@ All in `createTab.js`. Immutable — none mutate their inputs.
 
 ## Storage
 
-Keys: `olive12:tabs` (tabs array) and `olive12:tab_cards` (tab_cards array).
+Backed by IndexedDB via Dexie. See [storage.md](./storage.md) for the database schema and test setup.
 
 | Function | Behaviour |
 |---|---|
-| `loadTabs()` | Reads `olive12:tabs`. Returns `[]` if missing, invalid JSON, or not an array. |
-| `saveTabs(tabs)` | Writes full tabs array as JSON. |
-| `loadTabCards()` | Reads `olive12:tab_cards`. Same fallback as above. |
-| `saveTabCards(tabCards)` | Writes full tab_cards array as JSON. |
+| `getAllTabs()` | Returns all tab records from Dexie. |
+| `putTab(tab)` | Upserts a tab record. |
+| `getAllTabCards()` | Returns all tab_card records from Dexie. |
+| `putTabCard(tabCard)` | Upserts a tab_card record (compound key `[tabId, cardId]`). |
+| `deleteTabCard(tabId, cardId)` | Deletes a tab_card by compound key. |
 
 ## React hook
 
@@ -100,7 +101,8 @@ Keys: `olive12:tabs` (tabs array) and `olive12:tab_cards` (tab_cards array).
 
 | Property     | Type       | Description |
 |--------------|------------|-------------|
-| `tab`        | `Tab`      | The active tab (always the first/only tab for now) |
+| `tab`        | `Tab\|null` | The active tab; `null` before init completes |
+| `isReady`    | `boolean`  | `true` once async init has loaded all data from Dexie |
 | `entries`    | `Entry[]`  | Cards in position order. Each entry: `{ card, position, foldState, hiddenState }` |
 | `addCard`    | `function` | `({ title, body }) → card` — creates card + tab_card, persists both |
 | `updateCard` | `function` | `(cardId, { title, body })` — updates card fields via `updateCardFields`, persists |
@@ -111,7 +113,7 @@ Keys: `olive12:tabs` (tabs array) and `olive12:tab_cards` (tab_cards array).
 | `hide`       | `function` | `(cardId)` — sets hiddenState to `true` |
 | `unhide`     | `function` | `(cardId)` — sets hiddenState to `false` |
 
-On first mount with no stored tabs, `useTabs` auto-creates and persists a "Main" tab. Persistence runs in `useEffect`s watching the three state slices (`tab`, `tabCards`, `cardsById`).
+On first mount with no stored tabs, `useTabs` auto-creates and persists a "Main" tab. Initialisation is async: a single `useEffect` on mount awaits all three `getAllXxx()` calls in parallel, then sets state. Mutations call Dexie directly — there are no watcher `useEffect`s. `isReady` is `false` until init completes; `tab` is `null` and `entries` is `[]` during this window.
 
 ## Display component — Tab
 

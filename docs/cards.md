@@ -138,12 +138,13 @@ import { Card } from './card'
 
 ## Storage
 
-Plain functions with no React dependency.
+Backed by IndexedDB via Dexie. See [storage.md](./storage.md) for the database schema and test setup.
 
-| Function           | Behaviour |
-|--------------------|-----------|
-| `loadCards()`      | Reads `olive12:cards` from localStorage. Returns `[]` if missing, invalid JSON, or not an array. |
-| `saveCards(cards)` | Writes the full card array as JSON. |
+| Function | Behaviour |
+|---|---|
+| `getAllCards()` | Returns all card records from Dexie. |
+| `putCard(card)` | Upserts a card record with `dirty: true` (for future sync). |
+| `deleteCard(cardId)` | Deletes a card record by primary key. |
 
 ## React hook
 
@@ -151,10 +152,10 @@ Plain functions with no React dependency.
 
 | Property   | Type       | Description |
 |------------|------------|-------------|
-| `cards`    | `Card[]`   | Current list, loaded from storage on mount |
-| `addCard`  | `function` | `({ title, body }) => card` — creates via `createCard`, appends to state, persists |
+| `cards`    | `Card[]`   | Current list; starts `[]`, populated once the async `getAllCards()` call resolves on mount |
+| `addCard`  | `function` | `async ({ title, body }) => card` — creates via `createCard`, calls `putCard`, appends to state |
 
-Note: `useCards` is a lower-level hook. In practice, card mutation (update, remove, reorder) is owned by `useTabs`, which manages cards in the context of a tab. `useCards` is used by `useTabs` internally for card-level persistence.
+Note: `useCards` is a lower-level hook used only by `CardShell`. Card mutation (update, remove, reorder) within a tab is owned by `useTabs`, which calls `cardStorage` directly.
 
 ## Styling notes
 
