@@ -22,10 +22,15 @@ Flow:
 
 ```
 src/
+  vault/
+    VaultView.jsx         # Root layout: Tab / Shelf / Library pane switcher
+    VaultView.css
+    VaultView.test.jsx    # [TEST]
+    VaultView.stories.jsx # [STORY]
   tab/
     createTab.js          # Tab + tab_card factories; pure helpers
     createTab.test.js     # [TEST] Unit tests for all pure functions
-    tabStorage.js         # localStorage read/write for tabs and tab_cards (no React)
+    tabStorage.js         # Per-record tab and tab_card operations (no React)
     tabStorage.test.js    # [TEST] Round-trip, empty, and corrupt-data tests
     useTabs.js            # React hook: auto-init default tab, owns all tab state
     useTabs.test.js       # [TEST] State-transition tests
@@ -40,7 +45,7 @@ src/
     TransientCard.css
     TransientCard.test.jsx # [TEST]
     index.js              # Barrel exports for the tab module
-  App.jsx                 # Composes useTabs + Tab + Dock + TransientCard
+  App.jsx                 # Composes useTabs + VaultView
   App.css
 ```
 
@@ -114,10 +119,34 @@ Backed by IndexedDB via Dexie. See [storage.md](./storage.md) for the database s
 | `unhide`         | `function` | `(cardId)` — sets hiddenState to `false` |
 | `saveToShelf`    | `function` | `(cardId)` — sets card `location` to `'shelf'`, persists via `putCard` |
 | `moveToLibrary`  | `function` | `(cardId)` — sets card `location` to `'library'`, persists via `putCard` |
+| `shelfEntries`   | `Card[]`   | Derived: all cards with `location === 'shelf'`, sorted by `createdAt` ascending |
+| `libraryEntries` | `Card[]`   | Derived: all cards with `location === 'library'`, sorted by `updatedAt` descending |
 
-`location` is a data-only distinction in this slice — no Shelf/Library UI pane exists yet. The value is persisted to Dexie and surfaced via buttons on the card footer.
+`shelfEntries` and `libraryEntries` are pure computed arrays derived from `cardsById` — no extra storage calls. They update reactively whenever a card's `location` changes.
 
 On first mount with no stored tabs, `useTabs` auto-creates and persists a "Main" tab. Initialisation is async: a single `useEffect` on mount awaits all three `getAllXxx()` calls in parallel, then sets state. Mutations call Dexie directly — there are no watcher `useEffect`s. `isReady` is `false` until init completes; `tab` is `null` and `entries` is `[]` during this window.
+
+## VaultView component
+
+`VaultView` is the root layout component that composes Tab, Shelf, and Library panes behind a shared nav strip.
+
+| Prop | Type | Description |
+|---|---|---|
+| `view` | `'tab' \| 'shelf' \| 'library'` | Active pane |
+| `onChangeView` | `function` | `(nextView) => void` — called when nav button clicked |
+| `tabEntries` | `Entry[]` | Forwarded to `Tab` |
+| `shelfEntries` | `Card[]` | Cards to render in Shelf pane |
+| `libraryEntries` | `Card[]` | Cards to render in Library pane |
+| `onAddCard` | `function` | `({ title, body }) => void` — called on TransientCard submit |
+| `onUpdateCard` | `function` | `(cardId, fields) => void` — forwarded to Tab and individual Cards in Shelf/Library |
+| `onRemoveCard`, `onReorder`, `onFold`, `onUnfold`, `onHide`, `onUnhide` | `function` | Forwarded to Tab only |
+| `onSaveToShelf`, `onMoveToLibrary` | `function` | Forwarded to Tab and Shelf cards |
+
+Behavior:
+- When `view === 'tab'`: renders `Tab` + `TransientCard` + `Dock`. `transientOpen` toggle is local state inside `VaultView`.
+- When `view === 'shelf'`: renders a flat list of `Card` components from `shelfEntries`. Cards show "Move to Library" button when `onMoveToLibrary` is provided. No Dock.
+- When `view === 'library'`: renders a flat list of `Card` components from `libraryEntries`. No location button (terminal state). No Dock.
+- Empty states: `"Shelf is empty. Save some cards from your tab."` and `"Library is empty. Promote cards here when they're ready."`
 
 ## Display component — Tab
 
@@ -146,16 +175,18 @@ On first mount with no stored tabs, `useTabs` auto-creates and persists a "Main"
 - Title and body inputs with labels.
 - **Add →** button calls `onSubmit({ title, body })`.
 - **Cancel** button calls `onDismiss()`.
-- `App` sets `transientOpen` state: `true` opens the TransientCard and disables the Dock +; `false` closes it on submit or dismiss.
+- `VaultView` owns `transientOpen` state: `true` opens the TransientCard and disables the Dock +; `false` closes it on submit or dismiss.
 
 ## App wiring
 
 `App.jsx` owns:
 - `useTabs()` — all card and tab state
-- `transientOpen` state — whether the TransientCard is showing
-- `<Tab />` — renders the feed
-- `<TransientCard />` — rendered below the feed when open
-- `<Dock />` — sticky at the bottom, disabled while TransientCard is open
+- `view` state — active pane (`'tab' | 'shelf' | 'library'`); default `'tab'`
+- `<VaultView />` — root composition; receives all state and callbacks
+
+`VaultView` owns:
+- `transientOpen` state — whether the TransientCard is open (local UI toggle)
+- Renders Tab/Shelf/Library pane based on `view`
 
 ## Tests
 
@@ -163,11 +194,12 @@ On first mount with no stored tabs, `useTabs` auto-creates and persists a "Main"
 |------|----------------|
 | `createTab.test.js` | `createTab` defaults + custom, unique ids; `createTabCard` defaults; `nextPosition`; `reorderTabCard` (later, earlier, same, not-found, clamp); `setTabCardFold`; `setTabCardHidden`; `removeTabCard` (removes entry, renumbers positions) |
 | `tabStorage.test.js` | `loadTabs`/`loadTabCards` (empty, round-trip, invalid JSON, not-array, fold/hidden round-trip) |
-| `useTabs.test.js` | Default tab on first mount, existing state loaded on mount, `addCard`, `updateCard`, `removeCard`, `reorder`, `fold`/`unfold`, `hide`/`unhide`, `saveToShelf`/`moveToLibrary` (state + Dexie persistence), remount restores state |
+| `useTabs.test.js` | Default tab on first mount, existing state loaded on mount, `addCard`, `updateCard`, `removeCard`, `reorder`, `fold`/`unfold`, `hide`/`unhide`, `saveToShelf`/`moveToLibrary` (state + Dexie persistence), `shelfEntries`/`libraryEntries` derivation and sort order, remount restores state |
 | `Tab.test.jsx` | Empty state, renders title+body, folded hides body, hidden card renders with `.card--hidden`, position order, Collapse/Expand/Dim/Show/Move/Remove buttons, callbacks called with correct cardId, `onUpdate` passed through, `onSaveToShelf`/`onMoveToLibrary` forwarded |
+| `VaultView.test.jsx` | Three view buttons render; active button aria-selected; onChangeView called with correct view; tab/shelf/library panes show correct content; empty states; Dock only in tab view; location buttons in shelf; no location buttons in library |
 | `Dock.test.jsx` | Renders + button, calls onAdd, disabled state |
 | `TransientCard.test.jsx` | Form fields, submit calls onSubmit with values, cancel calls onDismiss, disabled type stubs |
-| `App.test.jsx` | + button opens TransientCard, disables dock while open, submit creates card and closes form, cancel closes without creating |
+| `App.test.jsx` | + button opens TransientCard, disables dock while open, submit creates card and closes form, cancel closes without creating; mounts with tab view active; Shelf/Library view switch shows empty states |
 
 ## Not built yet
 
@@ -177,8 +209,8 @@ Explicitly out of scope — do not add without a new slice:
 - Smart tabs (`kind: 'smart'`)
 - Drag-and-drop reorder (position is set via up/down buttons; drag-to-reorder is a separate slice)
 - A "reveal hidden cards" panel or bulk-reveal filter
-- Shelf, Library browsing UI / navigation (location value exists on cards but no separate pane)
+- Search, tagging, or filters over Shelf/Library
 - Portal, process, container card types
-- Dexie or Supabase persistence
+- Supabase sync
 - `user_id` / multi-user
 - Rich text, embeds

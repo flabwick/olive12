@@ -1,42 +1,45 @@
 import { useState } from 'react'
-import { Dock } from './tab/Dock'
-import { Tab } from './tab/Tab'
-import { TransientCard } from './tab/TransientCard'
+import { VaultView } from './vault/VaultView'
 import { useTabs } from './tab/useTabs'
 import './App.css'
 
 function App() {
-  const { entries, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide, saveToShelf, moveToLibrary } = useTabs()
-  const [transientOpen, setTransientOpen] = useState(false)
-
-  function handleAddCard({ title, body }) {
-    addCard({ title, body })
-    setTransientOpen(false)
-  }
+  const {
+    entries,
+    shelfEntries,
+    libraryEntries,
+    addCard,
+    updateCard,
+    removeCard,
+    reorder,
+    fold,
+    unfold,
+    hide,
+    unhide,
+    saveToShelf,
+    moveToLibrary,
+  } = useTabs()
+  const [view, setView] = useState('tab')
 
   return (
     <div className="app-shell">
-      <div className="app-shell__feed">
-        <Tab
-          entries={entries}
-          onReorder={reorder}
-          onUpdate={updateCard}
-          onRemove={removeCard}
-          onFold={fold}
-          onUnfold={unfold}
-          onHide={hide}
-          onUnhide={unhide}
-          onSaveToShelf={saveToShelf}
-          onMoveToLibrary={moveToLibrary}
-        />
-        {transientOpen && (
-          <TransientCard
-            onSubmit={handleAddCard}
-            onDismiss={() => setTransientOpen(false)}
-          />
-        )}
-      </div>
-      <Dock onAdd={() => setTransientOpen(true)} addDisabled={transientOpen} />
+      <VaultView
+        view={view}
+        onChangeView={setView}
+        tabEntries={entries}
+        shelfEntries={shelfEntries}
+        libraryEntries={libraryEntries}
+        onAddCard={addCard}
+        onUpdateCard={updateCard}
+        onRemoveCard={removeCard}
+        onReorder={reorder}
+        onFold={fold}
+        onUnfold={unfold}
+        onHide={hide}
+        onUnhide={unhide}
+        onSaveToShelf={saveToShelf}
+        onMoveToLibrary={moveToLibrary}
+      />
     </div>
   )
 }

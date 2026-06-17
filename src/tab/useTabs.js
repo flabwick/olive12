@@ -170,5 +170,13 @@ export function useTabs() {
     }))
     .filter((entry) => entry.card !== undefined)
 
-  return { tab, isReady, entries, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide, saveToShelf, moveToLibrary }
+  const shelfEntries = Object.values(cardsById)
+    .filter((c) => c.location === 'shelf')
+    .sort((a, b) => a.createdAt - b.createdAt)
+
+  const libraryEntries = Object.values(cardsById)
+    .filter((c) => c.location === 'library')
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+
+  return { tab, isReady, entries, shelfEntries, libraryEntries, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide, saveToShelf, moveToLibrary }
 }

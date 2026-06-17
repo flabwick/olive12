@@ -351,6 +351,142 @@ describe('useTabs', () => {
     expect(reloaded.current.entries[0].card.location).toBe('library')
   })
 
+  describe('shelfEntries and libraryEntries', () => {
+    it('new card appears in entries but not in shelfEntries or libraryEntries', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+      expect(result.current.entries).toHaveLength(1)
+      expect(result.current.shelfEntries).toHaveLength(0)
+      expect(result.current.libraryEntries).toHaveLength(0)
+    })
+
+    it('saveToShelf adds card to shelfEntries and keeps it in entries', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+      await act(async () => { await result.current.saveToShelf('card-uuid') })
+
+      expect(result.current.shelfEntries).toHaveLength(1)
+      expect(result.current.shelfEntries[0].id).toBe('card-uuid')
+      expect(result.current.entries).toHaveLength(1)
+      expect(result.current.libraryEntries).toHaveLength(0)
+    })
+
+    it('shelfEntries persists across remount', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result, unmount } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+      await act(async () => { await result.current.saveToShelf('card-uuid') })
+
+      unmount()
+      const { result: reloaded } = renderHook(() => useTabs())
+      await waitFor(() => expect(reloaded.current.isReady).toBe(true))
+
+      expect(reloaded.current.shelfEntries).toHaveLength(1)
+      expect(reloaded.current.shelfEntries[0].id).toBe('card-uuid')
+    })
+
+    it('moveToLibrary removes card from shelfEntries and adds to libraryEntries', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+      await act(async () => { await result.current.saveToShelf('card-uuid') })
+      await act(async () => { await result.current.moveToLibrary('card-uuid') })
+
+      expect(result.current.shelfEntries).toHaveLength(0)
+      expect(result.current.libraryEntries).toHaveLength(1)
+      expect(result.current.libraryEntries[0].id).toBe('card-uuid')
+    })
+
+    it('libraryEntries persists across remount', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result, unmount } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+      await act(async () => { await result.current.moveToLibrary('card-uuid') })
+
+      unmount()
+      const { result: reloaded } = renderHook(() => useTabs())
+      await waitFor(() => expect(reloaded.current.isReady).toBe(true))
+
+      expect(reloaded.current.libraryEntries).toHaveLength(1)
+      expect(reloaded.current.libraryEntries[0].id).toBe('card-uuid')
+      expect(reloaded.current.shelfEntries).toHaveLength(0)
+    })
+
+    it('shelfEntries is sorted by createdAt ascending', async () => {
+      await db.tabs.put({
+        id: 'sort-tab', name: 'Sort', kind: 'blank', order: 0,
+        createdAt: 1_000, updatedAt: 1_000,
+      })
+      await db.cards.put({
+        id: 'card-a', type: 'text', title: 'A', body: '', location: 'shelf',
+        createdAt: 2_000, updatedAt: 2_000, dirty: true,
+      })
+      await db.cards.put({
+        id: 'card-b', type: 'text', title: 'B', body: '', location: 'shelf',
+        createdAt: 1_000, updatedAt: 1_000, dirty: true,
+      })
+      await db.tab_cards.put({ tabId: 'sort-tab', cardId: 'card-a', position: 0, foldState: false, hiddenState: false })
+      await db.tab_cards.put({ tabId: 'sort-tab', cardId: 'card-b', position: 1, foldState: false, hiddenState: false })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(result.current.shelfEntries[0].id).toBe('card-b') // createdAt 1000 comes before 2000
+      expect(result.current.shelfEntries[1].id).toBe('card-a')
+    })
+
+    it('libraryEntries is sorted by updatedAt descending', async () => {
+      await db.tabs.put({
+        id: 'sort-tab', name: 'Sort', kind: 'blank', order: 0,
+        createdAt: 1_000, updatedAt: 1_000,
+      })
+      await db.cards.put({
+        id: 'card-a', type: 'text', title: 'A', body: '', location: 'library',
+        createdAt: 1_000, updatedAt: 3_000, dirty: true,
+      })
+      await db.cards.put({
+        id: 'card-b', type: 'text', title: 'B', body: '', location: 'library',
+        createdAt: 1_000, updatedAt: 1_000, dirty: true,
+      })
+      await db.tab_cards.put({ tabId: 'sort-tab', cardId: 'card-a', position: 0, foldState: false, hiddenState: false })
+      await db.tab_cards.put({ tabId: 'sort-tab', cardId: 'card-b', position: 1, foldState: false, hiddenState: false })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(result.current.libraryEntries[0].id).toBe('card-a') // updatedAt 3000 > 1000 = most recent first
+      expect(result.current.libraryEntries[1].id).toBe('card-b')
+    })
+  })
+
   it('removeCard persists removal across remount', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')

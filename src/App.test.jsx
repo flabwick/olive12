@@ -59,4 +59,28 @@ describe('App', () => {
     expect(screen.queryByLabelText('Title')).not.toBeInTheDocument()
     expect(screen.getByText('No cards yet.')).toBeInTheDocument()
   })
+
+  it('mounts with tab view active', async () => {
+    render(<App />)
+    await waitFor(() => screen.getByRole('tab', { name: 'Tab' }))
+    expect(screen.getByRole('tab', { name: 'Tab' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('clicking Shelf switches to shelf empty state', async () => {
+    render(<App />)
+    await waitFor(() => screen.getByRole('tab', { name: 'Shelf' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Shelf' }))
+    expect(
+      screen.getByText('Shelf is empty. Save some cards from your tab.'),
+    ).toBeInTheDocument()
+  })
+
+  it('clicking Library switches to library empty state', async () => {
+    render(<App />)
+    await waitFor(() => screen.getByRole('tab', { name: 'Library' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Library' }))
+    expect(
+      screen.getByText("Library is empty. Promote cards here when they're ready."),
+    ).toBeInTheDocument()
+  })
 })
