@@ -23,7 +23,11 @@ src/
     createCard.js          # Card factory (plain JS, no React)
     createCard.test.js
     createCard.stories.jsx
-    Card.jsx               # Read-only display component
+    CardHeader.jsx         # Dumb header strip: title + caret (fold) + eye (hide) buttons
+    CardHeader.css
+    CardHeader.test.jsx    # [TEST]
+    CardHeader.stories.jsx # [STORY]
+    Card.jsx               # Display component; composes CardHeader; accepts fold/hidden state + callbacks
     Card.css
     Card.test.jsx
     Card.stories.jsx
@@ -32,10 +36,10 @@ src/
     useCards.js            # React hook over storage
     useCards.test.js
     index.js               # Barrel exports
-  CardShell.jsx            # Throwaway UI wiring hook → Card (mounted by App)
+  CardShell.jsx            # Throwaway UI wiring hook → Card (mounted by App pre-build13)
   CardShell.css
   CardShell.test.jsx
-  App.jsx                  # Renders <CardShell />
+  App.jsx                  # Now mounts Tab via useTabs, not CardShell
 ```
 
 Build order used for this slice:
@@ -65,17 +69,53 @@ const card = createCard({ title: 'Notes', body: 'Buy milk' })
 
 There is no update path yet — `updatedAt` is set once at creation and never changed.
 
+## CardHeader component
+
+`CardHeader({ title, folded, hidden, onToggleFold, onToggleHide })` is a dumb header strip rendered at the top of every card.
+
+| Prop | Type | Description |
+|---|---|---|
+| `title` | string | Displayed as an `h3` |
+| `folded` | boolean | Controls caret rotation and `aria-label` on the fold button |
+| `hidden` | boolean | Controls eye icon variant and `aria-label` on the hide button |
+| `onToggleFold` | function \| undefined | If provided, renders the caret button; click calls this |
+| `onToggleHide` | function \| undefined | If provided, renders the eye button; click calls this |
+
+Buttons are only rendered when the corresponding callback is provided — CardShell-style usage (no callbacks) gets a title-only header with no controls.
+
+Aria labels: **Collapse card / Expand card** (fold), **Dim card / Show card** (hide).
+
 ## Display component
 
-`Card({ title, body })` is read-only. It renders a bordered panel with a heading and body text. Line breaks in `body` are preserved via `white-space: pre-wrap`.
+`Card({ title, body, foldState, hiddenState, onToggleFold, onToggleHide })` renders a bordered card with a `CardHeader` and an optional body.
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `title` | string | — | Forwarded to `CardHeader` |
+| `body` | string | — | Rendered below header; hidden when `foldState` is true |
+| `foldState` | boolean | `false` | When true, body is not rendered |
+| `hiddenState` | boolean | `false` | When true, applies `.card--hidden` (reduced opacity); card remains in the DOM |
+| `onToggleFold` | function | undefined | Forwarded to `CardHeader`; omit to suppress the fold button |
+| `onToggleHide` | function | undefined | Forwarded to `CardHeader`; omit to suppress the hide button |
 
 ```jsx
-import { Card } from './card'
+import { Card } from ‘./card’
 
+// Basic (no controls)
 <Card title="Meeting notes" body="Discuss roadmap" />
+
+// With fold/hide controls
+<Card
+  title="Meeting notes"
+  body="Discuss roadmap"
+  foldState={false}
+  hiddenState={false}
+  onToggleFold={() => toggleFold(id)}
+  onToggleHide={() => toggleHide(id)}
+/>
 ```
 
-Styling lives in `Card.css` and uses the app’s CSS variables (`--border`, `--bg`, `--text`, etc.) from `index.css`.
+Styling uses hardcoded warm parchment/espresso values in `Card.css` and `CardHeader.css`, following the refined neo-brutalism visual brief. Hidden cards use `opacity: 0.38` via `.card--hidden`; folded cards simply omit the `.card__body` element.
 
 ## Storage
 
@@ -158,7 +198,8 @@ npm run test:run -- --project unit
 | File | What it covers |
 |------|----------------|
 | `createCard.test.js` | Default fields, custom title/body, unique ids |
-| `Card.test.jsx` | Renders title/body, preserves line breaks |
+| `CardHeader.test.jsx` | Renders title; no buttons without callbacks; fold/hide callbacks called; correct aria-labels for folded/hidden states |
+| `Card.test.jsx` | Renders title/body, preserves line breaks; foldState hides body; hiddenState applies `.card--hidden`; onToggleFold/onToggleHide callbacks forwarded; no buttons when no callbacks |
 | `cardStorage.test.js` | Empty load, save/reload round trip, corrupt data |
 | `useCards.test.js` | Load on mount, add + persist, remount reload |
 | `CardShell.test.jsx` | UI create flow, remount survival |
@@ -174,7 +215,8 @@ npm run storybook
 
 | Story file | Stories |
 |------------|---------|
-| `Card.stories.jsx` | Default, Empty, MultilineBody |
+| `CardHeader.stories.jsx` | Default, Folded (caret rotated), Hidden (eye-slash icon), NoControls |
+| `Card.stories.jsx` | Default, Empty, MultilineBody, Folded, Hidden, NoControls |
 | `createCard.stories.jsx` | Default, Empty (JSON preview), WithContent |
 
 `createCard` stories use small render helpers because the factory is not a component — some stories show raw JSON, others pipe output into `Card`.

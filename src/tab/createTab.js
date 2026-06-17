@@ -1,0 +1,37 @@
+export function createTab({ name = 'New tab', order = 0 } = {}) {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    kind: 'blank',
+    order,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  }
+}
+
+export function createTabCard({ tabId, cardId, position }) {
+  return { tabId, cardId, position, foldState: false, hiddenState: false }
+}
+
+export function nextPosition(tabCards) {
+  return tabCards.length
+}
+
+export function reorderTabCard(tabCards, cardId, toPosition) {
+  const clamped = Math.max(0, Math.min(toPosition, tabCards.length - 1))
+  const from = tabCards.findIndex((tc) => tc.cardId === cardId)
+  if (from === -1 || from === clamped) return tabCards
+
+  const moved = tabCards[from]
+  const without = tabCards.filter((_, i) => i !== from)
+  const result = [...without.slice(0, clamped), moved, ...without.slice(clamped)]
+  return result.map((tc, i) => ({ ...tc, position: i }))
+}
+
+export function setTabCardFold(tabCards, cardId, foldState) {
+  return tabCards.map((tc) => (tc.cardId === cardId ? { ...tc, foldState } : tc))
+}
+
+export function setTabCardHidden(tabCards, cardId, hiddenState) {
+  return tabCards.map((tc) => (tc.cardId === cardId ? { ...tc, hiddenState } : tc))
+}

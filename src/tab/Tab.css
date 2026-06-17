@@ -1,0 +1,24 @@
+.tab {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tab--empty {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tab__empty-message {
+  color: #8b7a6a;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.tab__item {
+  display: block;
+}

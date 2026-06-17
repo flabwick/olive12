@@ -1,3 +1,36 @@
+.app-shell {
+  padding: 2rem 1.5rem;
+  text-align: left;
+}
+
+.app-shell__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.app-shell__input,
+.app-shell__textarea {
+  font: inherit;
+  border: 1px solid var(--border, #e5e4e7);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  background: var(--bg, #fff);
+  color: var(--text-h, #08060d);
+}
+
+.app-shell__button {
+  align-self: flex-start;
+  font: inherit;
+  border: 1px solid var(--border, #e5e4e7);
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--code-bg, #f4f3ec);
+  color: var(--text-h, #08060d);
+  cursor: pointer;
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;
