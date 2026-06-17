@@ -6,7 +6,7 @@ import { useTabs } from './tab/useTabs'
 import './App.css'
 
 function App() {
-  const { entries, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide } = useTabs()
+  const { entries, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide, saveToShelf, moveToLibrary } = useTabs()
   const [transientOpen, setTransientOpen] = useState(false)
 
   function handleAddCard({ title, body }) {
@@ -26,6 +26,8 @@ function App() {
           onUnfold={unfold}
           onHide={hide}
           onUnhide={unhide}
+          onSaveToShelf={saveToShelf}
+          onMoveToLibrary={moveToLibrary}
         />
         {transientOpen && (
           <TransientCard

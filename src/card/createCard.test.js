@@ -17,6 +17,7 @@ describe('createCard', () => {
       type: 'text',
       title: '',
       body: '',
+      location: 'none',
       createdAt: 1_700_000_000_000,
       updatedAt: 1_700_000_000_000,
     })
@@ -28,9 +29,14 @@ describe('createCard', () => {
       type: 'text',
       title: 'Notes',
       body: 'Buy milk',
+      location: 'none',
       createdAt: 1_700_000_000_000,
       updatedAt: 1_700_000_000_000,
     })
+  })
+
+  it('defaults location to "none"', () => {
+    expect(createCard().location).toBe('none')
   })
 
   it('assigns a unique id to each card', () => {
@@ -48,6 +54,7 @@ describe('updateCardFields', () => {
     type: 'text',
     title: 'Old title',
     body: 'Old body',
+    location: 'none',
     createdAt: 1_700_000_000_000,
     updatedAt: 1_700_000_000_000,
   }
@@ -79,9 +86,24 @@ describe('updateCardFields', () => {
     expect(result.title).toBe('Old title')
   })
 
+  it('preserves location when not provided', () => {
+    const shelfCard = { ...base, location: 'shelf' }
+    expect(updateCardFields(shelfCard, { title: 'New' }).location).toBe('shelf')
+  })
+
+  it('updates location to "shelf"', () => {
+    expect(updateCardFields(base, { location: 'shelf' }).location).toBe('shelf')
+  })
+
+  it('updates location from "shelf" to "library"', () => {
+    const shelfCard = { ...base, location: 'shelf' }
+    expect(updateCardFields(shelfCard, { location: 'library' }).location).toBe('library')
+  })
+
   it('does not mutate the original card', () => {
-    updateCardFields(base, { title: 'New title' })
+    updateCardFields(base, { title: 'New title', location: 'shelf' })
     expect(base.title).toBe('Old title')
+    expect(base.location).toBe('none')
   })
 
   it('stamps updatedAt with Date.now()', () => {

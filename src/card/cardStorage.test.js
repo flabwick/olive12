@@ -48,4 +48,20 @@ describe('cardStorage', () => {
     await deleteCard(card.id)
     expect(await getAllCards()).toEqual([])
   })
+
+  it('putCard round-trips the location field', async () => {
+    const card = { ...createCard({ title: 'A', body: 'B' }), location: 'shelf' }
+    await putCard(card)
+    const cards = await getAllCards()
+    expect(cards[0].location).toBe('shelf')
+  })
+
+  it('putCard preserves updated location on upsert', async () => {
+    const card = createCard({ title: 'A', body: 'B' })
+    await putCard(card)
+    await putCard({ ...card, location: 'library' })
+    const cards = await getAllCards()
+    expect(cards).toHaveLength(1)
+    expect(cards[0].location).toBe('library')
+  })
 })

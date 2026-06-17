@@ -1,7 +1,7 @@
 import { Card } from '../card/Card'
 import './Tab.css'
 
-export function Tab({ entries = [], onReorder, onUpdate, onRemove, onFold, onUnfold, onHide, onUnhide }) {
+export function Tab({ entries = [], onReorder, onUpdate, onRemove, onFold, onUnfold, onHide, onUnhide, onSaveToShelf, onMoveToLibrary }) {
   if (entries.length === 0) {
     return (
       <div className="tab tab--empty">
@@ -19,6 +19,7 @@ export function Tab({ entries = [], onReorder, onUpdate, onRemove, onFold, onUnf
             body={entry.card.body}
             foldState={entry.foldState}
             hiddenState={entry.hiddenState}
+            location={entry.card.location}
             onToggleFold={
               entry.foldState
                 ? () => onUnfold?.(entry.card.id)
@@ -37,6 +38,8 @@ export function Tab({ entries = [], onReorder, onUpdate, onRemove, onFold, onUnf
             }
             onUpdate={onUpdate ? (fields) => onUpdate(entry.card.id, fields) : undefined}
             onClose={onRemove ? () => onRemove(entry.card.id) : undefined}
+            onSaveToShelf={onSaveToShelf ? () => onSaveToShelf(entry.card.id) : undefined}
+            onMoveToLibrary={onMoveToLibrary ? () => onMoveToLibrary(entry.card.id) : undefined}
           />
         </li>
       ))}

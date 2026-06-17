@@ -4,11 +4,12 @@ export function createCard({ title = '', body = '' } = {}) {
     type: 'text',
     title,
     body,
+    location: 'none',
     createdAt: Date.now(),
     updatedAt: Date.now(),
   }
 }
 
-export function updateCardFields(card, { title = card.title, body = card.body } = {}) {
-  return { ...card, title, body, updatedAt: Date.now() }
+export function updateCardFields(card, { title = card.title, body = card.body, location = card.location } = {}) {
+  return { ...card, title, body, location, updatedAt: Date.now() }
 }

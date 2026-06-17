@@ -37,10 +37,18 @@ src/
 | `type`      | string | Always `'text'` for now        |
 | `title`     | string |                                |
 | `body`      | string | Plain text; newlines preserved |
+| `location`  | string | `'none' \| 'shelf' \| 'library'`; default `'none'` |
 | `createdAt` | number | `Date.now()` at creation       |
 | `updatedAt` | number | Updated by `updateCardFields`  |
 
-`updateCardFields(card, { title, body })` returns a new card object with updated fields and a refreshed `updatedAt`. Fields default to the existing values so partial updates are safe.
+`updateCardFields(card, { title, body, location })` returns a new card object with updated fields and a refreshed `updatedAt`. Fields default to the existing values so partial updates are safe.
+
+**`location` semantics:**
+- `'none'` — card lives only in its tab; not yet committed to the vault.
+- `'shelf'` — card has been saved to the Shelf (chronological, unsorted save target).
+- `'library'` — card has been promoted to the Library (organised, indexed save target).
+
+Currently `location` is a data-only distinction. No separate Shelf/Library UI surface exists yet; all cards remain visible in their tabs regardless of location. The value is persisted to Dexie and displayed via buttons on the card.
 
 ```js
 import { createCard, updateCardFields } from './card'
@@ -94,6 +102,9 @@ Aria labels: **Collapse card / Expand card** (fold), **Dim card / Show card** (h
 | `onMoveDown` | function | undefined | Forwarded to CardHeader down arrow |
 | `onUpdate` | function | undefined | `({ title, body }) => void` — when provided, enables inline editing (title and body become clickable) |
 | `onClose` | function | undefined | Forwarded to CardHeader X button |
+| `location` | string | `'none'` | `'none' \| 'shelf' \| 'library'` — controls which footer button (if any) is shown |
+| `onSaveToShelf` | function | undefined | Called when the "Save to Shelf" button is clicked; only rendered when `location === 'none'` |
+| `onMoveToLibrary` | function | undefined | Called when the "Move to Library" button is clicked; only rendered when `location === 'shelf'` |
 
 ### Inline editing
 
@@ -173,6 +184,17 @@ Note: `useCards` is a lower-level hook used only by `CardShell`. Card mutation (
 | `Card.test.jsx` | Renders title/body; line breaks preserved; foldState hides body and resize handle; hiddenState applies `.card--hidden`; resize handle present/absent; inline editing (click title enters edit mode with pre-selection, click body enters edit mode, commit on blur, cancel on Escape, no save if unchanged, body not clickable without onUpdate); move/close buttons forwarded |
 | `cardStorage.test.js` | Empty load, save/reload round trip, corrupt data |
 | `useCards.test.js` | Load on mount, add + persist, remount reload |
+
+## Card footer
+
+A `.card__footer` strip is rendered below the body area (outside the fold condition — visible even when folded) when there is an active location button. The button is determined by `location` and the callbacks provided:
+
+| `location` | `onSaveToShelf` present | `onMoveToLibrary` present | Result |
+|---|---|---|---|
+| `'none'` | yes | — | "Save to Shelf" button |
+| `'shelf'` | — | yes | "Move to Library" button |
+| `'library'` | — | — | No button (location terminal) |
+| any | neither | neither | Footer not rendered |
 
 ## Not built yet
 

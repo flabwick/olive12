@@ -110,19 +110,24 @@ Backed by IndexedDB via Dexie. See [storage.md](./storage.md) for the database s
 | `reorder`    | `function` | `(cardId, toPosition)` — reorders entries and renumbers positions |
 | `fold`       | `function` | `(cardId)` — sets foldState to `true` |
 | `unfold`     | `function` | `(cardId)` — sets foldState to `false` |
-| `hide`       | `function` | `(cardId)` — sets hiddenState to `true` |
-| `unhide`     | `function` | `(cardId)` — sets hiddenState to `false` |
+| `hide`           | `function` | `(cardId)` — sets hiddenState to `true` |
+| `unhide`         | `function` | `(cardId)` — sets hiddenState to `false` |
+| `saveToShelf`    | `function` | `(cardId)` — sets card `location` to `'shelf'`, persists via `putCard` |
+| `moveToLibrary`  | `function` | `(cardId)` — sets card `location` to `'library'`, persists via `putCard` |
+
+`location` is a data-only distinction in this slice — no Shelf/Library UI pane exists yet. The value is persisted to Dexie and surfaced via buttons on the card footer.
 
 On first mount with no stored tabs, `useTabs` auto-creates and persists a "Main" tab. Initialisation is async: a single `useEffect` on mount awaits all three `getAllXxx()` calls in parallel, then sets state. Mutations call Dexie directly — there are no watcher `useEffect`s. `isReady` is `false` until init completes; `tab` is `null` and `entries` is `[]` during this window.
 
 ## Display component — Tab
 
-`Tab({ entries, onReorder, onUpdate, onRemove, onFold, onUnfold, onHide, onUnhide })` is presentational.
+`Tab({ entries, onReorder, onUpdate, onRemove, onFold, onUnfold, onHide, onUnhide, onSaveToShelf, onMoveToLibrary })` is presentational.
 
 - Renders all entries in the order received (caller is responsible for sorting by `position` — `useTabs` pre-sorts).
 - Passes fold/hidden state, toggle callbacks, reorder callbacks, update callback, and close callback into each `Card`.
 - Toggle callbacks are computed inline (if folded → calls `onUnfold`; otherwise `onFold`; same pattern for hide/unhide).
 - Reorder: first card has no up button; last card has no down button; single card has neither.
+- Location buttons (`onSaveToShelf`, `onMoveToLibrary`) are forwarded to each `Card` with the card id bound; omitted when the parent does not supply the callback.
 - Empty state: renders `"No cards yet."` message.
 
 ## Dock
@@ -158,8 +163,8 @@ On first mount with no stored tabs, `useTabs` auto-creates and persists a "Main"
 |------|----------------|
 | `createTab.test.js` | `createTab` defaults + custom, unique ids; `createTabCard` defaults; `nextPosition`; `reorderTabCard` (later, earlier, same, not-found, clamp); `setTabCardFold`; `setTabCardHidden`; `removeTabCard` (removes entry, renumbers positions) |
 | `tabStorage.test.js` | `loadTabs`/`loadTabCards` (empty, round-trip, invalid JSON, not-array, fold/hidden round-trip) |
-| `useTabs.test.js` | Default tab on first mount, existing state loaded on mount, `addCard`, `updateCard`, `removeCard`, `reorder`, `fold`/`unfold`, `hide`/`unhide`, remount restores state |
-| `Tab.test.jsx` | Empty state, renders title+body, folded hides body, hidden card renders with `.card--hidden`, position order, Collapse/Expand/Dim/Show/Move/Remove buttons, callbacks called with correct cardId, `onUpdate` passed through |
+| `useTabs.test.js` | Default tab on first mount, existing state loaded on mount, `addCard`, `updateCard`, `removeCard`, `reorder`, `fold`/`unfold`, `hide`/`unhide`, `saveToShelf`/`moveToLibrary` (state + Dexie persistence), remount restores state |
+| `Tab.test.jsx` | Empty state, renders title+body, folded hides body, hidden card renders with `.card--hidden`, position order, Collapse/Expand/Dim/Show/Move/Remove buttons, callbacks called with correct cardId, `onUpdate` passed through, `onSaveToShelf`/`onMoveToLibrary` forwarded |
 | `Dock.test.jsx` | Renders + button, calls onAdd, disabled state |
 | `TransientCard.test.jsx` | Form fields, submit calls onSubmit with values, cancel calls onDismiss, disabled type stubs |
 | `App.test.jsx` | + button opens TransientCard, disables dock while open, submit creates card and closes form, cancel closes without creating |
@@ -172,7 +177,7 @@ Explicitly out of scope — do not add without a new slice:
 - Smart tabs (`kind: 'smart'`)
 - Drag-and-drop reorder (position is set via up/down buttons; drag-to-reorder is a separate slice)
 - A "reveal hidden cards" panel or bulk-reveal filter
-- Shelf, library
+- Shelf, Library browsing UI / navigation (location value exists on cards but no separate pane)
 - Portal, process, container card types
 - Dexie or Supabase persistence
 - `user_id` / multi-user

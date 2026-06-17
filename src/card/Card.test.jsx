@@ -210,4 +210,46 @@ describe('Card', () => {
       expect(screen.getByText('B')).toBeInTheDocument()
     })
   })
+
+  describe('location', () => {
+    it('renders Save to Shelf button when location is "none" and onSaveToShelf is provided', () => {
+      render(<Card title="T" body="B" location="none" onSaveToShelf={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Save to Shelf' })).toBeInTheDocument()
+    })
+
+    it('calls onSaveToShelf when Save to Shelf is clicked', async () => {
+      const onSaveToShelf = vi.fn()
+      render(<Card title="T" body="B" location="none" onSaveToShelf={onSaveToShelf} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
+      expect(onSaveToShelf).toHaveBeenCalledOnce()
+    })
+
+    it('renders Move to Library button when location is "shelf" and onMoveToLibrary is provided', () => {
+      render(<Card title="T" body="B" location="shelf" onMoveToLibrary={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Move to Library' })).toBeInTheDocument()
+    })
+
+    it('calls onMoveToLibrary when Move to Library is clicked', async () => {
+      const onMoveToLibrary = vi.fn()
+      render(<Card title="T" body="B" location="shelf" onMoveToLibrary={onMoveToLibrary} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Move to Library' }))
+      expect(onMoveToLibrary).toHaveBeenCalledOnce()
+    })
+
+    it('renders no location button when location is "library"', () => {
+      render(<Card title="T" body="B" location="library" onSaveToShelf={() => {}} onMoveToLibrary={() => {}} />)
+      expect(screen.queryByRole('button', { name: 'Save to Shelf' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Move to Library' })).not.toBeInTheDocument()
+    })
+
+    it('renders no location button when callbacks are not provided', () => {
+      render(<Card title="T" body="B" location="none" />)
+      expect(screen.queryByRole('button', { name: 'Save to Shelf' })).not.toBeInTheDocument()
+    })
+
+    it('Save to Shelf button visible when card is folded', () => {
+      render(<Card title="T" body="B" location="none" foldState={true} onSaveToShelf={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Save to Shelf' })).toBeInTheDocument()
+    })
+  })
 })

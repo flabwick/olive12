@@ -15,12 +15,15 @@ export function Card({
   body,
   foldState = false,
   hiddenState = false,
+  location = 'none',
   onToggleFold,
   onToggleHide,
   onMoveUp,
   onMoveDown,
   onUpdate,
   onClose,
+  onSaveToShelf,
+  onMoveToLibrary,
 }) {
   const [editing, setEditing] = useState(false)
   const [draftTitle, setDraftTitle] = useState(title)
@@ -110,6 +113,17 @@ export function Card({
     document.addEventListener('mouseup', onMouseUp)
   }
 
+  const locationButton =
+    location === 'none' && onSaveToShelf ? (
+      <button type="button" className="card__location-btn" onClick={onSaveToShelf}>
+        Save to Shelf
+      </button>
+    ) : location === 'shelf' && onMoveToLibrary ? (
+      <button type="button" className="card__location-btn" onClick={onMoveToLibrary}>
+        Move to Library
+      </button>
+    ) : null
+
   return (
     <div
       className={`card${hiddenState ? ' card--hidden' : ''}`}
@@ -169,6 +183,7 @@ export function Card({
           />
         </>
       )}
+      {locationButton && <div className="card__footer">{locationButton}</div>}
     </div>
   )
 }

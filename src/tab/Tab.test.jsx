@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Tab } from './Tab'
 
 const makeEntry = (overrides = {}) => ({
-  card: { id: 'card-1', title: 'Title', body: 'Body text', type: 'text' },
+  card: { id: 'card-1', title: 'Title', body: 'Body text', type: 'text', location: 'none' },
   position: 0,
   foldState: false,
   hiddenState: false,
@@ -159,6 +159,39 @@ describe('Tab', () => {
       render(<Tab entries={[makeEntry()]} onRemove={onRemove} />)
       await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
       expect(onRemove).toHaveBeenCalledWith('card-1')
+    })
+  })
+
+  describe('location', () => {
+    it('renders Save to Shelf button when onSaveToShelf is provided and location is "none"', () => {
+      render(<Tab entries={[makeEntry()]} onSaveToShelf={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Save to Shelf' })).toBeInTheDocument()
+    })
+
+    it('calls onSaveToShelf with the card id when clicked', async () => {
+      const onSaveToShelf = vi.fn()
+      render(<Tab entries={[makeEntry()]} onSaveToShelf={onSaveToShelf} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
+      expect(onSaveToShelf).toHaveBeenCalledWith('card-1')
+    })
+
+    it('renders Move to Library button when location is "shelf" and onMoveToLibrary is provided', () => {
+      const entry = makeEntry({ card: { id: 'card-1', title: 'T', body: 'B', type: 'text', location: 'shelf' } })
+      render(<Tab entries={[entry]} onMoveToLibrary={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Move to Library' })).toBeInTheDocument()
+    })
+
+    it('calls onMoveToLibrary with the card id when clicked', async () => {
+      const onMoveToLibrary = vi.fn()
+      const entry = makeEntry({ card: { id: 'card-1', title: 'T', body: 'B', type: 'text', location: 'shelf' } })
+      render(<Tab entries={[entry]} onMoveToLibrary={onMoveToLibrary} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Move to Library' }))
+      expect(onMoveToLibrary).toHaveBeenCalledWith('card-1')
+    })
+
+    it('renders no location buttons when callbacks are not provided', () => {
+      render(<Tab entries={[makeEntry()]} />)
+      expect(screen.queryByRole('button', { name: 'Save to Shelf' })).not.toBeInTheDocument()
     })
   })
 

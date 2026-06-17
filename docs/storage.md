@@ -41,7 +41,7 @@ db.version(1).stores({
 
 | Table | Primary key | Secondary index | Notes |
 |---|---|---|---|
-| `cards` | `id` | — | Stores card records; `dirty` field is not indexed |
+| `cards` | `id` | — | Stores card records including `location` and `dirty`; neither is indexed |
 | `tabs` | `id` | — | Stores tab records |
 | `tab_cards` | `[tabId+cardId]` compound | `tabId` | Compound PK; `tabId` index enables per-tab queries |
 
@@ -119,7 +119,7 @@ This runs before any test file and populates `globalThis.indexedDB` with a fresh
 
 | File | What it covers |
 |---|---|
-| `cardStorage.test.js` | Empty read, `putCard` round-trip, `dirty: true` assertion, upsert (no duplicate), `deleteCard` |
+| `cardStorage.test.js` | Empty read, `putCard` round-trip, `dirty: true` assertion, upsert (no duplicate), `deleteCard`, `location` round-trip and upsert |
 | `tabStorage.test.js` | Empty reads, `putTab` round-trip, upsert; `putTabCard` round-trip, foldState/hiddenState round-trip, position upsert, `deleteTabCard` by compound key |
 | `useTabs.test.js` | All tests use `waitFor(() => isReady)` after `renderHook`; mutations wrapped in `await act(async () => {...})`; remount tests verify Dexie persistence (not just React state) |
 
@@ -127,6 +127,7 @@ This runs before any test file and populates `globalThis.indexedDB` with a fresh
 
 Explicitly out of scope — do not add without a new slice:
 
+- Querying or filtering cards by `location` (the field is stored but no Dexie index exists for it)
 - `dirty` flag on tabs or tab_cards
 - Tombstoning / soft-delete (`deleted: true`)
 - Supabase sync pass (query dirty records, push, clear flag)

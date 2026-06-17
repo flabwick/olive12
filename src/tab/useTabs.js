@@ -137,6 +137,28 @@ export function useTabs() {
     [tabCards],
   )
 
+  const saveToShelf = useCallback(
+    async (cardId) => {
+      const card = cardsById[cardId]
+      if (!card) return
+      const updated = updateCardFields(card, { location: 'shelf' })
+      setCardsById((prev) => ({ ...prev, [cardId]: updated }))
+      await putCard(updated)
+    },
+    [cardsById],
+  )
+
+  const moveToLibrary = useCallback(
+    async (cardId) => {
+      const card = cardsById[cardId]
+      if (!card) return
+      const updated = updateCardFields(card, { location: 'library' })
+      setCardsById((prev) => ({ ...prev, [cardId]: updated }))
+      await putCard(updated)
+    },
+    [cardsById],
+  )
+
   const entries = tabCards
     .filter((tc) => tc.tabId === tab?.id)
     .sort((a, b) => a.position - b.position)
@@ -148,5 +170,5 @@ export function useTabs() {
     }))
     .filter((entry) => entry.card !== undefined)
 
-  return { tab, isReady, entries, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide }
+  return { tab, isReady, entries, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide, saveToShelf, moveToLibrary }
 }
