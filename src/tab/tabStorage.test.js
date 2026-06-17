@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { db } from '../db/vaultDb'
 import { createTab, createTabCard } from './createTab'
-import { loadTabCards, loadTabs, saveTabCards, saveTabs } from './tabStorage'
+import { deleteTabCard, getAllTabCards, getAllTabs, putTab, putTabCard } from './tabStorage'
 
 describe('tabStorage — tabs', () => {
-  beforeEach(() => {
-    localStorage.clear()
+  beforeEach(async () => {
+    await db.tabs.clear()
     vi.spyOn(crypto, 'randomUUID').mockReturnValue('test-tab-uuid')
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
   })
@@ -13,55 +14,65 @@ describe('tabStorage — tabs', () => {
     vi.restoreAllMocks()
   })
 
-  it('returns an empty array when nothing is stored', () => {
-    expect(loadTabs()).toEqual([])
+  it('returns an empty array when no tabs are stored', async () => {
+    expect(await getAllTabs()).toEqual([])
   })
 
-  it('persists and reloads a tab created with createTab', () => {
+  it('putTab stores a tab and getAllTabs retrieves it', async () => {
     const tab = createTab({ name: 'Work' })
-    saveTabs([tab])
-    expect(loadTabs()).toEqual([tab])
+    await putTab(tab)
+    const tabs = await getAllTabs()
+    expect(tabs).toHaveLength(1)
+    expect(tabs[0]).toMatchObject({ id: 'test-tab-uuid', name: 'Work' })
   })
 
-  it('returns an empty array when stored data is invalid JSON', () => {
-    localStorage.setItem('olive12:tabs', 'not-json')
-    expect(loadTabs()).toEqual([])
-  })
-
-  it('returns an empty array when stored data is not an array', () => {
-    localStorage.setItem('olive12:tabs', JSON.stringify({ id: 'nope' }))
-    expect(loadTabs()).toEqual([])
+  it('putTab updates an existing tab without creating a duplicate', async () => {
+    const tab = createTab({ name: 'Old' })
+    await putTab(tab)
+    await putTab({ ...tab, name: 'New' })
+    const tabs = await getAllTabs()
+    expect(tabs).toHaveLength(1)
+    expect(tabs[0].name).toBe('New')
   })
 })
 
 describe('tabStorage — tab_cards', () => {
-  beforeEach(() => {
-    localStorage.clear()
+  beforeEach(async () => {
+    await db.tab_cards.clear()
   })
 
-  it('returns an empty array when nothing is stored', () => {
-    expect(loadTabCards()).toEqual([])
+  it('returns an empty array when no tab_cards are stored', async () => {
+    expect(await getAllTabCards()).toEqual([])
   })
 
-  it('persists and reloads a tab_card created with createTabCard', () => {
+  it('putTabCard stores a tab_card and getAllTabCards retrieves it', async () => {
     const tc = createTabCard({ tabId: 'tab-1', cardId: 'card-1', position: 0 })
-    saveTabCards([tc])
-    expect(loadTabCards()).toEqual([tc])
+    await putTabCard(tc)
+    const tcs = await getAllTabCards()
+    expect(tcs).toHaveLength(1)
+    expect(tcs[0]).toMatchObject({ tabId: 'tab-1', cardId: 'card-1', position: 0 })
   })
 
-  it('round-trips fold and hidden state', () => {
+  it('round-trips foldState and hiddenState', async () => {
     const tc = { tabId: 'tab-1', cardId: 'card-1', position: 0, foldState: true, hiddenState: true }
-    saveTabCards([tc])
-    expect(loadTabCards()).toEqual([tc])
+    await putTabCard(tc)
+    const tcs = await getAllTabCards()
+    expect(tcs[0]).toMatchObject({ foldState: true, hiddenState: true })
   })
 
-  it('returns an empty array when stored data is invalid JSON', () => {
-    localStorage.setItem('olive12:tab_cards', 'not-json')
-    expect(loadTabCards()).toEqual([])
+  it('putTabCard updates position without creating a duplicate', async () => {
+    const tc = createTabCard({ tabId: 'tab-1', cardId: 'card-1', position: 0 })
+    await putTabCard(tc)
+    await putTabCard({ ...tc, position: 5 })
+    const tcs = await getAllTabCards()
+    expect(tcs).toHaveLength(1)
+    expect(tcs[0].position).toBe(5)
   })
 
-  it('returns an empty array when stored data is not an array', () => {
-    localStorage.setItem('olive12:tab_cards', JSON.stringify({ id: 'nope' }))
-    expect(loadTabCards()).toEqual([])
+  it('deleteTabCard removes the entry by compound key', async () => {
+    const tc = createTabCard({ tabId: 'tab-1', cardId: 'card-1', position: 0 })
+    await putTabCard(tc)
+    await deleteTabCard('tab-1', 'card-1')
+    expect(await getAllTabCards()).toEqual([])
   })
 })

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { loadCards, saveCards } from '../card/cardStorage'
+import { deleteCard, getAllCards, putCard } from '../card/cardStorage'
 import { createCard, updateCardFields } from '../card/createCard'
 import {
   createTab,
@@ -10,120 +10,143 @@ import {
   setTabCardFold,
   setTabCardHidden,
 } from './createTab'
-import { loadTabCards, loadTabs, saveTabCards, saveTabs } from './tabStorage'
-
-function initState() {
-  const tabs = loadTabs()
-  const tabCards = loadTabCards()
-  const cards = loadCards()
-
-  if (tabs.length === 0) {
-    const defaultTab = createTab({ name: 'Main', order: 0 })
-    saveTabs([defaultTab])
-    return { tab: defaultTab, tabCards: [], cardsById: {} }
-  }
-
-  const tab = tabs[0]
-  const cardsById = Object.fromEntries(cards.map((c) => [c.id, c]))
-  return { tab, tabCards, cardsById }
-}
+import { deleteTabCard, getAllTabCards, getAllTabs, putTab, putTabCard } from './tabStorage'
 
 export function useTabs() {
-  const [state, setState] = useState(initState)
+  const [isReady, setIsReady] = useState(false)
+  const [tab, setTab] = useState(null)
+  const [tabCards, setTabCards] = useState([])
+  const [cardsById, setCardsById] = useState({})
 
   useEffect(() => {
-    saveTabs([state.tab])
-  }, [state.tab])
+    let active = true
 
-  useEffect(() => {
-    saveTabCards(state.tabCards)
-  }, [state.tabCards])
+    async function init() {
+      const [tabs, tcs, cards] = await Promise.all([getAllTabs(), getAllTabCards(), getAllCards()])
+      if (!active) return
 
-  useEffect(() => {
-    saveCards(Object.values(state.cardsById))
-  }, [state.cardsById])
-
-  const addCard = useCallback(({ title = '', body = '' } = {}) => {
-    const card = createCard({ title, body })
-    setState((prev) => {
-      const position = nextPosition(prev.tabCards)
-      const tc = createTabCard({ tabId: prev.tab.id, cardId: card.id, position })
-      return {
-        ...prev,
-        tabCards: [...prev.tabCards, tc],
-        cardsById: { ...prev.cardsById, [card.id]: card },
+      if (tabs.length === 0) {
+        const defaultTab = createTab({ name: 'Main', order: 0 })
+        await putTab(defaultTab)
+        if (!active) return
+        setTab(defaultTab)
+        setTabCards([])
+        setCardsById({})
+      } else {
+        setTab(tabs[0])
+        setTabCards(tcs)
+        setCardsById(Object.fromEntries(cards.map((c) => [c.id, c])))
       }
-    })
-    return card
+
+      setIsReady(true)
+    }
+
+    init()
+    return () => {
+      active = false
+    }
   }, [])
 
-  const reorder = useCallback((cardId, toPosition) => {
-    setState((prev) => ({
-      ...prev,
-      tabCards: reorderTabCard(prev.tabCards, cardId, toPosition),
-    }))
-  }, [])
+  const addCard = useCallback(
+    async ({ title = '', body = '' } = {}) => {
+      if (!tab) return
+      const card = createCard({ title, body })
+      const position = nextPosition(tabCards)
+      const tc = createTabCard({ tabId: tab.id, cardId: card.id, position })
+      setTabCards((prev) => [...prev, tc])
+      setCardsById((prev) => ({ ...prev, [card.id]: card }))
+      await Promise.all([putCard(card), putTabCard(tc)])
+      return card
+    },
+    [tab, tabCards],
+  )
 
-  const fold = useCallback((cardId) => {
-    setState((prev) => ({
-      ...prev,
-      tabCards: setTabCardFold(prev.tabCards, cardId, true),
-    }))
-  }, [])
+  const updateCard = useCallback(
+    async (cardId, fields) => {
+      const card = cardsById[cardId]
+      if (!card) return
+      const updated = updateCardFields(card, fields)
+      setCardsById((prev) => ({ ...prev, [cardId]: updated }))
+      await putCard(updated)
+    },
+    [cardsById],
+  )
 
-  const unfold = useCallback((cardId) => {
-    setState((prev) => ({
-      ...prev,
-      tabCards: setTabCardFold(prev.tabCards, cardId, false),
-    }))
-  }, [])
+  const removeCard = useCallback(
+    async (cardId) => {
+      const tc = tabCards.find((t) => t.cardId === cardId)
+      const nextTabCards = removeTabCard(tabCards, cardId)
+      const { [cardId]: _, ...rest } = cardsById
+      setTabCards(nextTabCards)
+      setCardsById(rest)
+      await Promise.all([
+        deleteCard(cardId),
+        ...(tc ? [deleteTabCard(tc.tabId, cardId)] : []),
+        ...nextTabCards.map((t) => putTabCard(t)),
+      ])
+    },
+    [tabCards, cardsById],
+  )
 
-  const hide = useCallback((cardId) => {
-    setState((prev) => ({
-      ...prev,
-      tabCards: setTabCardHidden(prev.tabCards, cardId, true),
-    }))
-  }, [])
+  const reorder = useCallback(
+    async (cardId, toPosition) => {
+      const nextTabCards = reorderTabCard(tabCards, cardId, toPosition)
+      setTabCards(nextTabCards)
+      await Promise.all(nextTabCards.map((t) => putTabCard(t)))
+    },
+    [tabCards],
+  )
 
-  const unhide = useCallback((cardId) => {
-    setState((prev) => ({
-      ...prev,
-      tabCards: setTabCardHidden(prev.tabCards, cardId, false),
-    }))
-  }, [])
+  const fold = useCallback(
+    async (cardId) => {
+      const nextTabCards = setTabCardFold(tabCards, cardId, true)
+      setTabCards(nextTabCards)
+      const changed = nextTabCards.find((t) => t.cardId === cardId)
+      if (changed) await putTabCard(changed)
+    },
+    [tabCards],
+  )
 
-  const removeCard = useCallback((cardId) => {
-    setState((prev) => {
-      const { [cardId]: _removed, ...rest } = prev.cardsById
-      return {
-        ...prev,
-        tabCards: removeTabCard(prev.tabCards, cardId),
-        cardsById: rest,
-      }
-    })
-  }, [])
+  const unfold = useCallback(
+    async (cardId) => {
+      const nextTabCards = setTabCardFold(tabCards, cardId, false)
+      setTabCards(nextTabCards)
+      const changed = nextTabCards.find((t) => t.cardId === cardId)
+      if (changed) await putTabCard(changed)
+    },
+    [tabCards],
+  )
 
-  const updateCard = useCallback((cardId, fields) => {
-    setState((prev) => {
-      const card = prev.cardsById[cardId]
-      if (!card) return prev
-      return {
-        ...prev,
-        cardsById: { ...prev.cardsById, [cardId]: updateCardFields(card, fields) },
-      }
-    })
-  }, [])
+  const hide = useCallback(
+    async (cardId) => {
+      const nextTabCards = setTabCardHidden(tabCards, cardId, true)
+      setTabCards(nextTabCards)
+      const changed = nextTabCards.find((t) => t.cardId === cardId)
+      if (changed) await putTabCard(changed)
+    },
+    [tabCards],
+  )
 
-  const entries = state.tabCards
-    .filter((tc) => tc.tabId === state.tab.id)
+  const unhide = useCallback(
+    async (cardId) => {
+      const nextTabCards = setTabCardHidden(tabCards, cardId, false)
+      setTabCards(nextTabCards)
+      const changed = nextTabCards.find((t) => t.cardId === cardId)
+      if (changed) await putTabCard(changed)
+    },
+    [tabCards],
+  )
+
+  const entries = tabCards
+    .filter((tc) => tc.tabId === tab?.id)
     .sort((a, b) => a.position - b.position)
     .map((tc) => ({
-      card: state.cardsById[tc.cardId],
+      card: cardsById[tc.cardId],
       position: tc.position,
       foldState: tc.foldState,
       hiddenState: tc.hiddenState,
     }))
     .filter((entry) => entry.card !== undefined)
 
-  return { tab: state.tab, entries, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide }
+  return { tab, isReady, entries, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide }
 }

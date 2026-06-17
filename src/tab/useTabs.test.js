@@ -1,95 +1,89 @@
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { loadTabCards, loadTabs } from './tabStorage'
+import { db } from '../db/vaultDb'
+import { getAllTabCards, getAllTabs } from './tabStorage'
 import { useTabs } from './useTabs'
 
 describe('useTabs', () => {
-  beforeEach(() => {
-    localStorage.clear()
-    vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('default-tab-uuid')
-    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+  beforeEach(async () => {
+    await db.cards.clear()
+    await db.tabs.clear()
+    await db.tab_cards.clear()
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('creates and persists a default tab on first mount', () => {
+  it('creates and persists a default tab on first mount', async () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('default-tab-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
     const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+
     expect(result.current.tab.name).toBe('Main')
-    expect(loadTabs()).toHaveLength(1)
-    expect(loadTabs()[0].id).toBe('default-tab-uuid')
+    expect(result.current.tab.id).toBe('default-tab-uuid')
+    const tabs = await getAllTabs()
+    expect(tabs).toHaveLength(1)
+    expect(tabs[0].id).toBe('default-tab-uuid')
   })
 
-  it('loads an existing tab and its cards on mount', () => {
-    localStorage.setItem(
-      'olive12:tabs',
-      JSON.stringify([
-        {
-          id: 'stored-tab',
-          name: 'Stored',
-          kind: 'blank',
-          order: 0,
-          createdAt: 1_700_000_000_000,
-          updatedAt: 1_700_000_000_000,
-        },
-      ]),
-    )
-    localStorage.setItem(
-      'olive12:cards',
-      JSON.stringify([
-        {
-          id: 'stored-card',
-          type: 'text',
-          title: 'Hello',
-          body: 'World',
-          createdAt: 1_700_000_000_000,
-          updatedAt: 1_700_000_000_000,
-        },
-      ]),
-    )
-    localStorage.setItem(
-      'olive12:tab_cards',
-      JSON.stringify([
-        {
-          tabId: 'stored-tab',
-          cardId: 'stored-card',
-          position: 0,
-          foldState: false,
-          hiddenState: false,
-        },
-      ]),
-    )
+  it('loads an existing tab and its cards on mount', async () => {
+    await db.tabs.put({
+      id: 'stored-tab',
+      name: 'Stored',
+      kind: 'blank',
+      order: 0,
+      createdAt: 1_700_000_000_000,
+      updatedAt: 1_700_000_000_000,
+    })
+    await db.cards.put({
+      id: 'stored-card',
+      type: 'text',
+      title: 'Hello',
+      body: 'World',
+      createdAt: 1_700_000_000_000,
+      updatedAt: 1_700_000_000_000,
+    })
+    await db.tab_cards.put({
+      tabId: 'stored-tab',
+      cardId: 'stored-card',
+      position: 0,
+      foldState: false,
+      hiddenState: false,
+    })
 
     const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
 
     expect(result.current.tab.id).toBe('stored-tab')
     expect(result.current.entries).toHaveLength(1)
     expect(result.current.entries[0].card.title).toBe('Hello')
   })
 
-  it('addCard appends a card to entries and persists', () => {
-    vi.restoreAllMocks()
+  it('addCard appends a card to entries and persists', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
       .mockReturnValueOnce('card-uuid')
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
     const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
 
-    act(() => {
-      result.current.addCard({ title: 'Notes', body: 'Buy milk' })
+    await act(async () => {
+      await result.current.addCard({ title: 'Notes', body: 'Buy milk' })
     })
 
     expect(result.current.entries).toHaveLength(1)
     expect(result.current.entries[0].card.title).toBe('Notes')
     expect(result.current.entries[0].position).toBe(0)
-    expect(loadTabCards()).toHaveLength(1)
-    expect(loadTabCards()[0].cardId).toBe('card-uuid')
+    const tcs = await getAllTabCards()
+    expect(tcs).toHaveLength(1)
+    expect(tcs[0].cardId).toBe('card-uuid')
   })
 
-  it('addCard appends at next position', () => {
-    vi.restoreAllMocks()
+  it('addCard appends at next position', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
       .mockReturnValueOnce('card-a')
@@ -97,18 +91,20 @@ describe('useTabs', () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
     const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
 
-    act(() => {
-      result.current.addCard({ title: 'First', body: '' })
-      result.current.addCard({ title: 'Second', body: '' })
+    await act(async () => {
+      await result.current.addCard({ title: 'First', body: '' })
+    })
+    await act(async () => {
+      await result.current.addCard({ title: 'Second', body: '' })
     })
 
     expect(result.current.entries[0].position).toBe(0)
     expect(result.current.entries[1].position).toBe(1)
   })
 
-  it('reorder changes card positions', () => {
-    vi.restoreAllMocks()
+  it('reorder changes card positions', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
       .mockReturnValueOnce('card-a')
@@ -116,187 +112,114 @@ describe('useTabs', () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
     const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
 
-    act(() => {
-      result.current.addCard({ title: 'A', body: '' })
-      result.current.addCard({ title: 'B', body: '' })
+    await act(async () => {
+      await result.current.addCard({ title: 'A', body: '' })
     })
-
-    act(() => {
-      result.current.reorder('card-a', 1)
+    await act(async () => {
+      await result.current.addCard({ title: 'B', body: '' })
+    })
+    await act(async () => {
+      await result.current.reorder('card-a', 1)
     })
 
     expect(result.current.entries[0].card.id).toBe('card-b')
     expect(result.current.entries[1].card.id).toBe('card-a')
   })
 
-  it('fold sets foldState to true', () => {
-    vi.restoreAllMocks()
+  it('fold sets foldState to true', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
       .mockReturnValueOnce('card-uuid')
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
     const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
 
-    act(() => {
-      result.current.addCard({ title: 'A', body: '' })
-    })
-
-    act(() => {
-      result.current.fold('card-uuid')
-    })
+    await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+    await act(async () => { await result.current.fold('card-uuid') })
 
     expect(result.current.entries[0].foldState).toBe(true)
   })
 
-  it('unfold sets foldState to false', () => {
-    vi.restoreAllMocks()
+  it('unfold sets foldState to false', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
       .mockReturnValueOnce('card-uuid')
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
     const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
 
-    act(() => {
-      result.current.addCard({ title: 'A', body: '' })
-    })
-    act(() => {
-      result.current.fold('card-uuid')
-    })
-    act(() => {
-      result.current.unfold('card-uuid')
-    })
+    await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+    await act(async () => { await result.current.fold('card-uuid') })
+    await act(async () => { await result.current.unfold('card-uuid') })
 
     expect(result.current.entries[0].foldState).toBe(false)
   })
 
-  it('hide sets hiddenState to true', () => {
-    vi.restoreAllMocks()
+  it('hide sets hiddenState to true', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
       .mockReturnValueOnce('card-uuid')
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
     const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
 
-    act(() => {
-      result.current.addCard({ title: 'A', body: '' })
-    })
-    act(() => {
-      result.current.hide('card-uuid')
-    })
+    await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+    await act(async () => { await result.current.hide('card-uuid') })
 
     expect(result.current.entries[0].hiddenState).toBe(true)
   })
 
-  it('unhide sets hiddenState to false', () => {
-    vi.restoreAllMocks()
+  it('unhide sets hiddenState to false', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
       .mockReturnValueOnce('card-uuid')
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
     const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
 
-    act(() => {
-      result.current.addCard({ title: 'A', body: '' })
-    })
-    act(() => {
-      result.current.hide('card-uuid')
-    })
-    act(() => {
-      result.current.unhide('card-uuid')
-    })
+    await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+    await act(async () => { await result.current.hide('card-uuid') })
+    await act(async () => { await result.current.unhide('card-uuid') })
 
     expect(result.current.entries[0].hiddenState).toBe(false)
   })
 
-  it('remount reloads persisted state', () => {
-    vi.restoreAllMocks()
-    vi.spyOn(crypto, 'randomUUID')
-      .mockReturnValueOnce('tab-uuid')
-      .mockReturnValueOnce('card-uuid')
-    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
-
-    const { result, unmount } = renderHook(() => useTabs())
-
-    act(() => {
-      result.current.addCard({ title: 'Persist', body: 'After reload' })
-    })
-
-    unmount()
-
-    const { result: reloaded } = renderHook(() => useTabs())
-
-    expect(reloaded.current.entries).toHaveLength(1)
-    expect(reloaded.current.entries[0].card.title).toBe('Persist')
-    expect(reloaded.current.entries[0].foldState).toBe(false)
-    expect(reloaded.current.entries[0].hiddenState).toBe(false)
-  })
-
-  it('removeCard removes the card from entries and persists', () => {
-    vi.restoreAllMocks()
+  it('removeCard removes the card from entries', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
       .mockReturnValueOnce('card-uuid')
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
     const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
 
-    act(() => {
-      result.current.addCard({ title: 'Temp', body: 'Gone' })
-    })
-
+    await act(async () => { await result.current.addCard({ title: 'Temp', body: 'Gone' }) })
     expect(result.current.entries).toHaveLength(1)
 
-    act(() => {
-      result.current.removeCard('card-uuid')
-    })
-
+    await act(async () => { await result.current.removeCard('card-uuid') })
     expect(result.current.entries).toHaveLength(0)
   })
 
-  it('removeCard persists removal across remount', () => {
-    vi.restoreAllMocks()
-    vi.spyOn(crypto, 'randomUUID')
-      .mockReturnValueOnce('tab-uuid')
-      .mockReturnValueOnce('card-uuid')
-    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
-
-    const { result, unmount } = renderHook(() => useTabs())
-
-    act(() => {
-      result.current.addCard({ title: 'Temp', body: '' })
-    })
-    act(() => {
-      result.current.removeCard('card-uuid')
-    })
-
-    unmount()
-
-    const { result: reloaded } = renderHook(() => useTabs())
-    expect(reloaded.current.entries).toHaveLength(0)
-  })
-
-  it('updateCard updates title and body and persists', () => {
-    vi.restoreAllMocks()
+  it('updateCard updates title and body', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
       .mockReturnValueOnce('card-uuid')
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
     const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
 
-    act(() => {
-      result.current.addCard({ title: 'Original', body: 'Old body' })
-    })
+    await act(async () => { await result.current.addCard({ title: 'Original', body: 'Old body' }) })
 
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_001_000)
-
-    act(() => {
-      result.current.updateCard('card-uuid', { title: 'Updated', body: 'New body' })
+    await act(async () => {
+      await result.current.updateCard('card-uuid', { title: 'Updated', body: 'New body' })
     })
 
     expect(result.current.entries[0].card.title).toBe('Updated')
@@ -304,25 +227,67 @@ describe('useTabs', () => {
     expect(result.current.entries[0].card.updatedAt).toBe(1_700_000_001_000)
   })
 
-  it('remount preserves fold state', () => {
-    vi.restoreAllMocks()
+  it('remount reloads persisted state', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
       .mockReturnValueOnce('card-uuid')
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
     const { result, unmount } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
 
-    act(() => {
-      result.current.addCard({ title: 'A', body: '' })
-    })
-    act(() => {
-      result.current.fold('card-uuid')
+    await act(async () => {
+      await result.current.addCard({ title: 'Persist', body: 'After reload' })
     })
 
     unmount()
 
     const { result: reloaded } = renderHook(() => useTabs())
+    await waitFor(() => expect(reloaded.current.isReady).toBe(true))
+
+    expect(reloaded.current.entries).toHaveLength(1)
+    expect(reloaded.current.entries[0].card.title).toBe('Persist')
+    expect(reloaded.current.entries[0].foldState).toBe(false)
+    expect(reloaded.current.entries[0].hiddenState).toBe(false)
+  })
+
+  it('remount preserves fold state', async () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('tab-uuid')
+      .mockReturnValueOnce('card-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    const { result, unmount } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+
+    await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+    await act(async () => { await result.current.fold('card-uuid') })
+
+    unmount()
+
+    const { result: reloaded } = renderHook(() => useTabs())
+    await waitFor(() => expect(reloaded.current.isReady).toBe(true))
+
     expect(reloaded.current.entries[0].foldState).toBe(true)
+  })
+
+  it('removeCard persists removal across remount', async () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('tab-uuid')
+      .mockReturnValueOnce('card-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    const { result, unmount } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+
+    await act(async () => { await result.current.addCard({ title: 'Temp', body: '' }) })
+    await act(async () => { await result.current.removeCard('card-uuid') })
+
+    unmount()
+
+    const { result: reloaded } = renderHook(() => useTabs())
+    await waitFor(() => expect(reloaded.current.isReady).toBe(true))
+
+    expect(reloaded.current.entries).toHaveLength(0)
   })
 })

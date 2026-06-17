@@ -1,17 +1,13 @@
-const STORAGE_KEY = 'olive12:cards'
+import { db } from '../db/vaultDb'
 
-export function loadCards() {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) return []
-
-  try {
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
+export async function getAllCards() {
+  return db.cards.toArray()
 }
 
-export function saveCards(cards) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(cards))
+export async function putCard(card) {
+  await db.cards.put({ ...card, dirty: true })
+}
+
+export async function deleteCard(cardId) {
+  await db.cards.delete(cardId)
 }
