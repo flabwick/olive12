@@ -20,8 +20,8 @@ src/
     Card.css
     Card.test.jsx
     Card.stories.jsx
-    cardStorage.js         # localStorage read/write (plain JS, no React)
-    cardStorage.test.js
+    cardStorage.js         # Dexie-backed per-record card operations (plain JS, no React)
+    cardStorage.test.js    # [TEST]
     useCards.js            # React hook over cardStorage
     useCards.test.js
     index.js               # Barrel exports
@@ -31,30 +31,35 @@ src/
 
 `createCard({ title = '', body = '' })` returns:
 
-| Field       | Type   | Notes                          |
-|-------------|--------|--------------------------------|
-| `id`        | string | `crypto.randomUUID()`          |
-| `type`      | string | Always `'text'` for now        |
-| `title`     | string |                                |
-| `body`      | string | Plain text; newlines preserved |
-| `location`  | string | `'none' \| 'shelf' \| 'library'`; default `'none'` |
-| `createdAt` | number | `Date.now()` at creation       |
-| `updatedAt` | number | Updated by `updateCardFields`  |
+| Field       | Type            | Notes                                                   |
+|-------------|-----------------|--------------------------------------------------------|
+| `id`        | string          | `crypto.randomUUID()`                                  |
+| `type`      | string          | Always `'text'` for now                                |
+| `title`     | string          |                                                        |
+| `body`      | string          | Plain text; newlines preserved                         |
+| `location`  | string          | `'none' \| 'shelf' \| 'library'`; default `'none'`    |
+| `folderId`  | string \| null  | Library folder id; `null` for root-level or unplaced  |
+| `createdAt` | number          | `Date.now()` at creation                               |
+| `updatedAt` | number          | Updated by `updateCardFields`                          |
 
-`updateCardFields(card, { title, body, location })` returns a new card object with updated fields and a refreshed `updatedAt`. Fields default to the existing values so partial updates are safe.
+`updateCardFields(card, { title, body, location, folderId })` returns a new card object with updated fields and a refreshed `updatedAt`. All fields default to the existing values so partial updates are safe.
 
 **`location` semantics:**
 - `'none'` — card lives only in its tab; not yet committed to the vault.
 - `'shelf'` — card has been saved to the Shelf (chronological, unsorted save target).
 - `'library'` — card has been promoted to the Library (organised, indexed save target).
 
-Currently `location` is a data-only distinction. No separate Shelf/Library UI surface exists yet; all cards remain visible in their tabs regardless of location. The value is persisted to Dexie and displayed via buttons on the card.
+**`folderId` semantics:**
+- `null` — card is at the root of the Library (or not in the Library at all).
+- A folder id string — card is placed inside that folder in the Library tree.
 
 ```js
 import { createCard, updateCardFields } from './card'
 
 const card = createCard({ title: 'Notes', body: 'Buy milk' })
 const updated = updateCardFields(card, { body: 'Buy oat milk' })
+const shelved = updateCardFields(card, { location: 'shelf' })
+const filed = updateCardFields(card, { location: 'library', folderId: 'folder-uuid' })
 ```
 
 ## CardHeader component
@@ -81,7 +86,7 @@ Layout: `[fold-caret] [title or input] [up] [down] [eye] [X]`
 - The fold caret sits to the left of the title, borderless, 50% opacity, full opacity on hover.
 - Up/down arrows use a stemmed arrow SVG (shaft + arrowhead) to distinguish them visually from the fold caret (plain V chevron).
 - The close X has a left border separator.
-- All right-side controls are omitted entirely when the corresponding prop is `undefined` — a card with no callbacks renders no buttons at all.
+- All right-side controls are omitted entirely when the corresponding prop is `undefined`.
 - When `editing` is `true`, the title `h3` is replaced by a transparent `<input>` that is visually flush with the header (same size, same font, only an underline indicates the active field). The border-bottom space is always reserved on the `h3` so switching does not shift the header height.
 
 Aria labels: **Collapse card / Expand card** (fold), **Dim card / Show card** (hide), **Move card up**, **Move card down**, **Remove card**.
@@ -100,11 +105,11 @@ Aria labels: **Collapse card / Expand card** (fold), **Dim card / Show card** (h
 | `onToggleHide` | function | undefined | Forwarded to CardHeader eye button |
 | `onMoveUp` | function | undefined | Forwarded to CardHeader up arrow |
 | `onMoveDown` | function | undefined | Forwarded to CardHeader down arrow |
-| `onUpdate` | function | undefined | `({ title, body }) => void` — when provided, enables inline editing (title and body become clickable) |
+| `onUpdate` | function | undefined | `({ title, body }) => void` — when provided, enables inline editing |
 | `onClose` | function | undefined | Forwarded to CardHeader X button |
-| `location` | string | `'none'` | `'none' \| 'shelf' \| 'library'` — controls which footer button (if any) is shown |
-| `onSaveToShelf` | function | undefined | Called when the "Save to Shelf" button is clicked; only rendered when `location === 'none'` |
-| `onMoveToLibrary` | function | undefined | Called when the "Move to Library" button is clicked; only rendered when `location === 'shelf'` |
+| `location` | string | `'none'` | `'none' \| 'shelf' \| 'library'` — controls which footer button is shown |
+| `onSaveToShelf` | function | undefined | Called when "Save to Shelf" is clicked; only rendered when `location === 'none'` |
+| `onMoveToLibrary` | function | undefined | Called when "Move to Library" is clicked; only rendered when `location === 'shelf'` |
 
 ### Inline editing
 
@@ -115,16 +120,15 @@ When `onUpdate` is provided:
 - In edit mode, both title and body are simultaneously editable.
 - **Commit**: focus leaving the `.card` div saves changes via `onUpdate`. Only called if at least one field changed.
 - **Cancel**: Escape exits edit mode and restores the original values without saving.
-- Visual continuity: the card does not shift size when entering or leaving edit mode. The title input is flush with the header (same font, same dimensions, underline only). The textarea is initialised to the exact pixel height of the `<p>` it replaces (measured from the DOM before re-render), then grows as the user types.
+- Visual continuity: the card does not shift size when entering or leaving edit mode.
 
 ### Body resize
 
 A drag handle (`<div role="separator" aria-label="Resize card">`) is rendered below the body area when the card is not folded.
 
-- Dragging up shrinks the body area to a minimum of 40px (content scrolls within the constrained area).
+- Dragging up shrinks the body area to a minimum of 40px.
 - Dragging down past the natural content height snaps back to auto (unconstrained) height.
-- Resize height is ephemeral — stored in component state, not persisted to localStorage.
-- The textarea auto-grows to its content height as the user types regardless of the manual resize state.
+- Resize height is ephemeral — not persisted to Dexie.
 
 ```jsx
 import { Card } from './card'
@@ -172,17 +176,17 @@ Note: `useCards` is a lower-level hook used only by `CardShell`. Card mutation (
 
 - Cards use warm parchment/espresso values in `Card.css` and `CardHeader.css` following the neo-brutalism brief.
 - Hidden cards: `opacity: 0.38` via `.card--hidden`.
-- Folded cards: body and resize handle are not rendered (no CSS trick; they're just absent from the DOM).
-- `appearance: none; -webkit-appearance: none;` on both the title input and body textarea ensures text renders identically to the `h3`/`<p>` equivalents (no platform-native font-smoothing difference).
+- Folded cards: body and resize handle are not rendered (no CSS trick; they're absent from the DOM).
+- `appearance: none; -webkit-appearance: none;` on both the title input and body textarea ensures text renders identically to the `h3`/`<p>` equivalents.
 
 ## Tests
 
 | File | What it covers |
 |------|----------------|
-| `createCard.test.js` | Default fields, custom title/body, unique ids, `updateCardFields` partial and full update |
+| `createCard.test.js` | Default fields, custom title/body, unique ids, `folderId` defaults to null, `updateCardFields` partial and full update |
 | `CardHeader.test.jsx` | Renders title; no buttons without callbacks; fold/hide/move/close callbacks called; correct aria-labels; title focusable when onTitleClick provided |
 | `Card.test.jsx` | Renders title/body; line breaks preserved; foldState hides body and resize handle; hiddenState applies `.card--hidden`; resize handle present/absent; inline editing (click title enters edit mode with pre-selection, click body enters edit mode, commit on blur, cancel on Escape, no save if unchanged, body not clickable without onUpdate); move/close buttons forwarded |
-| `cardStorage.test.js` | Empty load, save/reload round trip, corrupt data |
+| `cardStorage.test.js` | Empty load, putCard round-trip, dirty: true assertion, upsert (no duplicate), deleteCard, location round-trip, location upsert |
 | `useCards.test.js` | Load on mount, add + persist, remount reload |
 
 ## Card footer
@@ -203,5 +207,4 @@ Explicitly out of scope — do not add without a new slice:
 - Additional card types (process, portal, container)
 - Rich text (Tiptap), embeds
 - Per-card colour, tags, or metadata
-- Dexie / Supabase persistence
 - `user_id` / multi-user sync

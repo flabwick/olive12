@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { deleteCard, getAllCards, putCard } from '../card/cardStorage'
 import { createCard, updateCardFields } from '../card/createCard'
 import { createFolder as makeFolderObject } from '../folder/createFolder'
 import { getAllFolders, putFolder } from '../folder/folderStorage'
+import { supabase } from '../lib/supabaseClient'
+import { createCardSyncScheduler } from '../sync/cardSync'
+import { makeCardSupabaseStorage } from '../sync/cardSupabaseStorage'
 import {
   createTab,
   createTabCard,
@@ -14,12 +17,27 @@ import {
 } from './createTab'
 import { deleteTabCard, getAllTabCards, getAllTabs, putTab, putTabCard } from './tabStorage'
 
-export function useTabs() {
+export function useTabs({ userId } = {}) {
   const [isReady, setIsReady] = useState(false)
   const [tab, setTab] = useState(null)
   const [tabCards, setTabCards] = useState([])
   const [cardsById, setCardsById] = useState({})
   const [folders, setFolders] = useState([])
+  const schedulerRef = useRef(null)
+
+  useEffect(() => {
+    if (!userId) {
+      schedulerRef.current = null
+      return
+    }
+    const storage = makeCardSupabaseStorage(supabase)
+    schedulerRef.current = createCardSyncScheduler({ userId, debounceMs: 3000, storage })
+  }, [userId])
+
+  useEffect(() => {
+    if (!isReady || !userId || !schedulerRef.current) return
+    schedulerRef.current.runNow()
+  }, [isReady, userId])
 
   useEffect(() => {
     let active = true
@@ -62,6 +80,7 @@ export function useTabs() {
       setTabCards((prev) => [...prev, tc])
       setCardsById((prev) => ({ ...prev, [card.id]: card }))
       await Promise.all([putCard(card), putTabCard(tc)])
+      schedulerRef.current?.scheduleSync()
       return card
     },
     [tab, tabCards],
@@ -74,6 +93,7 @@ export function useTabs() {
       const updated = updateCardFields(card, fields)
       setCardsById((prev) => ({ ...prev, [cardId]: updated }))
       await putCard(updated)
+      schedulerRef.current?.scheduleSync()
     },
     [cardsById],
   )
@@ -150,6 +170,7 @@ export function useTabs() {
       const updated = updateCardFields(card, { location: 'shelf' })
       setCardsById((prev) => ({ ...prev, [cardId]: updated }))
       await putCard(updated)
+      schedulerRef.current?.scheduleSync()
     },
     [cardsById],
   )
@@ -161,6 +182,7 @@ export function useTabs() {
       const updated = updateCardFields(card, { location: 'library', folderId })
       setCardsById((prev) => ({ ...prev, [cardId]: updated }))
       await putCard(updated)
+      schedulerRef.current?.scheduleSync()
     },
     [cardsById],
   )

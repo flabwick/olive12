@@ -60,16 +60,27 @@ describe('App', () => {
     expect(screen.getByText('No cards yet.')).toBeInTheDocument()
   })
 
-  it('renders the sidebar with Shelf and Library vault tabs', async () => {
+  it('clicking Folders opens the folder panel', async () => {
     render(<App />)
-    await waitFor(() => screen.getByRole('tab', { name: 'Shelf' }))
-    expect(screen.getByRole('tab', { name: 'Shelf' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Library' })).toBeInTheDocument()
+    await waitFor(() => screen.getByRole('button', { name: 'Folders' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Folders' }))
+    expect(screen.getByRole('dialog', { name: 'Vault and Brain' })).toBeInTheDocument()
   })
 
-  it('shows shelf empty state in sidebar by default', async () => {
+  it('folder panel shows Shelf, Library and Brain tabs', async () => {
     render(<App />)
-    await waitFor(() => screen.getByText(/Shelf is empty/))
-    expect(screen.getByText('Shelf is empty. Save some cards from your tab.')).toBeInTheDocument()
+    await waitFor(() => screen.getByRole('button', { name: 'Folders' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Folders' }))
+    expect(screen.getByRole('tab', { name: 'Shelf' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Library' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Brain' })).toBeInTheDocument()
+  })
+
+  it('closing the folder panel via X removes it from the screen', async () => {
+    render(<App />)
+    await waitFor(() => screen.getByRole('button', { name: 'Folders' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Folders' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: 'Vault and Brain' })).not.toBeInTheDocument()
   })
 })

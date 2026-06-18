@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '../db/vaultDb'
 import { createCard } from './createCard'
-import { deleteCard, getAllCards, putCard } from './cardStorage'
+import { deleteCard, getAllCards, getDirtyCards, markCardClean, putCard } from './cardStorage'
 
 describe('cardStorage', () => {
   beforeEach(async () => {
@@ -63,5 +63,41 @@ describe('cardStorage', () => {
     const cards = await getAllCards()
     expect(cards).toHaveLength(1)
     expect(cards[0].location).toBe('library')
+  })
+
+  it('getDirtyCards returns only cards with dirty: true', async () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('card-a').mockReturnValueOnce('card-b')
+    const cardA = createCard({ title: 'A', body: '' })
+    const cardB = createCard({ title: 'B', body: '' })
+    await putCard(cardA)  // dirty: true
+    await db.cards.put({ ...cardB, dirty: false })  // explicitly clean
+    const dirty = await getDirtyCards()
+    expect(dirty).toHaveLength(1)
+    expect(dirty[0].title).toBe('A')
+  })
+
+  it('getDirtyCards returns empty array when no cards are dirty', async () => {
+    const card = createCard({ title: 'A', body: '' })
+    await db.cards.put({ ...card, dirty: false })
+    expect(await getDirtyCards()).toEqual([])
+  })
+
+  it('markCardClean writes the card with dirty: false', async () => {
+    const card = createCard({ title: 'A', body: 'original' })
+    await putCard(card)
+    const merged = { ...card, title: 'Updated' }
+    await markCardClean(card.id, merged)
+    const cards = await getAllCards()
+    expect(cards).toHaveLength(1)
+    expect(cards[0].dirty).toBe(false)
+    expect(cards[0].title).toBe('Updated')
+  })
+
+  it('markCardClean forces dirty: false even if mergedCard has dirty: true', async () => {
+    const card = createCard({ title: 'A', body: '' })
+    await putCard(card)
+    await markCardClean(card.id, { ...card, dirty: true })
+    const cards = await getAllCards()
+    expect(cards[0].dirty).toBe(false)
   })
 })

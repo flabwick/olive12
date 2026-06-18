@@ -11,3 +11,12 @@ export async function putCard(card) {
 export async function deleteCard(cardId) {
   await db.cards.delete(cardId)
 }
+
+export async function getDirtyCards() {
+  const all = await db.cards.toArray()
+  return all.filter((c) => c.dirty)
+}
+
+export async function markCardClean(cardId, mergedCard) {
+  await db.cards.put({ ...mergedCard, id: cardId, dirty: false })
+}

@@ -7,11 +7,15 @@ export default {
   args: {
     onAdd: () => {},
     addDisabled: false,
+    onScrollTop: () => {},
+    onFolder: () => {},
+    onTabOverview: () => {},
+    onMenu: () => {},
   },
 }
 
 export const Default = {}
 
-export const Disabled = {
+export const AddDisabled = {
   args: { addDisabled: true },
 }

@@ -1,6 +1,6 @@
 # Storage — implementation
 
-This document describes the IndexedDB persistence layer introduced in the Dexie migration (build14). It covers the Dexie singleton, per-record storage functions for cards and tabs, and the `dirty` flag used to mark records pending Supabase sync.
+This document describes the IndexedDB persistence layer. It covers the Dexie singleton, per-record storage functions for cards, tabs, and folders, and the `dirty` flag used to mark records pending Supabase sync.
 
 For the long-term vault design (Supabase, multi-user) see [design.md](./design.md). For how cards and tabs consume this layer, see [cards.md](./cards.md) and [tabs.md](./tabs.md).
 
@@ -20,6 +20,9 @@ src/
   tab/
     tabStorage.js           # Per-record tab and tab_card operations (no React)
     tabStorage.test.js      # [TEST] put/get/delete for both tables
+  folder/
+    folderStorage.js        # Per-record folder operations (no React)
+    folderStorage.test.js   # [TEST] put/get/delete + parentId round-trip
   test/
     setup.js                # Imports fake-indexeddb/auto for all unit tests
 ```
@@ -32,20 +35,29 @@ src/
 import Dexie from 'dexie'
 
 export const db = new Dexie('olive12')
+
 db.version(1).stores({
   cards:     'id',
   tabs:      'id',
   tab_cards: '[tabId+cardId], tabId',
 })
+
+db.version(2).stores({
+  cards:     'id',
+  tabs:      'id',
+  tab_cards: '[tabId+cardId], tabId',
+  folders:   'id',
+})
 ```
 
 | Table | Primary key | Secondary index | Notes |
 |---|---|---|---|
-| `cards` | `id` | — | Stores card records including `location` and `dirty`; neither is indexed |
+| `cards` | `id` | — | Stores card records including `location`, `folderId`, and `dirty`; none are indexed |
 | `tabs` | `id` | — | Stores tab records |
 | `tab_cards` | `[tabId+cardId]` compound | `tabId` | Compound PK; `tabId` index enables per-tab queries |
+| `folders` | `id` | — | Stores folder records including `parentId`; not indexed |
 
-The database name is `olive12`. On first open, Dexie creates it via IndexedDB. The schema version is 1; increment it and add a migration block whenever the schema changes.
+The database name is `olive12`. On first open, Dexie creates it via IndexedDB. Increment the version number and add a migration block whenever the schema changes.
 
 ## Card storage
 
@@ -76,32 +88,40 @@ This means every card in Dexie has `dirty: true` until a future sync pass explic
 | `putTabCard(tabCard)` | `(tabCard) → Promise<void>` | Upserts a tab_card record |
 | `deleteTabCard(tabId, cardId)` | `(string, string) → Promise<void>` | Deletes by compound key `[tabId, cardId]` |
 
-Tabs are not flagged `dirty` in this slice — that is deferred to the Supabase-prep slice.
+Tabs are not flagged `dirty` in this slice — deferred to the Supabase-prep slice.
+
+## Folder storage
+
+`src/folder/folderStorage.js` — plain async functions, no React.
+
+| Function | Signature | Behaviour |
+|---|---|---|
+| `getAllFolders()` | `() → Promise<Folder[]>` | Returns all records from the `folders` table |
+| `putFolder(folder)` | `(folder) → Promise<void>` | Upserts a folder record |
+| `deleteFolder(folderId)` | `(id) → Promise<void>` | Deletes the record by primary key |
+
+Folders are not flagged `dirty` in this slice.
 
 ## Dirty flag
 
 The `dirty` field exists on every card record in Dexie. It is always `true` after a `putCard` call. Its purpose:
 
 - **Now**: exists but is never read; no sync occurs yet.
-- **Supabase-prep slice**: a sync pass will query `db.cards.where('dirty').equals(1)` (or filter in JS) and push those records to Supabase, then clear the flag.
+- **Supabase-prep slice**: a sync pass will query dirty cards and push them to Supabase, then clear the flag.
 
-Do not add a `dirty` flag to tabs or tab_cards until the Supabase-prep slice explicitly requires it.
+Do not add a `dirty` flag to tabs, tab_cards, or folders until the Supabase-prep slice explicitly requires it.
 
 ## Hook changes — useTabs
 
-The Dexie migration required making `useTabs` initialisation asynchronous. Key changes from the localStorage version:
+`useTabs` initialisation is asynchronous. A single `useEffect` on mount runs `init()`, which awaits all four `getAllXxx()` calls in parallel (`getAllTabs`, `getAllTabCards`, `getAllCards`, `getAllFolders`), then sets state. Mutations call storage functions directly — no watcher effects, no localStorage.
 
-**Before**: `useState(initState)` called `loadTabs()`, `loadTabCards()`, `loadCards()` synchronously in the state initialiser. Three `useEffect`s watched state slices and called `saveTabs`, `saveTabCards`, `saveCards` after every change.
-
-**After**: A single `useEffect` on mount runs `init()`, which awaits all three `getAllXxx()` calls in parallel, then sets state. Mutations call `putCard`, `putTabCard`, `deleteCard`, `deleteTabCard` directly — no watchers.
-
-`useTabs` now returns `isReady: boolean` in addition to the existing properties. It is `false` until the async init completes.
+`useTabs` returns `isReady: boolean`. It is `false` until the async init completes.
 
 ```js
-const { tab, isReady, entries, addCard, ... } = useTabs()
+const { tab, isReady, entries, folders, addCard, createFolder, ... } = useTabs()
 ```
 
-Before `isReady` is `true`, `tab` is `null` and `entries` is `[]`. The UI renders the Tab with empty entries (showing "No cards yet.") during this window.
+Before `isReady` is `true`, `tab` is `null`, `entries` is `[]`, and `folders` is `[]`.
 
 ## Tests
 
@@ -113,24 +133,25 @@ import 'fake-indexeddb/auto'
 
 This runs before any test file and populates `globalThis.indexedDB` with a fresh `IDBFactory`. When `vaultDb.js` is first imported in a test file, Dexie uses that factory.
 
-**Between tests** within a file: each `beforeEach` calls `db.cards.clear()` / `db.tabs.clear()` / `db.tab_cards.clear()` to reset state. Do not call `db.delete()` — reconnecting to a deleted Dexie database in the same module scope is unreliable in the test environment.
+**Between tests** within a file: each `beforeEach` calls `db.<table>.clear()` on the relevant tables to reset state. Do not call `db.delete()` — reconnecting to a deleted Dexie database in the same module scope is unreliable in the test environment.
 
-**Between test files**: vitest runs each file in its own worker, so each file gets a fresh module scope and a fresh `IDBFactory`. Cross-file leakage is not possible.
+**Between test files**: Vitest runs each file in its own worker, so each file gets a fresh module scope and a fresh `IDBFactory`. Cross-file leakage is not possible.
 
 | File | What it covers |
 |---|---|
 | `cardStorage.test.js` | Empty read, `putCard` round-trip, `dirty: true` assertion, upsert (no duplicate), `deleteCard`, `location` round-trip and upsert |
 | `tabStorage.test.js` | Empty reads, `putTab` round-trip, upsert; `putTabCard` round-trip, foldState/hiddenState round-trip, position upsert, `deleteTabCard` by compound key |
+| `folderStorage.test.js` | Empty read, `putFolder` round-trip, upsert (no duplicate), `deleteFolder`, `parentId` round-trip |
 | `useTabs.test.js` | All tests use `waitFor(() => isReady)` after `renderHook`; mutations wrapped in `await act(async () => {...})`; remount tests verify Dexie persistence (not just React state) |
 
 ## Not built yet
 
 Explicitly out of scope — do not add without a new slice:
 
-- Querying or filtering cards by `location` (the field is stored but no Dexie index exists for it)
-- `dirty` flag on tabs or tab_cards
+- Querying or filtering cards by `location` or `folderId` (fields are stored but no Dexie index exists)
+- `dirty` flag on tabs, tab_cards, or folders
 - Tombstoning / soft-delete (`deleted: true`)
 - Supabase sync pass (query dirty records, push, clear flag)
-- Schema migration (version 2+ of `vaultDb`)
+- Schema migration (version 3+ of `vaultDb`)
 - `user_id` field on any table
 - Dexie hooks (`db.cards.hook('creating', ...)`) for automatic dirty-stamping

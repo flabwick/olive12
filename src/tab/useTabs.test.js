@@ -6,6 +6,21 @@ import { getAllFolders } from '../folder/folderStorage'
 import { getAllTabCards, getAllTabs } from './tabStorage'
 import { useTabs } from './useTabs'
 
+const syncMocks = vi.hoisted(() => ({
+  scheduleSync: vi.fn(),
+  runNow: vi.fn().mockResolvedValue(undefined),
+  createCardSyncScheduler: vi.fn(),
+}))
+
+vi.mock('../lib/supabaseClient', () => ({ supabase: {} }))
+vi.mock('../sync/cardSupabaseStorage', () => ({
+  makeCardSupabaseStorage: vi.fn(() => ({})),
+}))
+vi.mock('../sync/cardSync', () => ({
+  createCardSyncScheduler: syncMocks.createCardSyncScheduler,
+  syncDirtyCardsForUser: vi.fn(),
+}))
+
 describe('useTabs', () => {
   beforeEach(async () => {
     await db.cards.clear()
@@ -594,5 +609,130 @@ describe('useTabs', () => {
     await waitFor(() => expect(reloaded.current.isReady).toBe(true))
 
     expect(reloaded.current.entries).toHaveLength(0)
+  })
+
+  describe('sync wiring', () => {
+    beforeEach(() => {
+      syncMocks.scheduleSync.mockClear()
+      syncMocks.runNow.mockClear()
+      syncMocks.createCardSyncScheduler.mockClear()
+      syncMocks.createCardSyncScheduler.mockReturnValue({
+        scheduleSync: syncMocks.scheduleSync,
+        runNow: syncMocks.runNow,
+      })
+    })
+
+    it('does not create a scheduler when userId is not provided', async () => {
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(syncMocks.createCardSyncScheduler).not.toHaveBeenCalled()
+    })
+
+    it('creates a scheduler when userId is provided', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('tab-uuid')
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(syncMocks.createCardSyncScheduler).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-1' }),
+      )
+    })
+
+    it('calls runNow once when isReady becomes true with userId', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('tab-uuid')
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(syncMocks.runNow).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not call runNow when userId is absent', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('tab-uuid')
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(syncMocks.runNow).not.toHaveBeenCalled()
+    })
+
+    it('addCard calls scheduleSync when userId is provided', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      syncMocks.scheduleSync.mockClear()
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+      expect(syncMocks.scheduleSync).toHaveBeenCalledTimes(1)
+    })
+
+    it('updateCard calls scheduleSync when userId is provided', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+      syncMocks.scheduleSync.mockClear()
+      await act(async () => { await result.current.updateCard('card-uuid', { title: 'B' }) })
+
+      expect(syncMocks.scheduleSync).toHaveBeenCalledTimes(1)
+    })
+
+    it('saveToShelf calls scheduleSync when userId is provided', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+      syncMocks.scheduleSync.mockClear()
+      await act(async () => { await result.current.saveToShelf('card-uuid') })
+
+      expect(syncMocks.scheduleSync).toHaveBeenCalledTimes(1)
+    })
+
+    it('moveToLibrary calls scheduleSync when userId is provided', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+      syncMocks.scheduleSync.mockClear()
+      await act(async () => { await result.current.moveToLibrary('card-uuid') })
+
+      expect(syncMocks.scheduleSync).toHaveBeenCalledTimes(1)
+    })
+
+    it('card mutations do not throw and work correctly without userId', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+      expect(result.current.entries).toHaveLength(1)
+      expect(syncMocks.scheduleSync).not.toHaveBeenCalled()
+    })
   })
 })
