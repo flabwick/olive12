@@ -19,3 +19,11 @@ export async function putTabCard(tabCard) {
 export async function deleteTabCard(tabId, cardId) {
   await db.tab_cards.delete([tabId, cardId])
 }
+
+export async function deleteTab(tabId) {
+  await db.tabs.delete(tabId)
+}
+
+export async function deleteAllTabCards(tabId) {
+  await db.tab_cards.where('tabId').equals(tabId).delete()
+}

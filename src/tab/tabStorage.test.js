@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '../db/vaultDb'
 import { createTab, createTabCard } from './createTab'
-import { deleteTabCard, getAllTabCards, getAllTabs, putTab, putTabCard } from './tabStorage'
+import { deleteAllTabCards, deleteTab, deleteTabCard, getAllTabCards, getAllTabs, putTab, putTabCard } from './tabStorage'
 
 describe('tabStorage — tabs', () => {
   beforeEach(async () => {
@@ -74,5 +74,45 @@ describe('tabStorage — tab_cards', () => {
     await putTabCard(tc)
     await deleteTabCard('tab-1', 'card-1')
     expect(await getAllTabCards()).toEqual([])
+  })
+})
+
+describe('tabStorage — deleteTab', () => {
+  beforeEach(async () => {
+    await db.tabs.clear()
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('test-tab-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+  })
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it('deleteTab removes the tab record', async () => {
+    const tab = createTab({ name: 'To Delete' })
+    await putTab(tab)
+    await deleteTab(tab.id)
+    expect(await getAllTabs()).toEqual([])
+  })
+
+  it('deleteTab is a no-op when tab does not exist', async () => {
+    await expect(deleteTab('nonexistent')).resolves.toBeUndefined()
+  })
+})
+
+describe('tabStorage — deleteAllTabCards', () => {
+  beforeEach(async () => { await db.tab_cards.clear() })
+
+  it('deletes all tab_cards for the given tabId', async () => {
+    await putTabCard(createTabCard({ tabId: 'tab-a', cardId: 'card-1', position: 0 }))
+    await putTabCard(createTabCard({ tabId: 'tab-a', cardId: 'card-2', position: 1 }))
+    await deleteAllTabCards('tab-a')
+    expect(await getAllTabCards()).toEqual([])
+  })
+
+  it('leaves tab_cards for other tabs intact', async () => {
+    await putTabCard(createTabCard({ tabId: 'tab-a', cardId: 'card-1', position: 0 }))
+    await putTabCard(createTabCard({ tabId: 'tab-b', cardId: 'card-2', position: 0 }))
+    await deleteAllTabCards('tab-a')
+    const remaining = await getAllTabCards()
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0].tabId).toBe('tab-b')
   })
 })
