@@ -2,11 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createTab,
   createTabCard,
+  moveTabToLibrary,
   nextPosition,
+  removeTab,
   removeTabCard,
   reorderTabCard,
+  reorderTabs,
+  saveTabToShelf,
   setTabCardFold,
   setTabCardHidden,
+  setTabName,
+  updateTabFields,
 } from './createTab'
 
 describe('createTab', () => {
@@ -25,6 +31,8 @@ describe('createTab', () => {
       name: 'New tab',
       kind: 'blank',
       order: 0,
+      savedLocation: 'none',
+      savedFolderId: null,
       createdAt: 1_700_000_000_000,
       updatedAt: 1_700_000_000_000,
     })
@@ -36,6 +44,8 @@ describe('createTab', () => {
       name: 'Work',
       kind: 'blank',
       order: 2,
+      savedLocation: 'none',
+      savedFolderId: null,
       createdAt: 1_700_000_000_000,
       updatedAt: 1_700_000_000_000,
     })
@@ -188,5 +198,141 @@ describe('removeTabCard', () => {
   it('does not mutate the input array', () => {
     removeTabCard(base, 'b')
     expect(base).toHaveLength(3)
+  })
+})
+
+describe('updateTabFields', () => {
+  beforeEach(() => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_001_000)
+  })
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it('merges fields and refreshes updatedAt', () => {
+    const tab = { id: 'a', name: 'Old', updatedAt: 1_000 }
+    const result = updateTabFields(tab, { name: 'New' })
+    expect(result.name).toBe('New')
+    expect(result.updatedAt).toBe(1_700_000_001_000)
+    expect(result.id).toBe('a')
+  })
+
+  it('does not mutate the input tab', () => {
+    const tab = { id: 'a', name: 'Old', updatedAt: 1_000 }
+    updateTabFields(tab, { name: 'New' })
+    expect(tab.name).toBe('Old')
+  })
+})
+
+describe('setTabName', () => {
+  beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(1_700_000_002_000) })
+  afterEach(() => { vi.restoreAllMocks() })
+
+  const base = [
+    { id: 'tab-a', name: 'Alpha', order: 0, updatedAt: 1_000 },
+    { id: 'tab-b', name: 'Beta', order: 1, updatedAt: 1_000 },
+  ]
+
+  it('updates name and updatedAt of matching tab', () => {
+    const result = setTabName(base, 'tab-a', 'Renamed')
+    expect(result[0].name).toBe('Renamed')
+    expect(result[0].updatedAt).toBe(1_700_000_002_000)
+  })
+
+  it('leaves other tabs unchanged', () => {
+    const result = setTabName(base, 'tab-a', 'Renamed')
+    expect(result[1].name).toBe('Beta')
+  })
+
+  it('does not mutate the original array', () => {
+    setTabName(base, 'tab-a', 'Renamed')
+    expect(base[0].name).toBe('Alpha')
+  })
+})
+
+describe('removeTab', () => {
+  const base = [
+    { id: 'tab-a', name: 'A', order: 0 },
+    { id: 'tab-b', name: 'B', order: 1 },
+    { id: 'tab-c', name: 'C', order: 2 },
+  ]
+
+  it('removes the matching tab', () => {
+    const result = removeTab(base, 'tab-b')
+    expect(result.map((t) => t.id)).toEqual(['tab-a', 'tab-c'])
+  })
+
+  it('renumbers order fields after removal', () => {
+    const result = removeTab(base, 'tab-a')
+    expect(result.map((t) => t.order)).toEqual([0, 1])
+  })
+
+  it('does not mutate original array', () => {
+    removeTab(base, 'tab-a')
+    expect(base).toHaveLength(3)
+  })
+})
+
+describe('reorderTabs', () => {
+  const base = [
+    { id: 'tab-a', name: 'A', order: 0 },
+    { id: 'tab-b', name: 'B', order: 1 },
+    { id: 'tab-c', name: 'C', order: 2 },
+  ]
+
+  it('moves a tab to a later position', () => {
+    const result = reorderTabs(base, 'tab-a', 2)
+    expect(result.map((t) => t.id)).toEqual(['tab-b', 'tab-c', 'tab-a'])
+    expect(result.map((t) => t.order)).toEqual([0, 1, 2])
+  })
+
+  it('moves a tab to an earlier position', () => {
+    const result = reorderTabs(base, 'tab-c', 0)
+    expect(result.map((t) => t.id)).toEqual(['tab-c', 'tab-a', 'tab-b'])
+  })
+
+  it('returns same array when tab is already at position', () => {
+    const result = reorderTabs(base, 'tab-b', 1)
+    expect(result).toBe(base)
+  })
+})
+
+describe('saveTabToShelf', () => {
+  beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(1_700_000_003_000) })
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it('sets savedLocation to shelf', () => {
+    const tab = { id: 't', savedLocation: 'none', savedFolderId: null, updatedAt: 1_000 }
+    const result = saveTabToShelf(tab)
+    expect(result.savedLocation).toBe('shelf')
+    expect(result.updatedAt).toBe(1_700_000_003_000)
+  })
+
+  it('does not mutate the input tab', () => {
+    const tab = { id: 't', savedLocation: 'none', updatedAt: 1_000 }
+    saveTabToShelf(tab)
+    expect(tab.savedLocation).toBe('none')
+  })
+})
+
+describe('moveTabToLibrary', () => {
+  beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(1_700_000_004_000) })
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it('sets savedLocation to library', () => {
+    const tab = { id: 't', savedLocation: 'shelf', savedFolderId: null, updatedAt: 1_000 }
+    const result = moveTabToLibrary(tab)
+    expect(result.savedLocation).toBe('library')
+    expect(result.updatedAt).toBe(1_700_000_004_000)
+  })
+
+  it('sets savedFolderId when provided', () => {
+    const tab = { id: 't', savedLocation: 'shelf', savedFolderId: null, updatedAt: 1_000 }
+    const result = moveTabToLibrary(tab, 'folder-1')
+    expect(result.savedFolderId).toBe('folder-1')
+  })
+
+  it('defaults savedFolderId to null', () => {
+    const tab = { id: 't', savedLocation: 'shelf', savedFolderId: 'old', updatedAt: 1_000 }
+    const result = moveTabToLibrary(tab)
+    expect(result.savedFolderId).toBeNull()
   })
 })

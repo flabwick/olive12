@@ -4,9 +4,43 @@ export function createTab({ name = 'New tab', order = 0 } = {}) {
     name,
     kind: 'blank',
     order,
+    savedLocation: 'none',
+    savedFolderId: null,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   }
+}
+
+export function updateTabFields(tab, fields) {
+  return { ...tab, ...fields, updatedAt: Date.now() }
+}
+
+export function setTabName(tabs, tabId, name) {
+  return tabs.map((t) => (t.id === tabId ? updateTabFields(t, { name }) : t))
+}
+
+export function removeTab(tabs, tabId) {
+  return tabs
+    .filter((t) => t.id !== tabId)
+    .map((t, i) => ({ ...t, order: i }))
+}
+
+export function reorderTabs(tabs, tabId, toIndex) {
+  const clamped = Math.max(0, Math.min(toIndex, tabs.length - 1))
+  const from = tabs.findIndex((t) => t.id === tabId)
+  if (from === -1 || from === clamped) return tabs
+  const moved = tabs[from]
+  const without = tabs.filter((_, i) => i !== from)
+  const result = [...without.slice(0, clamped), moved, ...without.slice(clamped)]
+  return result.map((t, i) => ({ ...t, order: i }))
+}
+
+export function saveTabToShelf(tab) {
+  return updateTabFields(tab, { savedLocation: 'shelf' })
+}
+
+export function moveTabToLibrary(tab, folderId = null) {
+  return updateTabFields(tab, { savedLocation: 'library', savedFolderId: folderId })
 }
 
 export function createTabCard({ tabId, cardId, position }) {
