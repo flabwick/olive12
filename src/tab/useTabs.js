@@ -27,13 +27,16 @@ export function useTabs({ userId } = {}) {
   const [promptLoading, setPromptLoading] = useState(false)
   const [promptError, setPromptError] = useState('')
   const schedulerRef = useRef(null)
+  const storageRef = useRef(null)
 
   useEffect(() => {
     if (!userId) {
       schedulerRef.current = null
+      storageRef.current = null
       return
     }
     const storage = makeCardSupabaseStorage(supabase)
+    storageRef.current = storage
     schedulerRef.current = createCardSyncScheduler({ userId, debounceMs: 3000, storage })
   }, [userId])
 
@@ -144,6 +147,7 @@ export function useTabs({ userId } = {}) {
         deleteCard(cardId),
         ...(tc ? [deleteTabCard(tc.tabId, cardId)] : []),
         ...nextTabCards.map((t) => putTabCard(t)),
+        ...(storageRef.current ? [storageRef.current.deleteRemoteCard(cardId)] : []),
       ])
     },
     [tabCards, cardsById],
@@ -250,18 +254,34 @@ export function useTabs({ userId } = {}) {
 
   const runDockPrompt = useCallback(
     async (promptText) => {
+      console.log('[useTabs] runDockPrompt called, prompt:', JSON.stringify(promptText))
       setPromptLoading(true)
       setPromptError('')
       try {
         const contextCards = assembleContext(entries)
+        console.log('[useTabs] contextCards:', JSON.stringify(contextCards))
+        console.log('[useTabs] invoking dock-prompt edge function...')
         const { data, error } = await supabase.functions.invoke('dock-prompt', {
           body: { prompt: promptText, contextCards },
         })
-        if (error) throw error
-        await addCard({ title: data?.title ?? '', body: data?.body ?? '' })
+        console.log('[useTabs] invoke complete')
+        console.log('[useTabs] raw data:', JSON.stringify(data))
+        console.log('[useTabs] _debug from server:', JSON.stringify(data?._debug))
+        console.log('[useTabs] raw error:', JSON.stringify(error))
+        if (error) {
+          console.error('[useTabs] invoke returned an error, throwing')
+          throw error
+        }
+        const title = data?.title ?? ''
+        const body = data?.body ?? ''
+        console.log('[useTabs] title to addCard:', JSON.stringify(title))
+        console.log('[useTabs] body to addCard:', JSON.stringify(body))
+        const card = await addCard({ title, body })
+        console.log('[useTabs] addCard result:', JSON.stringify(card))
         setPromptLoading(false)
         return true
       } catch (err) {
+        console.error('[useTabs] caught error:', err)
         setPromptError(err.message || 'Something went wrong')
         setPromptLoading(false)
         return false

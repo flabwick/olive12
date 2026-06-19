@@ -13,12 +13,13 @@ const syncMocks = vi.hoisted(() => ({
 }))
 
 const invokeMock = vi.hoisted(() => vi.fn())
+const deleteRemoteMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 
 vi.mock('../lib/supabaseClient', () => ({
   supabase: { functions: { invoke: invokeMock } },
 }))
 vi.mock('../sync/cardSupabaseStorage', () => ({
-  makeCardSupabaseStorage: vi.fn(() => ({})),
+  makeCardSupabaseStorage: vi.fn(() => ({ deleteRemoteCard: deleteRemoteMock })),
 }))
 vi.mock('../sync/cardSync', () => ({
   createCardSyncScheduler: syncMocks.createCardSyncScheduler,
@@ -620,6 +621,7 @@ describe('useTabs', () => {
       syncMocks.scheduleSync.mockClear()
       syncMocks.runNow.mockClear()
       syncMocks.createCardSyncScheduler.mockClear()
+      deleteRemoteMock.mockClear()
       syncMocks.createCardSyncScheduler.mockReturnValue({
         scheduleSync: syncMocks.scheduleSync,
         runNow: syncMocks.runNow,
@@ -761,6 +763,23 @@ describe('useTabs', () => {
       await waitFor(() => expect(result.current.entries).toHaveLength(1))
       expect(result.current.entries[0].card.title).toBe('Remote Card')
       expect(result.current.entries[0].card.body).toBe('From server')
+    })
+
+    it('removeCard with userId also deletes the card from Supabase', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'Temp', body: '' }) })
+
+      deleteRemoteMock.mockClear()
+      await act(async () => { await result.current.removeCard('card-uuid') })
+
+      expect(deleteRemoteMock).toHaveBeenCalledOnce()
+      expect(deleteRemoteMock).toHaveBeenCalledWith('card-uuid')
     })
 
     it('does not duplicate tab_cards for cards that already have one', async () => {

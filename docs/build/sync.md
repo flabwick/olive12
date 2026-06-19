@@ -7,6 +7,7 @@ Supabase card sync: pure conflict-resolution logic, Supabase storage adapter, sy
 | Data | Syncs to Supabase |
 |---|---|
 | Card `title`, `body`, `location` | Yes — on every mutation, debounced 3 s |
+| Card deletion | Yes — immediate on `removeCard` |
 | Card `folderId` | No — local only |
 | Tabs, tab_card order, `foldState`, `hiddenState` | No — Dexie only |
 | Folders | No — Dexie only |
@@ -21,7 +22,7 @@ src/
     cardSyncLogic.js                # Pure: FNV-1a hash, classify, resolve conflict
     cardSyncLogic.test.js           # [TEST] 19 tests
     cardSupabaseStorage.js          # Supabase adapter factory (no default export)
-    cardSupabaseStorage.test.js     # [TEST] 7 tests
+    cardSupabaseStorage.test.js     # [TEST] 9 tests
     cardSync.js                     # Orchestration: syncDirty, pullRemote, scheduler
     cardSync.test.js                # [TEST] 14 tests
   prompt/
@@ -101,7 +102,7 @@ Factory function. Never imports `supabase` directly — client is always injecte
 
 ```js
 export function makeCardSupabaseStorage(client) {
-  // returns { fetchRemoteCardsForUser, upsertRemoteCard, fetchRemoteCardById }
+  // returns { fetchRemoteCardsForUser, upsertRemoteCard, fetchRemoteCardById, deleteRemoteCard }
 }
 ```
 
@@ -110,6 +111,7 @@ export function makeCardSupabaseStorage(client) {
 | `fetchRemoteCardsForUser(userId)` | `SELECT *` WHERE `user_id = userId` |
 | `upsertRemoteCard(cardRow)` | UPSERT on conflict `(id)` |
 | `fetchRemoteCardById(userId, cardId)` | Single-row SELECT; returns `null` if not found |
+| `deleteRemoteCard(cardId)` | `DELETE` WHERE `id = cardId` |
 
 ## Sync orchestration — cardSync.js
 
@@ -150,7 +152,7 @@ Filters `useTabs` entries, keeping only non-hidden cards. Returns `[{ id, title,
 ### `buildPrompt(prompt, contextCards)` → `messages[]`
 
 Builds the OpenRouter messages array:
-- System: instructs model to respond with `{ "title": "...", "body": "..." }` JSON only.
+- System: instructs model to write a short title on the first line, leave a blank line, then write the response as plain text. No JSON, no markdown.
 - User: context cards as titled, divider-separated blocks, followed by the prompt.
 
 This function is mirrored inside `supabase/functions/dock-prompt/index.ts`. Keep both in sync if the prompt wording changes.
@@ -167,10 +169,10 @@ const MODEL_CONFIG = {
 ```
 
 Request: `{ prompt: string, contextCards: [{id, title, body}] }`
-Response: `{ title: string, body: string }`
+Response: `{ title: string, body: string, _debug: { finishReason, rawContent } }`
 Error: `{ error: string, detail?: string }`
 
-If the model returns non-JSON, falls back to `{ title: 'Response', body: <raw content> }`.
+**Parsing:** `parseContent(content)` splits the model's plain-text response on the first `\n`. Everything before is the title (falls back to `'Response'` if empty); everything after is the body (falls back to the full content if blank). No JSON parsing — the plain-text format avoids the tool-call mode that small models enter when asked for JSON output.
 
 **Deploy:** `supabase functions deploy dock-prompt`
 **Secret:** `OPENROUTER_API_KEY` must be set via `supabase secrets set`.
@@ -195,18 +197,17 @@ Sign-up shows a "Check your email" confirmation; sign-in logs in immediately on 
 | File | What it covers |
 |---|---|
 | `cardSyncLogic.test.js` | `computeContentHash` (deterministic, body-only, config included), `classifyCardSync` (all 5 states, timestamp edges), `resolveCardConflict` (all 5 → correct action/winner) |
-| `cardSupabaseStorage.test.js` | `fetchRemoteCardsForUser`, `upsertRemoteCard`, `fetchRemoteCardById` via fake client chains |
+| `cardSupabaseStorage.test.js` | `fetchRemoteCardsForUser`, `upsertRemoteCard`, `fetchRemoteCardById`, `deleteRemoteCard` via fake client chains |
 | `cardSync.test.js` | `syncDirtyCardsForUser` (push local-only, push local-newer, pull remote-newer, NOOP in-sync, error leaves dirty, skips clean); `pullRemoteCardsForUser` (writes new remote, overwrites clean local when newer, skips dirty local, skips when local newer, empty → []); scheduler (debounce, runNow pull+sync, runNow cancels pending debounce) |
 | `assembleContext.test.js` | Empty, maps to {id,title,body}, excludes hidden, includes folded, preserves order, all-hidden |
-| `buildPrompt.test.js` | Two-element array, system JSON instruction, user message contains prompt, card titles/bodies, placeholder when no cards, untitled → "Card N", dividers between multiple cards |
-| `useTabs.test.js` | Scheduler created with userId, not without; runNow on initial reconcile; scheduleSync on mutations; orphan card detection; runDockPrompt (invoke args, card created, returns true/false, hidden cards excluded) |
+| `buildPrompt.test.js` | Two-element array, system plain-text instruction, user message contains prompt, card titles/bodies, placeholder when no cards, untitled → "Card N", dividers between multiple cards |
+| `useTabs.test.js` | Scheduler created with userId, not without; runNow on initial reconcile; scheduleSync on mutations; orphan card detection; removeCard with userId calls deleteRemoteCard; runDockPrompt (invoke args, card created, returns true/false, hidden cards excluded) |
 | `App.test.jsx` | Auth gate; Prompt button; DockPrompt open/close/submit |
 
 ## Not built yet
 
 - Conflict UI (currently `REMOTE_NEWER` always wins)
 - Tab, tab_card, or folder sync
-- Card deletion sync
 - Optimistic rollback on sync failure
 - Real-time Supabase subscriptions
 - Streaming dock-prompt responses

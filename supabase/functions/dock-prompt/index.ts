@@ -29,7 +29,7 @@ function buildMessages(
     {
       role: 'system',
       content:
-        'You are an AI assistant embedded in a note-taking app. The user will give you a prompt and the current tab\'s visible cards as context. Respond with a single JSON object and nothing else — no markdown fences, no explanation. The object must have exactly two string fields: "title" (max 80 characters) and "body" (plain text content). Do not wrap the JSON in backticks or any other formatting.',
+        'You are an AI assistant embedded in a note-taking app. Write a short title on the first line (max 80 characters). Leave one blank line. Then write your full response as plain text. No JSON, no markdown, no labels — just the title, a blank line, then the content.',
     },
     {
       role: 'user',
@@ -38,15 +38,29 @@ function buildMessages(
   ]
 }
 
+function parseContent(content: string): { title: string; body: string } {
+  const trimmed = content.trim()
+  const firstNewline = trimmed.indexOf('\n')
+  if (firstNewline < 0) {
+    return { title: trimmed || 'Response', body: trimmed }
+  }
+  const title = trimmed.slice(0, firstNewline).trim() || 'Response'
+  const body = trimmed.slice(firstNewline + 1).trim()
+  return { title, body: body || trimmed }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS })
   }
 
   try {
-    const { prompt, contextCards } = await req.json()
+    const body = await req.json()
+    console.log('[dock-prompt] received body:', JSON.stringify(body))
+    const { prompt, contextCards } = body
 
     if (!prompt || typeof prompt !== 'string') {
+      console.log('[dock-prompt] missing or invalid prompt')
       return new Response(JSON.stringify({ error: 'prompt is required' }), {
         status: 400,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
@@ -54,6 +68,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const apiKey = Deno.env.get('OPENROUTER_API_KEY')
+    console.log('[dock-prompt] apiKey present:', !!apiKey)
     if (!apiKey) {
       return new Response(JSON.stringify({ error: 'OPENROUTER_API_KEY not configured' }), {
         status: 500,
@@ -62,6 +77,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const messages = buildMessages(prompt, contextCards ?? [])
+    console.log('[dock-prompt] sending to OpenRouter, model:', MODEL_CONFIG.model)
 
     const openRouterRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -77,8 +93,11 @@ Deno.serve(async (req: Request) => {
       }),
     })
 
+    console.log('[dock-prompt] OpenRouter status:', openRouterRes.status)
+
     if (!openRouterRes.ok) {
       const detail = await openRouterRes.text()
+      console.log('[dock-prompt] OpenRouter error detail:', detail)
       return new Response(
         JSON.stringify({ error: `OpenRouter responded with ${openRouterRes.status}`, detail }),
         {
@@ -89,24 +108,27 @@ Deno.serve(async (req: Request) => {
     }
 
     const completion = await openRouterRes.json()
+    const finishReason = completion.choices?.[0]?.finish_reason
     const content: string = completion.choices?.[0]?.message?.content ?? ''
+    console.log('[dock-prompt] finish_reason:', finishReason)
+    console.log('[dock-prompt] raw content:', JSON.stringify(content))
 
-    let parsed: { title?: string; body?: string } = {}
-    try {
-      parsed = JSON.parse(content)
-    } catch {
-      // Model didn't return valid JSON — use raw content as the body.
-      parsed = { title: 'Response', body: content }
+    const { title, body: cardBody } = parseContent(content)
+    console.log('[dock-prompt] parsed title:', JSON.stringify(title))
+    console.log('[dock-prompt] parsed body:', JSON.stringify(cardBody))
+
+    const responsePayload = {
+      title,
+      body: cardBody,
+      _debug: { finishReason, rawContent: content },
     }
 
     return new Response(
-      JSON.stringify({
-        title: parsed.title ?? 'Response',
-        body: parsed.body ?? content,
-      }),
+      JSON.stringify(responsePayload),
       { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
     )
   } catch (err) {
+    console.error('[dock-prompt] unhandled error:', String(err))
     return new Response(
       JSON.stringify({ error: 'Internal error', detail: String(err) }),
       {

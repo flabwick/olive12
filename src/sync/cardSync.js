@@ -1,4 +1,4 @@
-import { getDirtyCards, markCardClean } from '../card/cardStorage'
+import { getAllCards, getDirtyCards, markCardClean } from '../card/cardStorage'
 import { computeContentHash, resolveCardConflict } from './cardSyncLogic'
 
 function localToRemote(card, userId) {
@@ -60,9 +60,38 @@ export async function syncDirtyCardsForUser(userId, storage) {
   }
 }
 
+// Fetches all of the user's cards from Supabase and writes any that are new
+// or remotely-newer into local Dexie. Returns the ids of cards that were
+// brand-new to this device (no prior local record), so the caller can create
+// tab_card entries for them.
+export async function pullRemoteCardsForUser(userId, storage) {
+  const [remoteCards, localCards] = await Promise.all([
+    storage.fetchRemoteCardsForUser(userId),
+    getAllCards(),
+  ])
+
+  const localById = Object.fromEntries(localCards.map((c) => [c.id, c]))
+  const newCardIds = []
+
+  for (const row of remoteCards) {
+    const local = localById[row.id]
+    const remoteTs = new Date(row.updated_at).getTime()
+    const localTs = local?.updatedAt ?? 0
+
+    // Write if: no local copy, OR remote is newer and local isn't dirty
+    if (!local || (!local.dirty && remoteTs > localTs)) {
+      await markCardClean(row.id, remoteToLocal(row))
+      if (!local) newCardIds.push(row.id)
+    }
+  }
+
+  return newCardIds
+}
+
 export function createCardSyncScheduler({ userId, debounceMs = 3000, storage }) {
   let timer = null
 
+  // scheduleSync: used after mutations — debounced push of dirty local cards
   function scheduleSync() {
     clearTimeout(timer)
     timer = setTimeout(() => {
@@ -73,9 +102,11 @@ export function createCardSyncScheduler({ userId, debounceMs = 3000, storage }) 
     }, debounceMs)
   }
 
+  // runNow: used on initial load — pull remote first, then push dirty local cards
   async function runNow() {
     clearTimeout(timer)
     timer = null
+    await pullRemoteCardsForUser(userId, storage)
     await syncDirtyCardsForUser(userId, storage)
   }
 

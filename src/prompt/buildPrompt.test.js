@@ -9,11 +9,11 @@ describe('buildPrompt', () => {
     expect(messages[1].role).toBe('user')
   })
 
-  it('system message instructs JSON-only output', () => {
+  it('system message instructs plain text output with title on first line', () => {
     const [system] = buildPrompt('test', [])
-    expect(system.content).toContain('JSON')
-    expect(system.content).toContain('"title"')
-    expect(system.content).toContain('"body"')
+    expect(system.content).toContain('title')
+    expect(system.content).toContain('first line')
+    expect(system.content).not.toContain('JSON object')
   })
 
   it('user message contains the prompt', () => {

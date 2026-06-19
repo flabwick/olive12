@@ -51,7 +51,9 @@ function AppShell({ userId }) {
   }
 
   async function handlePromptSubmit(text) {
+    console.log('[app] handlePromptSubmit fired, text:', JSON.stringify(text))
     const ok = await runDockPrompt(text)
+    console.log('[app] runDockPrompt returned:', ok)
     if (ok) setPromptOpen(false)
   }
 

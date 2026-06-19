@@ -16,7 +16,7 @@ export function buildPrompt(prompt, contextCards) {
     {
       role: 'system',
       content:
-        'You are an AI assistant embedded in a note-taking app. The user will give you a prompt and the current tab\'s visible cards as context. Respond with a single JSON object and nothing else — no markdown fences, no explanation. The object must have exactly two string fields: "title" (max 80 characters) and "body" (plain text content). Do not wrap the JSON in backticks or any other formatting.',
+        'You are an AI assistant embedded in a note-taking app. Write a short title on the first line (max 80 characters). Leave one blank line. Then write your full response as plain text. No JSON, no markdown, no labels — just the title, a blank line, then the content.',
     },
     {
       role: 'user',

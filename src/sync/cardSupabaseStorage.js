@@ -29,5 +29,13 @@ export function makeCardSupabaseStorage(client) {
     return data
   }
 
-  return { fetchRemoteCardsForUser, upsertRemoteCard, fetchRemoteCardById }
+  async function deleteRemoteCard(cardId) {
+    const { error } = await client
+      .from('cards')
+      .delete()
+      .eq('id', cardId)
+    if (error) throw error
+  }
+
+  return { fetchRemoteCardsForUser, upsertRemoteCard, fetchRemoteCardById, deleteRemoteCard }
 }

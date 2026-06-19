@@ -56,6 +56,8 @@ supabase secrets set OPENROUTER_API_KEY=<your-openrouter-key>
 
 The model is configured at the top of `supabase/functions/dock-prompt/index.ts` in `MODEL_CONFIG`. To change the model, edit that constant and redeploy. The current model is `meta-llama/llama-3.2-3b-instruct`.
 
+The system prompt instructs the model to write a title on the first line, leave a blank line, then write the response as plain text. This format is used instead of JSON because small models (including llama-3.2-3b) enter tool-call mode when asked for JSON output, returning `null` content. The `parseContent` function in the edge function splits on the first newline to extract title and body.
+
 ## Sync flow
 
 1. On authenticated load, `useTabs` calls `runNow()`:
@@ -69,6 +71,7 @@ The model is configured at the top of `supabase/functions/dock-prompt/index.ts` 
 | Data | Syncs to Supabase |
 |---|---|
 | Card `title`, `body`, `location` | Yes — debounced 3 s after mutation |
+| Card deletion | Yes — immediate on `removeCard` |
 | Card `folderId` | No — local only |
 | Tabs, tab order, `foldState`, `hiddenState` | No — Dexie only |
 | Folders | No — Dexie only |

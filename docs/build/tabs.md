@@ -117,7 +117,7 @@ supabase/
 
 **Three `useEffect` hooks:**
 
-1. **Scheduler setup** — runs when `userId` changes. Creates a `createCardSyncScheduler` and stores it in `schedulerRef`. Sets `null` when `userId` is absent.
+1. **Scheduler setup** — runs when `userId` changes. Creates a `makeCardSupabaseStorage` adapter (stored in `storageRef`) and a `createCardSyncScheduler` (stored in `schedulerRef`). Sets both to `null` when `userId` is absent.
 2. **Initial reconcile** — runs once when `isReady` and `userId` are both truthy. Calls `runNow()` (pull remote → sync dirty), then detects **orphan cards** (cards in Dexie `cards` with no `tab_cards` entry — pulled from Supabase on another device) and auto-creates `tab_card` entries for them.
 3. **Dexie init** — on mount, loads all tabs/tab_cards/cards/folders in parallel; sets `isReady: true`.
 
@@ -133,7 +133,7 @@ supabase/
 | `folders` | `Folder[]` | All folders |
 | `addCard` | function | `({ title, body }) → card` — creates card + tab_card, persists, schedules sync |
 | `updateCard` | function | `(cardId, fields)` — updates card, persists, schedules sync |
-| `removeCard` | function | `(cardId)` — removes from state and Dexie (no sync) |
+| `removeCard` | function | `(cardId)` — removes from state, Dexie, and Supabase (immediate delete, no debounce) |
 | `reorder` | function | `(cardId, toPosition)` — reorders and persists all positions |
 | `fold` | function | `(cardId)` — sets `foldState: true` |
 | `unfold` | function | `(cardId)` — sets `foldState: false` |
@@ -201,7 +201,7 @@ Slide-up panel. Three tabs: **Shelf** (ShelfRow entries), **Library** (FolderTre
 |---|---|
 | `createTab.test.js` | createTab defaults/custom/unique ids; createTabCard defaults; nextPosition; reorderTabCard; setTabCardFold; setTabCardHidden; removeTabCard |
 | `tabStorage.test.js` | Empty reads, putTab round-trip, upsert; putTabCard round-trip, foldState/hiddenState, position upsert, deleteTabCard |
-| `useTabs.test.js` | Default tab on first mount, state loaded on mount, addCard, updateCard, removeCard, reorder, fold/unfold, hide/unhide, saveToShelf/moveToLibrary (state + Dexie), shelfEntries/libraryEntries derivation + sort, createFolder, moveToLibrary with folderId, remount persistence; sync wiring (scheduler created, runNow called, scheduleSync on mutations, orphan card detection); runDockPrompt (invoke called with correct args, card created from response, returns true/false, excludes hidden cards from context) |
+| `useTabs.test.js` | Default tab on first mount, state loaded on mount, addCard, updateCard, removeCard, reorder, fold/unfold, hide/unhide, saveToShelf/moveToLibrary (state + Dexie), shelfEntries/libraryEntries derivation + sort, createFolder, moveToLibrary with folderId, remount persistence; sync wiring (scheduler created, runNow called, scheduleSync on mutations, orphan card detection, removeCard with userId calls deleteRemoteCard); runDockPrompt (invoke called with correct args, card created from response, returns true/false, excludes hidden cards from context) |
 | `Tab.test.jsx` | Empty state, renders title+body, fold hides body, hidden card class, position order, all callbacks |
 | `Dock.test.jsx` | All 6 buttons render; all callbacks; addDisabled; promptDisabled |
 | `DockPrompt.test.jsx` | Renders textarea + buttons; Send disabled when empty; enables after typing; onSubmit with trimmed text; onDismiss; whitespace-only no-op; loading state; error alert; no alert when error empty |
@@ -219,7 +219,6 @@ Slide-up panel. Three tabs: **Shelf** (ShelfRow entries), **Library** (FolderTre
 - Search, tagging, filters
 - Portal, process, container card types
 - Tab, tab_card, or folder sync to Supabase
-- Card deletion sync
 - Conflict UI (remote always wins on timestamp difference)
 - Dock Prompt streaming, job queue, credits
 - Brain feed (currently placeholder)

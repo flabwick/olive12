@@ -6,6 +6,7 @@ function makeFakeClient(overrides = {}) {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     upsert: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn(),
     single: vi.fn(),
   }
@@ -107,6 +108,28 @@ describe('makeCardSupabaseStorage', () => {
       chain.select.mockReturnValueOnce({ eq: vi.fn(() => eq1Chain) })
 
       await expect(storage.fetchRemoteCardById('u1', 'c1')).rejects.toThrow('fetch failed')
+    })
+  })
+
+  describe('deleteRemoteCard', () => {
+    it('deletes from the cards table filtered by id', async () => {
+      const eqResult = { error: null }
+      const deleteChain = { eq: vi.fn(() => eqResult) }
+      chain.delete.mockReturnValueOnce(deleteChain)
+
+      await storage.deleteRemoteCard('c1')
+
+      expect(client.from).toHaveBeenCalledWith('cards')
+      expect(chain.delete).toHaveBeenCalled()
+      expect(deleteChain.eq).toHaveBeenCalledWith('id', 'c1')
+    })
+
+    it('throws when Supabase returns an error', async () => {
+      const eqResult = { error: new Error('delete failed') }
+      const deleteChain = { eq: vi.fn(() => eqResult) }
+      chain.delete.mockReturnValueOnce(deleteChain)
+
+      await expect(storage.deleteRemoteCard('c1')).rejects.toThrow('delete failed')
     })
   })
 })
