@@ -32,6 +32,7 @@ describe('useTabs', () => {
     await db.tabs.clear()
     await db.tab_cards.clear()
     await db.folders.clear()
+    localStorage.clear()
   })
 
   afterEach(() => {
@@ -1034,6 +1035,34 @@ describe('useTabs', () => {
       expect(result.current.tabs[0].savedLocation).toBe('shelf')
       const stored = await getAllTabs()
       expect(stored[0].savedLocation).toBe('shelf')
+    })
+
+    it('restores activeTabId from localStorage on remount', async () => {
+      await db.tabs.put({ id: 'tab-a', name: 'A', kind: 'blank', order: 0, savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000 })
+      await db.tabs.put({ id: 'tab-b', name: 'B', kind: 'blank', order: 1, savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000 })
+
+      const { result, unmount } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      act(() => { result.current.switchTab('tab-b') })
+      expect(result.current.activeTabId).toBe('tab-b')
+
+      unmount()
+
+      const { result: reloaded } = renderHook(() => useTabs())
+      await waitFor(() => expect(reloaded.current.isReady).toBe(true))
+
+      expect(reloaded.current.activeTabId).toBe('tab-b')
+    })
+
+    it('falls back to first tab if saved activeTabId no longer exists', async () => {
+      localStorage.setItem('olive12:activeTabId', 'deleted-tab')
+      await db.tabs.put({ id: 'tab-a', name: 'A', kind: 'blank', order: 0, savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000 })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(result.current.activeTabId).toBe('tab-a')
     })
 
     it('moveTabToLibrary sets savedLocation to library and persists', async () => {

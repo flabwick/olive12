@@ -30,6 +30,8 @@ import {
   putTabCard,
 } from './tabStorage'
 
+const ACTIVE_TAB_KEY = 'olive12:activeTabId'
+
 export function useTabs({ userId } = {}) {
   const [isReady, setIsReady] = useState(false)
   const [tabs, setTabs] = useState([])
@@ -114,8 +116,12 @@ export function useTabs({ userId } = {}) {
         setTabCards([])
         setCardsById({})
       } else {
+        const savedId = localStorage.getItem(ACTIVE_TAB_KEY)
+        const restoredId = savedId && sortedTabs.find((t) => t.id === savedId)
+          ? savedId
+          : sortedTabs[0].id
         setTabs(sortedTabs)
-        setActiveTabId(sortedTabs[0].id)
+        setActiveTabId(restoredId)
         setTabCards(tcs)
         setCardsById(Object.fromEntries(cards.map((c) => [c.id, c])))
       }
@@ -127,6 +133,10 @@ export function useTabs({ userId } = {}) {
     init()
     return () => { active = false }
   }, [])
+
+  useEffect(() => {
+    if (activeTabId) localStorage.setItem(ACTIVE_TAB_KEY, activeTabId)
+  }, [activeTabId])
 
   const switchTab = useCallback((tabId) => {
     setActiveTabId(tabId)
