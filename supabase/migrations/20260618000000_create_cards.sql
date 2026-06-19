@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS cards (
 -- Row-level security: every user sees only their own cards
 ALTER TABLE cards ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users own their cards" ON cards;
 CREATE POLICY "Users own their cards"
   ON cards FOR ALL
   USING (auth.uid() = user_id)

@@ -8,6 +8,9 @@ import { supabase } from '../lib/supabaseClient'
 import { assembleContext } from '../prompt/assembleContext'
 import { createCardSyncScheduler } from '../sync/cardSync'
 import { makeCardSupabaseStorage } from '../sync/cardSupabaseStorage'
+import { computeContentHash } from '../sync/cardSyncLogic'
+import { createIndexEntry } from '../brain/createIndexEntry'
+import { getAllIndexEntries, putIndexEntry } from '../brain/indexEntryStorage'
 import {
   createTab,
   createTabCard,
@@ -363,8 +366,40 @@ export function useTabs({ userId } = {}) {
       setCardsById((prev) => ({ ...prev, [cardId]: updated }))
       await putCard(updated)
       schedulerRef.current?.scheduleSync()
+
+      try {
+        const neighborEntries = (await getAllIndexEntries()).slice(0, 10)
+        const { data, error } = await supabase.functions.invoke('wiki-index', {
+          body: { card: updated, neighborEntries },
+        })
+        if (!error && data) {
+          const entry = createIndexEntry({
+            cardId,
+            title: data.title || updated.title || '',
+            tags: data.tags ?? [],
+            summary: data.summary ?? '',
+            links: data.links ?? [],
+            contentHash: computeContentHash(updated),
+          })
+          await putIndexEntry(entry)
+          if (userId) {
+            await supabase.from('index_entries').upsert({
+              card_id: cardId,
+              user_id: userId,
+              title: entry.title,
+              tags: entry.tags,
+              summary: entry.summary,
+              links: entry.links,
+              content_hash: entry.contentHash,
+              updated_at: new Date(entry.updatedAt).toISOString(),
+            })
+          }
+        }
+      } catch (err) {
+        console.error('[useTabs] wiki-index error:', err)
+      }
     },
-    [cardsById],
+    [cardsById, userId],
   )
 
   const createFolder = useCallback(async ({ name = 'New folder', parentId = null } = {}) => {

@@ -17,6 +17,9 @@ src/
   folder/
     folderStorage.js        # Per-record folder operations (pure, no React)
     folderStorage.test.js   # [TEST]
+  brain/
+    indexEntryStorage.js    # Per-record index_entries operations (pure, no React)
+    indexEntryStorage.test.js # [TEST]
   test/
     setup.js                # Imports fake-indexeddb/auto for all unit tests
 ```
@@ -70,6 +73,16 @@ db.version(5).stores({
   folders:   'id',
   links:     '[sourceCardId+targetCardId], sourceCardId, targetCardId',
 })
+
+// v6: adds index_entries table for Brain/Wiki knowledge index.
+db.version(6).stores({
+  cards:         'id',
+  tabs:          'id',
+  tab_cards:     '[tabId+cardId], tabId',
+  folders:       'id',
+  links:         '[sourceCardId+targetCardId], sourceCardId, targetCardId',
+  index_entries: 'cardId',
+})
 ```
 
 | Table | Primary key | Secondary index | Notes |
@@ -79,6 +92,7 @@ db.version(5).stores({
 | `tab_cards` | `[tabId+cardId]` compound | `tabId` | Compound PK; `tabId` index enables per-tab queries |
 | `folders` | `id` | — | Stores folder records including `parentId`; not indexed |
 | `links` | `[sourceCardId+targetCardId]` compound | `sourceCardId`, `targetCardId` | Directed edge from source to target; rebuilt on every card write |
+| `index_entries` | `cardId` | — | One Brain/Wiki index entry per card; keyed by `cardId` |
 
 The database name is `olive12`. Increment the version number and add a migration block for any schema change. Always use `tx.table('tableName')` — not `tx.tableName` — in Dexie v4 upgrade callbacks.
 
@@ -120,6 +134,20 @@ The database name is `olive12`. Increment the version number and add a migration
 | `putFolder(folder)` | Upserts a folder record |
 | `deleteFolder(folderId)` | Deletes the record by primary key |
 
+## Index entry storage
+
+`src/brain/indexEntryStorage.js` — plain async functions, no React. See [brain.md](./brain.md) for the full data shape.
+
+| Function | Behaviour |
+|---|---|
+| `getAllIndexEntries()` | Returns all records from `index_entries` |
+| `getIndexEntry(cardId)` | Returns the entry for a single card, or `undefined` |
+| `putIndexEntry(entry)` | Upserts by `cardId` |
+| `deleteIndexEntry(cardId)` | Deletes by primary key |
+| `searchIndexEntries(query)` | Case-insensitive substring match over `title`, joined `tags`, and `summary`; returns results sorted by `updatedAt` desc |
+
+Index entries are not flagged `dirty` — they are written directly to Supabase at index time rather than through the debounced sync scheduler.
+
 ## Dirty flag
 
 Every card in Dexie has a `dirty` field.
@@ -145,6 +173,7 @@ Between test files: Vitest runs each file in its own worker, so each file gets a
 | `cardStorage.test.js` | Empty load; `putCard` round-trip; `dirty: true`; upsert; `deleteCard`; `location` round-trip; `getDirtyCards`; `markCardClean` |
 | `tabStorage.test.js` | Empty reads; `putTab` round-trip + upsert; `deleteTab`; `putTabCard` round-trip; `foldState`/`hiddenState`; position upsert; `deleteTabCard` by compound key; `deleteAllTabCards` removes all records for a given tabId |
 | `folderStorage.test.js` | Empty read; `putFolder` round-trip; upsert; `deleteFolder`; `parentId` round-trip |
+| `indexEntryStorage.test.js` | Empty read; put round-trip; `getIndexEntry` found/undefined; upsert (no duplicate); `deleteIndexEntry`; `searchIndexEntries` — title match, tag match, summary match, no-match → [], case-insensitive, sorted by updatedAt desc |
 
 ## Not built yet
 
@@ -153,3 +182,5 @@ Between test files: Vitest runs each file in its own worker, so each file gets a
 - Tombstoning / soft-delete (`deleted: true`)
 - Card deletion sync (no remote delete when a local card is removed)
 - `user_id` on any local Dexie table
+- Index entry deletion from Dexie when a card is deleted (index_entries row in Supabase is auto-removed via FK cascade, but the local Dexie record is not cleaned up)
+- `indexEntrySupabaseStorage.js` adapter (Supabase writes are done inline in `useTabs` for now)

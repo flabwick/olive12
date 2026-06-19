@@ -12,6 +12,7 @@ Supabase card sync: pure conflict-resolution logic, Supabase storage adapter, sy
 | Card `folderId` | No — local only |
 | Tabs, tab_card order, `foldState`, `hiddenState` | No — Dexie only |
 | Folders | No — Dexie only |
+| Index entries (`index_entries`) | Yes — written directly via `supabase.from('index_entries').upsert(...)` inside `moveToLibrary`; not through the debounced scheduler |
 
 ## File map
 
@@ -35,8 +36,11 @@ supabase/
   functions/
     dock-prompt/
       index.ts                      # Deno Edge Function: OpenRouter call → { title, body }
+    wiki-index/
+      index.ts                      # Deno Edge Function: card + neighbors → { title, tags, summary, links }
   migrations/
-    20260618000000_create_cards.sql # Cards table + RLS
+    20260618000000_create_cards.sql           # Cards table + RLS
+    20260620000000_create_index_entries.sql   # index_entries table + RLS
 ```
 
 ## Supabase client
@@ -147,6 +151,10 @@ Returns `{ scheduleSync, runNow }`.
 ## Dock Prompt — AI card creation
 
 See [prompt.md](prompt.md) for full detail on `assembleContext`, `buildPrompt`, the edge function, `runDockPrompt`, and the `DockPrompt` UI component.
+
+## Wiki Index — AI knowledge indexing
+
+See [brain.md](../brain.md) for full detail on `createIndexEntry`, `indexEntryStorage`, the `wiki-index` edge function, and the `moveToLibrary` wiring.
 
 ## Auth (App.jsx)
 

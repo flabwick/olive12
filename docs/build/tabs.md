@@ -74,6 +74,11 @@ src/
     TransientCard.test.jsx    # [TEST]
     TransientCard.stories.jsx # [STORY]
     index.js                  # Barrel exports
+  brain/
+    createIndexEntry.js       # Pure: IndexEntry data shape factory
+    createIndexEntry.test.js  # [TEST]
+    indexEntryStorage.js      # Dexie-backed index_entries operations (pure, no React)
+    indexEntryStorage.test.js # [TEST]
   App.jsx                     # App (session gate) + AppShell (composes all UI)
   App.css
   CardShell.jsx               # Thin wrapper used in CardShell-only contexts
@@ -82,8 +87,11 @@ supabase/
   functions/
     dock-prompt/
       index.ts                # Deno Edge Function: OpenRouter call → { title, body }
+    wiki-index/
+      index.ts                # Deno Edge Function: card + neighbors → { title, tags, summary, links }
   migrations/
     20260618000000_create_cards.sql
+    20260620000000_create_index_entries.sql
 playwright.config.js          # Playwright config; webServer → http://localhost:5173
 e2e/
   tabs.spec.js                # [E2E] Full tab management flow (requires TEST_EMAIL / TEST_PASSWORD)
@@ -211,7 +219,7 @@ All tab mutation functions (`addTab`, `removeTab`, `renameTab`, `saveTabToShelf`
 | `hide` | function | `(cardId)` — sets `hiddenState: true` |
 | `unhide` | function | `(cardId)` — sets `hiddenState: false` |
 | `saveToShelf` | function | `(cardId)` — see behaviour below |
-| `moveToLibrary` | function | `(cardId, folderId?)` — sets `location: 'library'` + `folderId`, schedules sync |
+| `moveToLibrary` | function | `(cardId, folderId?)` — sets `location: 'library'` + `folderId`, schedules sync, then triggers wiki-index and writes the result to Dexie + Supabase (non-blocking) |
 | `createFolder` | function | `({ name?, parentId? }) → folder` — creates and persists folder |
 | `runDockPrompt` | function | `async (promptText) → boolean` — invokes `dock-prompt` edge function, creates card on success |
 | `promptLoading` | `boolean` | `true` while the edge function call is in flight |
@@ -347,7 +355,7 @@ Slide-up panel. Three tabs: **Shelf** (VaultTabRow tab entries + ShelfRow card e
 |---|---|
 | `createTab.test.js` | `createTab` defaults/custom/unique ids; `savedLocation`/`savedFolderId` defaults; `createTabCard` defaults; `nextPosition`; `reorderTabCard`; `setTabCardFold`; `setTabCardHidden`; `removeTabCard`; `updateTabFields`; `setTabName`; `removeTab` (removes and renumbers); `reorderTabs`; `saveTabToShelf`; `moveTabToLibrary` |
 | `tabStorage.test.js` | Empty reads; `putTab` round-trip + upsert; `deleteTab`; `putTabCard` round-trip, foldState/hiddenState, position upsert; `deleteTabCard`; `deleteAllTabCards` |
-| `useTabs.test.js` | Default tab on first mount; state loaded on mount; `addCard`; `addPortalCard` (creates portal, appends at end, dedup — same target twice is no-op, target card already in tab is no-op); `updateCard`; `removeCard`; `reorder`; `fold`/`unfold`; `hide`/`unhide`; `saveToShelf` (moves card to shelf, replaces tab instance with portal at same position, persists); `moveToLibrary` (state + Dexie); `shelfEntries`/`libraryEntries` derivation + sort; `shelfTabs`/`libraryTabs` derivation; `createFolder`; `moveToLibrary` with folderId; remount persistence; multi-tab: `addTab`, `removeTab`, `renameTab`, `saveTabToShelf`, `moveTabToLibrary`, `switchTab`; localStorage: `activeTabId` persisted on switch, restored on remount; sync wiring: scheduler created, `runNow` called, `scheduleSync` on mutations, orphan card detection, `removeCard` with userId calls `deleteRemoteCard`; `runDockPrompt`: invoke args, card created, returns true/false, excludes hidden cards |
+| `useTabs.test.js` | Default tab on first mount; state loaded on mount; `addCard`; `addPortalCard` (creates portal, appends at end, dedup — same target twice is no-op, target card already in tab is no-op); `updateCard`; `removeCard`; `reorder`; `fold`/`unfold`; `hide`/`unhide`; `saveToShelf` (moves card to shelf, replaces tab instance with portal at same position, persists); `moveToLibrary` (state + Dexie); `shelfEntries`/`libraryEntries` derivation + sort; `shelfTabs`/`libraryTabs` derivation; `createFolder`; `moveToLibrary` with folderId; remount persistence; multi-tab: `addTab`, `removeTab`, `renameTab`, `saveTabToShelf`, `moveTabToLibrary`, `switchTab`; localStorage: `activeTabId` persisted on switch, restored on remount; sync wiring: scheduler created, `runNow` called, `scheduleSync` on mutations, orphan card detection, `removeCard` with userId calls `deleteRemoteCard`; `runDockPrompt`: invoke args, card created, returns true/false, excludes hidden cards. **Note:** the `wiki-index` invocation path inside `moveToLibrary` is not covered in the test suite — the AI call is fire-and-forget and the tests exercise card-state changes only. |
 | `TabHeader.test.jsx` | Renders name and save button; click → edit mode; Enter commits; blur commits; Escape cancels; shelf state button; library state button (disabled); no button when no handlers |
 | `TabSwitcher.test.jsx` | Renders all tiles; active tile highlighted; card counts; shelf/library badges; switch on tile click; add tile; close on × click; close on backdrop click; Escape closes; remove tile calls `onRemoveTab`; save button calls `onSaveTab` |
 | `Tab.test.jsx` | Empty state; renders title+body; fold hides body; hidden card class; position order; all callbacks; portal card renders target title/body; portal placeholder when null target; portal onUpdate routes to target id; null target not editable; onLocate called with target id |
@@ -369,5 +377,6 @@ Slide-up panel. Three tabs: **Shelf** (VaultTabRow tab entries + ShelfRow card e
 - Tab, tab_card, or folder sync to Supabase
 - Conflict UI (remote always wins on timestamp difference)
 - Dock Prompt streaming, job queue, credits
-- Brain feed (currently placeholder)
+- Brain feed content (FolderPanel Brain pane is a "coming soon" placeholder — see [brain.md](./brain.md))
 - Moving a saved tab to a specific library folder (currently `moveTabToLibrary` always uses root)
+- wiki-index test coverage for the `moveToLibrary` wiring path

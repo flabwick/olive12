@@ -92,7 +92,7 @@ Compound primary key `[sourceCardId+targetCardId]` prevents duplicate edges and 
 
 ## Not built yet
 
-- Supabase sync for `links` (not needed until Brain/Wiki)
+- Supabase sync for `links` (Brain/Wiki slice started but the links table is not yet synced — only `index_entries` is)
 - Any UI rendering links (no graph view, no backlinks panel)
 - Incoming links cleanup when a target card is deleted (only the source card's outgoing links are cleaned up on `removeCard`; target-side link rows from other cards are not removed)
 - Container card `container_children` or process card `input_card_ids` parsing

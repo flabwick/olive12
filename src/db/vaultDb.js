@@ -44,3 +44,12 @@ db.version(5).stores({
   folders: 'id',
   links: '[sourceCardId+targetCardId], sourceCardId, targetCardId',
 })
+
+db.version(6).stores({
+  cards: 'id',
+  tabs: 'id',
+  tab_cards: '[tabId+cardId], tabId',
+  folders: 'id',
+  links: '[sourceCardId+targetCardId], sourceCardId, targetCardId',
+  index_entries: 'cardId',
+})
