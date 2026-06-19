@@ -5,16 +5,27 @@ import { supabase } from './lib/supabaseClient'
 import { Dock } from './tab/Dock'
 import { DockPrompt } from './tab/DockPrompt'
 import { Tab } from './tab/Tab'
+import { TabHeader } from './tab/TabHeader'
+import { TabSwitcher } from './tab/TabSwitcher'
 import { TransientCard } from './tab/TransientCard'
 import { useTabs } from './tab/useTabs'
 import './App.css'
 
 function AppShell({ userId }) {
   const {
+    tab,
+    tabs,
+    activeTabId,
     entries,
     shelfEntries,
     libraryEntries,
     folders,
+    switchTab,
+    addTab,
+    removeTab,
+    renameTab,
+    saveTabToShelf,
+    moveTabToLibrary,
     addCard,
     updateCard,
     removeCard,
@@ -29,11 +40,14 @@ function AppShell({ userId }) {
     runDockPrompt,
     promptLoading,
     promptError,
+    allTabCards,
+    cardsById,
   } = useTabs({ userId })
 
   const [folderPanelOpen, setFolderPanelOpen] = useState(false)
   const [transientOpen, setTransientOpen] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
+  const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false)
 
   function handleAddCard(fields) {
     addCard(fields)
@@ -57,9 +71,24 @@ function AppShell({ userId }) {
     if (ok) setPromptOpen(false)
   }
 
+  function handleTabOverview() {
+    setFolderPanelOpen(false)
+    setPromptOpen(false)
+    setTabSwitcherOpen(true)
+  }
+
   return (
     <div className="app-shell">
       <div className="app-shell__content">
+        {tab && (
+          <TabHeader
+            name={tab.name}
+            savedLocation={tab.savedLocation}
+            onRename={(name) => renameTab(tab.id, name)}
+            onSaveToShelf={tab.savedLocation === 'none' ? () => saveTabToShelf(tab.id) : undefined}
+            onMoveToLibrary={tab.savedLocation === 'shelf' ? () => moveTabToLibrary(tab.id) : undefined}
+          />
+        )}
         <Tab
           entries={entries}
           folders={folders}
@@ -105,8 +134,29 @@ function AppShell({ userId }) {
           onFolder={handleFolder}
           onPrompt={handlePromptToggle}
           promptDisabled={promptLoading}
+          onTabOverview={handleTabOverview}
         />
       </div>
+      {tabSwitcherOpen && (
+        <TabSwitcher
+          tabs={tabs}
+          activeTabId={activeTabId}
+          tabEntries={Object.fromEntries(
+            tabs.map((t) => [
+              t.id,
+              allTabCards
+                .filter((tc) => tc.tabId === t.id)
+                .map((tc) => cardsById[tc.cardId])
+                .filter(Boolean),
+            ])
+          )}
+          onSwitch={(tabId) => { switchTab(tabId); setTabSwitcherOpen(false) }}
+          onClose={() => setTabSwitcherOpen(false)}
+          onAdd={addTab}
+          onRemoveTab={removeTab}
+          onSaveTab={saveTabToShelf}
+        />
+      )}
     </div>
   )
 }

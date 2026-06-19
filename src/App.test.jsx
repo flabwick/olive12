@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from './db/vaultDb'
@@ -180,6 +180,58 @@ describe('App', () => {
     await waitFor(() => screen.getByRole('heading', { name: 'AI result' }))
     expect(screen.getByRole('heading', { name: 'AI result' })).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Prompt input' })).not.toBeInTheDocument()
+  })
+
+  // ── Tab switcher tests ───────────────────────────────────────────────────
+  describe('tab switcher', () => {
+    it('tab overview button opens the tab switcher', async () => {
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Tab overview' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+      expect(screen.getByRole('dialog', { name: 'Tab switcher' })).toBeInTheDocument()
+    })
+
+    it('closing the tab switcher removes it from the screen', async () => {
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Tab overview' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(screen.queryByRole('dialog', { name: 'Tab switcher' })).not.toBeInTheDocument()
+    })
+
+    it('creating a new tab from the switcher adds a tab', async () => {
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Tab overview' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+
+      const initialTiles = document.querySelectorAll('.tab-switcher__tile:not(.tab-switcher__tile--add)')
+      const initialCount = initialTiles.length
+
+      await userEvent.click(screen.getByRole('button', { name: 'New tab' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+
+      await waitFor(() => {
+        const tiles = document.querySelectorAll('.tab-switcher__tile:not(.tab-switcher__tile--add)')
+        expect(tiles.length).toBe(initialCount + 1)
+      })
+    })
+
+    it('switching tabs via the switcher changes the active tab header', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('tab-2')
+
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Tab overview' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+      await userEvent.click(screen.getByRole('button', { name: 'New tab' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+
+      const tiles = document.querySelectorAll('.tab-switcher__tile:not(.tab-switcher__tile--add)')
+      await userEvent.click(tiles[0])
+
+      expect(screen.queryByRole('dialog', { name: 'Tab switcher' })).not.toBeInTheDocument()
+    })
   })
 
   // ── Auth gate tests ──────────────────────────────────────────────────────
