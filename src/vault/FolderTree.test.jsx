@@ -90,4 +90,41 @@ describe('FolderTree', () => {
     expect(screen.getByRole('tree', { name: 'Library' })).toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
+
+  it('renders Open in tab button for a root card when onOpenAsPortal is provided', () => {
+    render(
+      <FolderTree
+        folders={[]}
+        cards={[{ id: 'c1', title: 'Root card', folderId: null }]}
+        onOpenAsPortal={() => {}}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Open Root card in tab' })).toBeInTheDocument()
+  })
+
+  it('calls onOpenAsPortal with card id when Open in tab is clicked for a root card', async () => {
+    const onOpenAsPortal = vi.fn()
+    render(
+      <FolderTree
+        folders={[]}
+        cards={[{ id: 'c1', title: 'Root card', folderId: null }]}
+        onOpenAsPortal={onOpenAsPortal}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Open Root card in tab' }))
+    expect(onOpenAsPortal).toHaveBeenCalledWith('c1')
+  })
+
+  it('calls onOpenAsPortal with card id when Open in tab is clicked for a folder card', async () => {
+    const onOpenAsPortal = vi.fn()
+    render(
+      <FolderTree
+        folders={[{ id: 'f1', name: 'Work', parentId: null, createdAt: 1, updatedAt: 1 }]}
+        cards={[{ id: 'c2', title: 'Work card', folderId: 'f1' }]}
+        onOpenAsPortal={onOpenAsPortal}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Open Work card in tab' }))
+    expect(onOpenAsPortal).toHaveBeenCalledWith('c2')
+  })
 })

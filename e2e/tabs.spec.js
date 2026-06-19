@@ -65,4 +65,30 @@ test.describe('Tab management flow', () => {
     // Verify the saved location badge is still shelf
     await expect(page.locator('[aria-label="Tab saved to Shelf — click to move to Library"]')).toBeVisible()
   })
+
+  test('open vault panel → shelf tab → click Open in tab → portal card appears in active tab', async ({ page }) => {
+    // Add a text card and save it to shelf
+    await page.click('[aria-label="Add card"]')
+    await page.waitForSelector('[aria-label="New card"]')
+    await page.fill('[aria-label="Title"]', 'Shelf source card')
+    await page.fill('[aria-label="Body"]', 'Content of the shelf card')
+    await page.click('button:has-text("Add")')
+
+    // Save the card to shelf via its Save to Shelf button
+    await page.click('[aria-label="Save to Shelf"]')
+
+    // Open the vault panel (Folders button in dock)
+    await page.click('[aria-label="Folders"]')
+    await expect(page.getByRole('dialog', { name: 'Vault and Brain' })).toBeVisible()
+
+    // Shelf tab is active by default — click Open in tab for our card
+    await page.click('[aria-label="Open in tab"]')
+
+    // Panel should close
+    await expect(page.getByRole('dialog', { name: 'Vault and Brain' })).not.toBeVisible()
+
+    // A portal card should appear in the active tab showing the target's title
+    await expect(page.locator('.portal-card')).toBeVisible()
+    await expect(page.locator('.portal-card')).toContainText('Shelf source card')
+  })
 })

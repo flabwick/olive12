@@ -1,4 +1,4 @@
-.shelf-row {
+.vault-tab-row {
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -7,11 +7,11 @@
   font-size: 0.8125rem;
 }
 
-.shelf-row:last-child {
+.vault-tab-row:last-child {
   border-bottom: none;
 }
 
-.shelf-row__title {
+.vault-tab-row__name {
   flex: 1;
   font-weight: 500;
   color: var(--olive-text, #2a1a0a);
@@ -20,7 +20,7 @@
   white-space: nowrap;
 }
 
-.shelf-row__type {
+.vault-tab-row__type {
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -32,7 +32,7 @@
   flex-shrink: 0;
 }
 
-.shelf-row__date {
+.vault-tab-row__date {
   font-size: 0.6875rem;
   color: var(--olive-text-muted, #8a6848);
   flex-shrink: 0;
@@ -40,7 +40,8 @@
   text-align: right;
 }
 
-.shelf-row__move-btn {
+.vault-tab-row__open-btn,
+.vault-tab-row__move-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -56,11 +57,14 @@
   transition: background 0.1s, color 0.1s, border-color 0.1s, transform 0.1s;
 }
 
-.shelf-row--highlighted {
-  background: rgba(200, 168, 122, 0.25);
+.vault-tab-row__open-btn:hover {
+  background: var(--olive-surface, #ede3d4);
+  border-color: var(--olive-border-dark, #2c1810);
+  color: var(--olive-text, #2c1810);
+  transform: translateY(-1px);
 }
 
-.shelf-row__move-btn:hover {
+.vault-tab-row__move-btn:hover {
   background: var(--olive-surface, #ede3d4);
   border-color: var(--olive-border-dark, #2c1810);
   color: var(--olive-text, #2c1810);

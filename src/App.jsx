@@ -19,6 +19,8 @@ function AppShell({ userId }) {
     entries,
     shelfEntries,
     libraryEntries,
+    shelfTabs,
+    libraryTabs,
     folders,
     switchTab,
     addTab,
@@ -27,6 +29,7 @@ function AppShell({ userId }) {
     saveTabToShelf,
     moveTabToLibrary,
     addCard,
+    addPortalCard,
     updateCard,
     removeCard,
     reorder,
@@ -48,9 +51,38 @@ function AppShell({ userId }) {
   const [transientOpen, setTransientOpen] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
   const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false)
+  const [vaultInitialTab, setVaultInitialTab] = useState('shelf')
+  const [highlightedCardId, setHighlightedCardId] = useState(null)
 
   function handleAddCard(fields) {
     addCard(fields)
+    setTransientOpen(false)
+  }
+
+  function handleOpenAsPortal(cardId) {
+    addPortalCard(cardId)
+    setFolderPanelOpen(false)
+  }
+
+  function handleOpenSavedTab(tabId) {
+    switchTab(tabId)
+    setFolderPanelOpen(false)
+  }
+
+  function handleLocate(targetCardId) {
+    const card = cardsById[targetCardId]
+    if (!card) return
+    setVaultInitialTab(card.location === 'library' ? 'library' : 'shelf')
+    setHighlightedCardId(targetCardId)
+    setFolderPanelOpen(true)
+  }
+
+  function handleMoveTabToLibrary(tabId) {
+    moveTabToLibrary(tabId, null)
+  }
+
+  function handleSubmitPortal(cardId) {
+    addPortalCard(cardId)
     setTransientOpen(false)
   }
 
@@ -92,6 +124,7 @@ function AppShell({ userId }) {
         <Tab
           entries={entries}
           folders={folders}
+          cardsById={cardsById}
           onReorder={reorder}
           onUpdate={updateCard}
           onRemove={removeCard}
@@ -101,11 +134,15 @@ function AppShell({ userId }) {
           onUnhide={unhide}
           onSaveToShelf={saveToShelf}
           onMoveToLibrary={moveToLibrary}
+          onLocate={handleLocate}
         />
         {transientOpen && (
           <TransientCard
             onSubmit={handleAddCard}
             onDismiss={() => setTransientOpen(false)}
+            onSubmitPortal={handleSubmitPortal}
+            shelfEntries={shelfEntries}
+            libraryEntries={libraryEntries}
           />
         )}
       </div>
@@ -114,10 +151,17 @@ function AppShell({ userId }) {
           <FolderPanel
             shelfEntries={shelfEntries}
             libraryEntries={libraryEntries}
+            shelfTabs={shelfTabs}
+            libraryTabs={libraryTabs}
             folders={folders}
             onMoveToLibrary={moveToLibrary}
+            onMoveTabToLibrary={handleMoveTabToLibrary}
             onCreateFolder={createFolder}
             onClose={() => setFolderPanelOpen(false)}
+            onOpenAsPortal={handleOpenAsPortal}
+            onOpenTab={handleOpenSavedTab}
+            initialTab={vaultInitialTab}
+            highlightedCardId={highlightedCardId}
           />
         )}
         {promptOpen && (

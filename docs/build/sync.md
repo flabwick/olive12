@@ -6,7 +6,8 @@ Supabase card sync: pure conflict-resolution logic, Supabase storage adapter, sy
 
 | Data | Syncs to Supabase |
 |---|---|
-| Card `title`, `body`, `location` | Yes — on every mutation, debounced 3 s |
+| Card `title`, `body`, `location` (text and portal cards) | Yes — on every mutation, debounced 3 s |
+| Portal card `config` (`target_card_id`) | Yes — portal cards go through the same `putCard` path |
 | Card deletion | Yes — immediate on `removeCard` |
 | Card `folderId` | No — local only |
 | Tabs, tab_card order, `foldState`, `hiddenState` | No — Dexie only |
@@ -56,11 +57,11 @@ Placeholder values prevent the import from throwing in test environments. Tests 
 |---|---|---|
 | `id` | uuid | Matches local `card.id` |
 | `user_id` | uuid | Supabase auth user id; enforced by RLS |
-| `type` | text | `'text'` |
+| `type` | text | `'text'` or `'portal'` |
 | `subtype` | text | `null` |
-| `title` | text | |
+| `title` | text | Empty string for portal cards |
 | `body` | jsonb | `{ kind: 'plain', text: '...' }` |
-| `config` | jsonb | `{}` |
+| `config` | jsonb | `{}` for text cards; `{ target_card_id: string }` for portal cards |
 | `location` | text | `'none' \| 'shelf' \| 'library'` — CHECK constraint |
 | `content_hash` | text | FNV-1a hex of `{ body, config }` |
 | `created_at` | timestamptz | |
@@ -145,41 +146,7 @@ Returns `{ scheduleSync, runNow }`.
 
 ## Dock Prompt — AI card creation
 
-### `assembleContext(entries)` → `contextCard[]`
-
-Filters `useTabs` entries, keeping only non-hidden cards. Returns `[{ id, title, body }]` in position order. Folded cards are included (folding is a display affordance; hidden is the context exclusion).
-
-### `buildPrompt(prompt, contextCards)` → `messages[]`
-
-Builds the OpenRouter messages array:
-- System: instructs model to write a short title on the first line, leave a blank line, then write the response as plain text. No JSON, no markdown.
-- User: context cards as titled, divider-separated blocks, followed by the prompt.
-
-This function is mirrored inside `supabase/functions/dock-prompt/index.ts`. Keep both in sync if the prompt wording changes.
-
-### Edge Function — `supabase/functions/dock-prompt/index.ts`
-
-Model config (only place model selection lives):
-```ts
-const MODEL_CONFIG = {
-  model: 'meta-llama/llama-3.2-3b-instruct',
-  temperature: 0.7,
-  maxTokens: 2000,
-}
-```
-
-Request: `{ prompt: string, contextCards: [{id, title, body}] }`
-Response: `{ title: string, body: string, _debug: { finishReason, rawContent } }`
-Error: `{ error: string, detail?: string }`
-
-**Parsing:** `parseContent(content)` splits the model's plain-text response on the first `\n`. Everything before is the title (falls back to `'Response'` if empty); everything after is the body (falls back to the full content if blank). No JSON parsing — the plain-text format avoids the tool-call mode that small models enter when asked for JSON output.
-
-**Deploy:** `supabase functions deploy dock-prompt`
-**Secret:** `OPENROUTER_API_KEY` must be set via `supabase secrets set`.
-
-### `runDockPrompt(promptText)` in useTabs
-
-Assembles context from current `entries`, invokes the edge function, calls `addCard` on success. Returns `true` on success, `false` on error. Exposes `promptLoading` and `promptError` state.
+See [prompt.md](prompt.md) for full detail on `assembleContext`, `buildPrompt`, the edge function, `runDockPrompt`, and the `DockPrompt` UI component.
 
 ## Auth (App.jsx)
 
@@ -201,7 +168,7 @@ Sign-up shows a "Check your email" confirmation; sign-in logs in immediately on 
 | `cardSync.test.js` | `syncDirtyCardsForUser` (push local-only, push local-newer, pull remote-newer, NOOP in-sync, error leaves dirty, skips clean); `pullRemoteCardsForUser` (writes new remote, overwrites clean local when newer, skips dirty local, skips when local newer, empty → []); scheduler (debounce, runNow pull+sync, runNow cancels pending debounce) |
 | `assembleContext.test.js` | Empty, maps to {id,title,body}, excludes hidden, includes folded, preserves order, all-hidden |
 | `buildPrompt.test.js` | Two-element array, system plain-text instruction, user message contains prompt, card titles/bodies, placeholder when no cards, untitled → "Card N", dividers between multiple cards |
-| `useTabs.test.js` | Scheduler created with userId, not without; runNow on initial reconcile; scheduleSync on mutations; orphan card detection; removeCard with userId calls deleteRemoteCard; runDockPrompt (invoke args, card created, returns true/false, hidden cards excluded) |
+| `useTabs.test.js` (sync subset) | Scheduler created with userId, not without; runNow on initial reconcile; scheduleSync on mutations; orphan card detection; removeCard with userId calls deleteRemoteCard; runDockPrompt (invoke args, card created, returns true/false, hidden cards excluded) |
 | `App.test.jsx` | Auth gate; Prompt button; DockPrompt open/close/submit |
 
 ## Not built yet

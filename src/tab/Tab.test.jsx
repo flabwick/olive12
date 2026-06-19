@@ -196,6 +196,71 @@ describe('Tab', () => {
     })
   })
 
+  describe('portal card', () => {
+    const makePortalEntry = (targetCardId) => ({
+      card: {
+        id: 'portal-1',
+        type: 'portal',
+        config: { target_card_id: targetCardId },
+        title: '',
+        body: '',
+        location: 'none',
+      },
+      position: 0,
+      foldState: false,
+      hiddenState: false,
+    })
+
+    it('renders target title and body for a resolved portal card', () => {
+      const cardsById = {
+        'target-1': { id: 'target-1', title: 'Target card', body: 'Target body', type: 'text', config: null },
+      }
+      render(<Tab entries={[makePortalEntry('target-1')]} cardsById={cardsById} />)
+      expect(screen.getByText('Target card')).toBeInTheDocument()
+      expect(screen.getByText('Target body')).toBeInTheDocument()
+    })
+
+    it('renders placeholder when portal target is null', () => {
+      render(<Tab entries={[makePortalEntry(null)]} cardsById={{}} />)
+      expect(screen.getByText('Portal — no target')).toBeInTheDocument()
+      expect(screen.getByText('No card linked.')).toBeInTheDocument()
+    })
+
+    it('calls onUpdate with target card id when portal card content is edited', async () => {
+      const onUpdate = vi.fn()
+      const cardsById = {
+        'target-1': { id: 'target-1', title: 'Target', body: 'Old body', type: 'text', config: null },
+      }
+      render(
+        <div>
+          <Tab entries={[makePortalEntry('target-1')]} cardsById={cardsById} onUpdate={onUpdate} />
+          <button type="button">Outside</button>
+        </div>,
+      )
+      await userEvent.click(screen.getByRole('button', { name: 'Old body' }))
+      const textarea = screen.getByRole('textbox', { name: 'Card body' })
+      await userEvent.clear(textarea)
+      await userEvent.type(textarea, 'New body')
+      await userEvent.click(screen.getByRole('button', { name: 'Outside' }))
+      expect(onUpdate).toHaveBeenCalledWith('target-1', { title: 'Target', body: 'New body' })
+    })
+
+    it('portal card with no target is not editable', () => {
+      render(<Tab entries={[makePortalEntry(null)]} cardsById={{}} onUpdate={() => {}} />)
+      expect(screen.queryByRole('button', { name: 'No card linked.' })).not.toBeInTheDocument()
+    })
+
+    it('calls onLocate with the target card id when Show in vault is clicked', async () => {
+      const onLocate = vi.fn()
+      const cardsById = {
+        'target-1': { id: 'target-1', title: 'Target', body: 'Body', type: 'text', config: null },
+      }
+      render(<Tab entries={[makePortalEntry('target-1')]} cardsById={cardsById} onLocate={onLocate} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Show in vault' }))
+      expect(onLocate).toHaveBeenCalledWith('target-1')
+    })
+  })
+
   describe('inline update', () => {
     it('passes onUpdate to each Card', async () => {
       const onUpdate = vi.fn()

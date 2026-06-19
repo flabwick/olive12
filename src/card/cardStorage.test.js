@@ -100,4 +100,13 @@ describe('cardStorage', () => {
     const cards = await getAllCards()
     expect(cards[0].dirty).toBe(false)
   })
+
+  it('putCard round-trips portal card config.target_card_id', async () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('portal-uuid')
+    const card = createCard({ type: 'portal', config: { target_card_id: 'target-123' } })
+    await putCard(card)
+    const cards = await getAllCards()
+    expect(cards[0].type).toBe('portal')
+    expect(cards[0].config.target_card_id).toBe('target-123')
+  })
 })

@@ -1,0 +1,36 @@
+.portal-card {
+  position: relative;
+}
+
+.portal-card__locate {
+  position: absolute;
+  bottom: 0.3125rem;
+  right: 0.4375rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--olive-border, #c8b89a);
+  background: var(--olive-parchment, #f5ede0);
+  color: var(--olive-text-muted, #8a6848);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s, border-color 0.15s, color 0.15s;
+  z-index: 1;
+}
+
+.portal-card__locate:hover {
+  opacity: 1;
+  border-color: var(--olive-border-dark, #2c1810);
+  color: var(--olive-text, #2c1810);
+}
+
+@media (prefers-color-scheme: dark) {
+  .portal-card__locate {
+    background: #1e1810;
+    border-color: #6a4e35;
+    color: #8a6848;
+  }
+}

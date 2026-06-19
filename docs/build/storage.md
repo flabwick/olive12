@@ -38,16 +38,49 @@ db.version(2).stores({
   tab_cards: '[tabId+cardId], tabId',
   folders:   'id',
 })
+
+// v3: schema-only (no upgrade callback) — added savedLocation/savedFolderId fields to tabs
+db.version(3).stores({
+  cards:     'id',
+  tabs:      'id',
+  tab_cards: '[tabId+cardId], tabId',
+  folders:   'id',
+})
+
+// v4: re-runs the v3 populate step — required because the original v3 migration used
+// tx.tabs (undefined in Dexie v4) instead of tx.table('tabs'), so browsers that ran
+// v3 never got the field defaults. v4 is safe to run again on already-migrated records.
+db.version(4).stores({
+  cards:     'id',
+  tabs:      'id',
+  tab_cards: '[tabId+cardId], tabId',
+  folders:   'id',
+}).upgrade((tx) => {
+  return tx.table('tabs').toCollection().modify((tab) => {
+    if (tab.savedLocation === undefined) tab.savedLocation = 'none'
+    if (tab.savedFolderId === undefined) tab.savedFolderId = null
+  })
+})
+
+// v5: adds links table for directed edges between cards.
+db.version(5).stores({
+  cards:     'id',
+  tabs:      'id',
+  tab_cards: '[tabId+cardId], tabId',
+  folders:   'id',
+  links:     '[sourceCardId+targetCardId], sourceCardId, targetCardId',
+})
 ```
 
 | Table | Primary key | Secondary index | Notes |
 |---|---|---|---|
 | `cards` | `id` | — | Stores card records including `location`, `folderId`, `dirty`; none are indexed |
-| `tabs` | `id` | — | Stores tab records |
+| `tabs` | `id` | — | Stores tab records including `savedLocation`, `savedFolderId` |
 | `tab_cards` | `[tabId+cardId]` compound | `tabId` | Compound PK; `tabId` index enables per-tab queries |
 | `folders` | `id` | — | Stores folder records including `parentId`; not indexed |
+| `links` | `[sourceCardId+targetCardId]` compound | `sourceCardId`, `targetCardId` | Directed edge from source to target; rebuilt on every card write |
 
-The database name is `olive12`. Increment the version number and add a migration block for any schema change.
+The database name is `olive12`. Increment the version number and add a migration block for any schema change. Always use `tx.table('tableName')` — not `tx.tableName` — in Dexie v4 upgrade callbacks.
 
 ## Card storage
 
@@ -71,9 +104,11 @@ The database name is `olive12`. Increment the version number and add a migration
 |---|---|
 | `getAllTabs()` | Returns all tab records |
 | `putTab(tab)` | Upserts a tab record |
+| `deleteTab(tabId)` | Deletes a tab record by primary key |
 | `getAllTabCards()` | Returns all tab_card join records |
 | `putTabCard(tabCard)` | Upserts a tab_card record |
 | `deleteTabCard(tabId, cardId)` | Deletes by compound key `[tabId, cardId]` |
+| `deleteAllTabCards(tabId)` | Deletes all tab_card records for a given tab (used when removing a tab) |
 
 ## Folder storage
 
@@ -107,9 +142,9 @@ Between test files: Vitest runs each file in its own worker, so each file gets a
 
 | File | What it covers |
 |---|---|
-| `cardStorage.test.js` | Empty load, `putCard` round-trip, `dirty: true`, upsert, `deleteCard`, `location` round-trip, `getDirtyCards`, `markCardClean` |
-| `tabStorage.test.js` | Empty reads, `putTab` round-trip, upsert; `putTabCard` round-trip, foldState/hiddenState, position upsert, `deleteTabCard` by compound key |
-| `folderStorage.test.js` | Empty read, `putFolder` round-trip, upsert, `deleteFolder`, `parentId` round-trip |
+| `cardStorage.test.js` | Empty load; `putCard` round-trip; `dirty: true`; upsert; `deleteCard`; `location` round-trip; `getDirtyCards`; `markCardClean` |
+| `tabStorage.test.js` | Empty reads; `putTab` round-trip + upsert; `deleteTab`; `putTabCard` round-trip; `foldState`/`hiddenState`; position upsert; `deleteTabCard` by compound key; `deleteAllTabCards` removes all records for a given tabId |
+| `folderStorage.test.js` | Empty read; `putFolder` round-trip; upsert; `deleteFolder`; `parentId` round-trip |
 
 ## Not built yet
 
@@ -117,5 +152,4 @@ Between test files: Vitest runs each file in its own worker, so each file gets a
 - `dirty` flag on tabs, tab_cards, or folders
 - Tombstoning / soft-delete (`deleted: true`)
 - Card deletion sync (no remote delete when a local card is removed)
-- Schema version 3+
 - `user_id` on any local Dexie table

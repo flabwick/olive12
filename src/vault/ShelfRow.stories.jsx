@@ -32,3 +32,15 @@ export const NoAction = {
 export const WithFolders = {
   args: { folders },
 }
+
+export const WithOpenAsPortal = {
+  args: { onOpenAsPortal: () => {} },
+}
+
+export const WithAllActions = {
+  args: { onMoveToLibrary: () => {}, onOpenAsPortal: () => {} },
+}
+
+export const NoActions = {
+  args: { onMoveToLibrary: undefined, onOpenAsPortal: undefined },
+}

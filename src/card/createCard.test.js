@@ -17,6 +17,7 @@ describe('createCard', () => {
       type: 'text',
       title: '',
       body: '',
+      config: null,
       location: 'none',
       folderId: null,
       createdAt: 1_700_000_000_000,
@@ -30,6 +31,21 @@ describe('createCard', () => {
       type: 'text',
       title: 'Notes',
       body: 'Buy milk',
+      config: null,
+      location: 'none',
+      folderId: null,
+      createdAt: 1_700_000_000_000,
+      updatedAt: 1_700_000_000_000,
+    })
+  })
+
+  it('creates a portal card with correct type and config', () => {
+    expect(createCard({ type: 'portal', config: { target_card_id: 'card-xyz' } })).toEqual({
+      id: 'test-uuid',
+      type: 'portal',
+      title: '',
+      body: '',
+      config: { target_card_id: 'card-xyz' },
       location: 'none',
       folderId: null,
       createdAt: 1_700_000_000_000,
@@ -60,6 +76,7 @@ describe('updateCardFields', () => {
     type: 'text',
     title: 'Old title',
     body: 'Old body',
+    config: null,
     location: 'none',
     folderId: null,
     createdAt: 1_700_000_000_000,
@@ -127,5 +144,17 @@ describe('updateCardFields', () => {
     const result = updateCardFields(base, { title: 'T' })
     expect(result.updatedAt).toBe(1_700_000_001_000)
     expect(result.createdAt).toBe(1_700_000_000_000)
+  })
+
+  it('passes config through when not updated', () => {
+    const portalBase = { ...base, type: 'portal', config: { target_card_id: 'abc' } }
+    const result = updateCardFields(portalBase, { title: 'T' })
+    expect(result.config).toEqual({ target_card_id: 'abc' })
+  })
+
+  it('updates config when provided', () => {
+    const portalBase = { ...base, type: 'portal', config: { target_card_id: 'abc' } }
+    const result = updateCardFields(portalBase, { config: { target_card_id: 'xyz' } })
+    expect(result.config).toEqual({ target_card_id: 'xyz' })
   })
 })

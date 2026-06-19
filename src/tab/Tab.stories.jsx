@@ -1,5 +1,15 @@
 import { Tab } from './Tab'
 
+const cardsById = {
+  'target-1': {
+    id: 'target-1',
+    title: 'Referenced meeting notes',
+    body: 'Key decisions: ship Q3 feature, defer auth redesign.',
+    type: 'text',
+    config: null,
+  },
+}
+
 export default {
   title: 'Tab/Tab',
   component: Tab,
@@ -8,11 +18,12 @@ export default {
     onUnfold: () => {},
     onHide: () => {},
     onUnhide: () => {},
+    cardsById,
   },
 }
 
 const makeEntry = (id, title, body, overrides = {}) => ({
-  card: { id, title, body, type: 'text' },
+  card: { id, title, body, type: 'text', config: null },
   position: 0,
   foldState: false,
   hiddenState: false,
@@ -53,5 +64,47 @@ export const OneHidden = {
       }),
       makeEntry('c', 'Also visible', 'I appear normally too.', { position: 2 }),
     ],
+  },
+}
+
+export const WithPortalCard = {
+  args: {
+    entries: [
+      makeEntry('a', 'Text card', 'Regular content.', { position: 0 }),
+      {
+        card: {
+          id: 'portal-1',
+          type: 'portal',
+          config: { target_card_id: 'target-1' },
+          title: '',
+          body: '',
+          location: 'none',
+        },
+        position: 1,
+        foldState: false,
+        hiddenState: false,
+      },
+    ],
+  },
+}
+
+export const WithUnresolvedPortal = {
+  args: {
+    entries: [
+      {
+        card: {
+          id: 'portal-2',
+          type: 'portal',
+          config: { target_card_id: null },
+          title: '',
+          body: '',
+          location: 'none',
+        },
+        position: 0,
+        foldState: false,
+        hiddenState: false,
+      },
+    ],
+    cardsById: {},
   },
 }

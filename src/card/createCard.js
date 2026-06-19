@@ -1,9 +1,10 @@
-export function createCard({ title = '', body = '' } = {}) {
+export function createCard({ title = '', body = '', type = 'text', config = null } = {}) {
   return {
     id: crypto.randomUUID(),
-    type: 'text',
+    type,
     title,
     body,
+    config,
     location: 'none',
     folderId: null,
     createdAt: Date.now(),
@@ -11,6 +12,6 @@ export function createCard({ title = '', body = '' } = {}) {
   }
 }
 
-export function updateCardFields(card, { title = card.title, body = card.body, location = card.location, folderId = card.folderId } = {}) {
-  return { ...card, title, body, location, folderId, updatedAt: Date.now() }
+export function updateCardFields(card, { title = card.title, body = card.body, location = card.location, folderId = card.folderId, config = card.config } = {}) {
+  return { ...card, title, body, location, folderId, config, updatedAt: Date.now() }
 }

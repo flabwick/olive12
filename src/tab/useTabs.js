@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { deleteCard, getAllCards, putCard } from '../card/cardStorage'
+import { deleteLinksForSource, rebuildLinksForCard } from '../card/linkStorage'
 import { createCard, updateCardFields } from '../card/createCard'
 import { createFolder as makeFolderObject } from '../folder/createFolder'
 import { getAllFolders, putFolder } from '../folder/folderStorage'
@@ -209,10 +210,34 @@ export function useTabs({ userId } = {}) {
       setTabCards((prev) => [...prev, tc])
       setCardsById((prev) => ({ ...prev, [card.id]: card }))
       await Promise.all([putCard(card), putTabCard(tc)])
+      await rebuildLinksForCard(card)
       schedulerRef.current?.scheduleSync()
       return card
     },
     [activeTab, tabCards],
+  )
+
+  const addPortalCard = useCallback(
+    async (targetCardId) => {
+      if (!activeTab) return null
+      const activeTabCards = tabCards.filter((tc) => tc.tabId === activeTab.id)
+      const alreadyPresent = activeTabCards.some((tc) => {
+        const c = cardsById[tc.cardId]
+        if (!c) return false
+        return c.id === targetCardId || (c.type === 'portal' && c.config?.target_card_id === targetCardId)
+      })
+      if (alreadyPresent) return null
+      const card = createCard({ type: 'portal', config: { target_card_id: targetCardId } })
+      const position = nextPosition(activeTabCards)
+      const tc = createTabCard({ tabId: activeTab.id, cardId: card.id, position })
+      setTabCards((prev) => [...prev, tc])
+      setCardsById((prev) => ({ ...prev, [card.id]: card }))
+      await Promise.all([putCard(card), putTabCard(tc)])
+      await rebuildLinksForCard(card)
+      schedulerRef.current?.scheduleSync()
+      return card
+    },
+    [activeTab, tabCards, cardsById],
   )
 
   const updateCard = useCallback(
@@ -222,6 +247,7 @@ export function useTabs({ userId } = {}) {
       const updated = updateCardFields(card, fields)
       setCardsById((prev) => ({ ...prev, [cardId]: updated }))
       await putCard(updated)
+      await rebuildLinksForCard(updated)
       schedulerRef.current?.scheduleSync()
     },
     [cardsById],
@@ -236,6 +262,7 @@ export function useTabs({ userId } = {}) {
       setCardsById(rest)
       await Promise.all([
         deleteCard(cardId),
+        deleteLinksForSource(cardId),
         ...(tc ? [deleteTabCard(tc.tabId, cardId)] : []),
         ...nextTabCards.map((t) => putTabCard(t)),
         ...(storageRef.current ? [storageRef.current.deleteRemoteCard(cardId)] : []),
@@ -298,11 +325,34 @@ export function useTabs({ userId } = {}) {
       const card = cardsById[cardId]
       if (!card) return
       const updated = updateCardFields(card, { location: 'shelf' })
-      setCardsById((prev) => ({ ...prev, [cardId]: updated }))
+
+      const matchingTabCards = tabCards.filter((tc) => tc.cardId === cardId)
+      const portalCards = matchingTabCards.map(() =>
+        createCard({ type: 'portal', config: { target_card_id: cardId } }),
+      )
+      const portalTabCards = matchingTabCards.map((tc, i) =>
+        createTabCard({ tabId: tc.tabId, cardId: portalCards[i].id, position: tc.position }),
+      )
+
+      const newCardsById = { ...cardsById, [cardId]: updated }
+      for (const pc of portalCards) newCardsById[pc.id] = pc
+
+      setCardsById(newCardsById)
+      setTabCards((prev) => [
+        ...prev.filter((tc) => tc.cardId !== cardId),
+        ...portalTabCards,
+      ])
+
       await putCard(updated)
+      await Promise.all([
+        ...portalCards.map((pc) => putCard(pc)),
+        ...portalTabCards.map((tc) => putTabCard(tc)),
+        ...matchingTabCards.map((tc) => deleteTabCard(tc.tabId, cardId)),
+      ])
+      await Promise.all(portalCards.map((pc) => rebuildLinksForCard(pc)))
       schedulerRef.current?.scheduleSync()
     },
-    [cardsById],
+    [cardsById, tabCards],
   )
 
   const moveToLibrary = useCallback(
@@ -342,6 +392,9 @@ export function useTabs({ userId } = {}) {
   const libraryEntries = Object.values(cardsById)
     .filter((c) => c.location === 'library')
     .sort((a, b) => b.updatedAt - a.updatedAt)
+
+  const shelfTabs = tabs.filter((t) => t.savedLocation === 'shelf')
+  const libraryTabs = tabs.filter((t) => t.savedLocation === 'library')
 
   const runDockPrompt = useCallback(
     async (promptText) => {
@@ -389,6 +442,8 @@ export function useTabs({ userId } = {}) {
     entries,
     shelfEntries,
     libraryEntries,
+    shelfTabs,
+    libraryTabs,
     folders,
     allTabCards: tabCards,
     cardsById,
@@ -399,6 +454,7 @@ export function useTabs({ userId } = {}) {
     saveTabToShelf,
     moveTabToLibrary,
     addCard,
+    addPortalCard,
     updateCard,
     removeCard,
     reorder,

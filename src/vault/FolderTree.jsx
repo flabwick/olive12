@@ -61,7 +61,7 @@ function FileIcon() {
   )
 }
 
-function FolderNode({ node, cardsByFolderId, onCreateFolder }) {
+function FolderNode({ node, cardsByFolderId, onCreateFolder, onOpenAsPortal, highlightedCardId }) {
   const [expanded, setExpanded] = useState(true)
   const cards = cardsByFolderId[node.id] ?? []
   const hasChildren = node.children.length > 0 || cards.length > 0
@@ -100,12 +100,24 @@ function FolderNode({ node, cardsByFolderId, onCreateFolder }) {
               node={child}
               cardsByFolderId={cardsByFolderId}
               onCreateFolder={onCreateFolder}
+              onOpenAsPortal={onOpenAsPortal}
+              highlightedCardId={highlightedCardId}
             />
           ))}
           {cards.map((card) => (
-            <li key={card.id} className="folder-tree__file-row">
+            <li key={card.id} className={`folder-tree__file-row${card.id === highlightedCardId ? ' folder-tree__file-row--highlighted' : ''}`}>
               <FileIcon />
               <span className="folder-tree__file-name">{card.title || '(untitled)'}</span>
+              {onOpenAsPortal && (
+                <button
+                  type="button"
+                  className="folder-tree__open-btn"
+                  aria-label={`Open ${card.title || '(untitled)'} in tab`}
+                  onClick={() => onOpenAsPortal(card.id)}
+                >
+                  ↗
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -114,7 +126,7 @@ function FolderNode({ node, cardsByFolderId, onCreateFolder }) {
   )
 }
 
-export function FolderTree({ folders = [], cards = [], onCreateFolder }) {
+export function FolderTree({ folders = [], cards = [], onCreateFolder, onOpenAsPortal, highlightedCardId }) {
   const tree = buildFolderTree(folders)
   const rootCards = cards.filter((c) => c.folderId === null)
   const cardsByFolderId = {}
@@ -145,9 +157,19 @@ export function FolderTree({ folders = [], cards = [], onCreateFolder }) {
       )}
       <ul className="folder-tree__root">
         {rootCards.map((card) => (
-          <li key={card.id} className="folder-tree__file-row folder-tree__file-row--root">
+          <li key={card.id} className={`folder-tree__file-row folder-tree__file-row--root${card.id === highlightedCardId ? ' folder-tree__file-row--highlighted' : ''}`}>
             <FileIcon />
             <span className="folder-tree__file-name">{card.title || '(untitled)'}</span>
+            {onOpenAsPortal && (
+              <button
+                type="button"
+                className="folder-tree__open-btn"
+                aria-label={`Open ${card.title || '(untitled)'} in tab`}
+                onClick={() => onOpenAsPortal(card.id)}
+              >
+                ↗
+              </button>
+            )}
           </li>
         ))}
         {tree.map((node) => (
@@ -156,6 +178,8 @@ export function FolderTree({ folders = [], cards = [], onCreateFolder }) {
             node={node}
             cardsByFolderId={cardsByFolderId}
             onCreateFolder={onCreateFolder}
+            onOpenAsPortal={onOpenAsPortal}
+            highlightedCardId={highlightedCardId}
           />
         ))}
       </ul>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ShelfRow } from '../vault/ShelfRow'
 import { FolderTree } from '../vault/FolderTree'
+import { VaultTabRow } from '../vault/VaultTabRow'
 import './FolderPanel.css'
 
 const TABS = ['shelf', 'library', 'brain']
@@ -8,27 +9,46 @@ const TABS = ['shelf', 'library', 'brain']
 export function FolderPanel({
   shelfEntries = [],
   libraryEntries = [],
+  shelfTabs = [],
+  libraryTabs = [],
   folders = [],
   onMoveToLibrary,
+  onMoveTabToLibrary,
   onCreateFolder,
   onClose,
+  onOpenAsPortal,
+  onOpenTab,
+  initialTab = 'shelf',
+  highlightedCardId,
 }) {
-  const [tab, setTab] = useState('shelf')
+  const [tab, setTab] = useState(initialTab)
+
+  const shelfEmpty = shelfEntries.length === 0 && shelfTabs.length === 0
 
   return (
     <div className="folder-panel" role="dialog" aria-label="Vault and Brain" aria-modal="true">
       {/* Content sits at the top, scrolls if it overflows */}
       <div className="folder-panel__body">
         {tab === 'shelf' && (
-          shelfEntries.length === 0 ? (
+          shelfEmpty ? (
             <p className="folder-panel__empty">Shelf is empty. Save some cards from your tab.</p>
           ) : (
             <div className="folder-panel__shelf-list" role="list">
+              {shelfTabs.map((t) => (
+                <VaultTabRow
+                  key={t.id}
+                  tab={t}
+                  onOpen={onOpenTab ? () => onOpenTab(t.id) : undefined}
+                  onMoveToLibrary={onMoveTabToLibrary ? () => onMoveTabToLibrary(t.id) : undefined}
+                />
+              ))}
               {shelfEntries.map((card) => (
                 <ShelfRow
                   key={card.id}
                   card={card}
                   onMoveToLibrary={onMoveToLibrary ? () => onMoveToLibrary(card.id, null) : undefined}
+                  onOpenAsPortal={onOpenAsPortal}
+                  highlighted={card.id === highlightedCardId}
                 />
               ))}
             </div>
@@ -36,11 +56,26 @@ export function FolderPanel({
         )}
 
         {tab === 'library' && (
-          <FolderTree
-            folders={folders}
-            cards={libraryEntries}
-            onCreateFolder={onCreateFolder}
-          />
+          <>
+            {libraryTabs.length > 0 && (
+              <div className="folder-panel__shelf-list" role="list">
+                {libraryTabs.map((t) => (
+                  <VaultTabRow
+                    key={t.id}
+                    tab={t}
+                    onOpen={onOpenTab ? () => onOpenTab(t.id) : undefined}
+                  />
+                ))}
+              </div>
+            )}
+            <FolderTree
+              folders={folders}
+              cards={libraryEntries}
+              onCreateFolder={onCreateFolder}
+              onOpenAsPortal={onOpenAsPortal}
+              highlightedCardId={highlightedCardId}
+            />
+          </>
         )}
 
         {tab === 'brain' && (

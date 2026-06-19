@@ -35,7 +35,7 @@ describe('ShelfRow', () => {
     expect(screen.getByRole('button', { name: 'Move to Library' })).toBeInTheDocument()
   })
 
-  it('renders no action button when onMoveToLibrary is not provided', () => {
+  it('renders no action button when neither callback is provided', () => {
     render(<ShelfRow card={card} />)
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
@@ -45,5 +45,32 @@ describe('ShelfRow', () => {
     render(<ShelfRow card={card} onMoveToLibrary={onMoveToLibrary} />)
     await userEvent.click(screen.getByRole('button', { name: 'Move to Library' }))
     expect(onMoveToLibrary).toHaveBeenCalledOnce()
+  })
+
+  it('renders Open in tab button when onOpenAsPortal is provided', () => {
+    render(<ShelfRow card={card} onOpenAsPortal={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Open in tab' })).toBeInTheDocument()
+  })
+
+  it('calls onOpenAsPortal with card id when Open in tab is clicked', async () => {
+    const onOpenAsPortal = vi.fn()
+    render(<ShelfRow card={card} onOpenAsPortal={onOpenAsPortal} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Open in tab' }))
+    expect(onOpenAsPortal).toHaveBeenCalledWith(card.id)
+  })
+
+  it('does not render Open in tab button when onOpenAsPortal is not provided', () => {
+    render(<ShelfRow card={card} onMoveToLibrary={() => {}} />)
+    expect(screen.queryByRole('button', { name: 'Open in tab' })).not.toBeInTheDocument()
+  })
+
+  it('applies shelf-row--highlighted class when highlighted is true', () => {
+    render(<ShelfRow card={card} highlighted={true} />)
+    expect(screen.getByRole('listitem')).toHaveClass('shelf-row--highlighted')
+  })
+
+  it('does not apply shelf-row--highlighted class when highlighted is false', () => {
+    render(<ShelfRow card={card} highlighted={false} />)
+    expect(screen.getByRole('listitem')).not.toHaveClass('shelf-row--highlighted')
   })
 })

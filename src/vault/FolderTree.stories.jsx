@@ -28,3 +28,11 @@ export const Empty = {
 export const NoCreateFolder = {
   args: { onCreateFolder: undefined },
 }
+
+export const WithOpenAsPortal = {
+  args: { onOpenAsPortal: () => {} },
+}
+
+export const WithAllActions = {
+  args: { onCreateFolder: () => {}, onOpenAsPortal: () => {} },
+}

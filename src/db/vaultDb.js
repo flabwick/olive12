@@ -36,3 +36,11 @@ db.version(4).stores({
     if (tab.savedFolderId === undefined) tab.savedFolderId = null
   })
 })
+
+db.version(5).stores({
+  cards: 'id',
+  tabs: 'id',
+  tab_cards: '[tabId+cardId], tabId',
+  folders: 'id',
+  links: '[sourceCardId+targetCardId], sourceCardId, targetCardId',
+})

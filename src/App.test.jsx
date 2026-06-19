@@ -58,6 +58,7 @@ describe('App', () => {
     await db.tabs.clear()
     await db.tab_cards.clear()
     await db.folders.clear()
+    await db.links.clear()
     authMocks.signInWithPassword.mockReset()
     authMocks.signUp.mockReset()
     syncMocks.scheduleSync.mockClear()
@@ -72,6 +73,7 @@ describe('App', () => {
     await db.tabs.clear()
     await db.tab_cards.clear()
     await db.folders.clear()
+    await db.links.clear()
   })
 
   // ── Existing app shell tests (unchanged behaviour) ───────────────────────
@@ -179,7 +181,7 @@ describe('App', () => {
     await waitFor(() => expect(invokeMock).toHaveBeenCalledOnce())
     await waitFor(() => screen.getByRole('heading', { name: 'AI result' }))
     expect(screen.getByRole('heading', { name: 'AI result' })).toBeInTheDocument()
-    expect(screen.queryByRole('textbox', { name: 'Prompt input' })).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Prompt input' })).not.toBeInTheDocument())
   })
 
   // ── Tab switcher tests ───────────────────────────────────────────────────

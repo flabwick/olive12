@@ -32,6 +32,7 @@ describe('useTabs', () => {
     await db.tabs.clear()
     await db.tab_cards.clear()
     await db.folders.clear()
+    await db.links.clear()
     localStorage.clear()
   })
 
@@ -105,6 +106,73 @@ describe('useTabs', () => {
     const tcs = await getAllTabCards()
     expect(tcs).toHaveLength(1)
     expect(tcs[0].cardId).toBe('card-uuid')
+  })
+
+  it('addPortalCard creates a portal card with correct type and config', async () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('tab-uuid')
+      .mockReturnValueOnce('portal-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+
+    await act(async () => {
+      await result.current.addPortalCard('target-card-id')
+    })
+
+    expect(result.current.entries).toHaveLength(1)
+    expect(result.current.entries[0].card.type).toBe('portal')
+    expect(result.current.entries[0].card.config.target_card_id).toBe('target-card-id')
+  })
+
+  it('addPortalCard appends portal card at the end of entries', async () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('tab-uuid')
+      .mockReturnValueOnce('text-uuid')
+      .mockReturnValueOnce('portal-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+
+    await act(async () => { await result.current.addCard({ title: 'Existing', body: '' }) })
+    await act(async () => { await result.current.addPortalCard('target-id') })
+
+    expect(result.current.entries).toHaveLength(2)
+    expect(result.current.entries[1].card.type).toBe('portal')
+    expect(result.current.entries[1].position).toBe(1)
+  })
+
+  it('addPortalCard is a no-op when a portal with the same target already exists in the active tab', async () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('tab-uuid')
+      .mockReturnValueOnce('portal-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+
+    await act(async () => { await result.current.addPortalCard('target-id') })
+    await act(async () => { await result.current.addPortalCard('target-id') })
+
+    expect(result.current.entries).toHaveLength(1)
+  })
+
+  it('addPortalCard is a no-op when the target card itself is already in the active tab', async () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('tab-uuid')
+      .mockReturnValueOnce('card-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+
+    await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+    await act(async () => { await result.current.addPortalCard('card-uuid') })
+
+    expect(result.current.entries).toHaveLength(1)
+    expect(result.current.entries[0].card.type).toBe('text')
   })
 
   it('addCard appends at next position', async () => {
@@ -308,10 +376,11 @@ describe('useTabs', () => {
     expect(result.current.entries[0].card.location).toBe('none')
   })
 
-  it('saveToShelf sets location to "shelf"', async () => {
+  it('saveToShelf sets location to "shelf" on the saved card', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
       .mockReturnValueOnce('card-uuid')
+      .mockReturnValueOnce('portal-uuid')
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
     const { result } = renderHook(() => useTabs())
@@ -319,13 +388,50 @@ describe('useTabs', () => {
     await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
     await act(async () => { await result.current.saveToShelf('card-uuid') })
 
-    expect(result.current.entries[0].card.location).toBe('shelf')
+    expect(result.current.shelfEntries[0].location).toBe('shelf')
+    expect(result.current.shelfEntries[0].id).toBe('card-uuid')
   })
 
-  it('saveToShelf persists across remount', async () => {
+  it('saveToShelf replaces the tab instance with a portal card pointing at the saved card', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
       .mockReturnValueOnce('card-uuid')
+      .mockReturnValueOnce('portal-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+    await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+    await act(async () => { await result.current.saveToShelf('card-uuid') })
+
+    expect(result.current.entries).toHaveLength(1)
+    expect(result.current.entries[0].card.type).toBe('portal')
+    expect(result.current.entries[0].card.config.target_card_id).toBe('card-uuid')
+  })
+
+  it('saveToShelf preserves the position of the replaced tab instance', async () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('tab-uuid')
+      .mockReturnValueOnce('card-a')
+      .mockReturnValueOnce('card-b')
+      .mockReturnValueOnce('portal-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+    await act(async () => { await result.current.addCard({ title: 'First', body: '' }) })
+    await act(async () => { await result.current.addCard({ title: 'Second', body: '' }) })
+    await act(async () => { await result.current.saveToShelf('card-b') })
+
+    const portalEntry = result.current.entries.find((e) => e.card.type === 'portal')
+    expect(portalEntry?.position).toBe(1)
+  })
+
+  it('saveToShelf persists original card as shelf entry across remount', async () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('tab-uuid')
+      .mockReturnValueOnce('card-uuid')
+      .mockReturnValueOnce('portal-uuid')
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
     const { result, unmount } = renderHook(() => useTabs())
@@ -337,9 +443,10 @@ describe('useTabs', () => {
     const { result: reloaded } = renderHook(() => useTabs())
     await waitFor(() => expect(reloaded.current.isReady).toBe(true))
 
-    expect(reloaded.current.entries[0].card.location).toBe('shelf')
+    expect(reloaded.current.shelfEntries[0].id).toBe('card-uuid')
     const cards = await getAllCards()
-    expect(cards[0].location).toBe('shelf')
+    const original = cards.find((c) => c.id === 'card-uuid')
+    expect(original?.location).toBe('shelf')
   })
 
   it('moveToLibrary sets location to "library"', async () => {
@@ -390,7 +497,7 @@ describe('useTabs', () => {
       expect(result.current.libraryEntries).toHaveLength(0)
     })
 
-    it('saveToShelf adds card to shelfEntries and keeps it in entries', async () => {
+    it('saveToShelf adds card to shelfEntries and replaces tab entry with a portal card', async () => {
       vi.spyOn(crypto, 'randomUUID')
         .mockReturnValueOnce('tab-uuid')
         .mockReturnValueOnce('card-uuid')
@@ -404,6 +511,7 @@ describe('useTabs', () => {
       expect(result.current.shelfEntries).toHaveLength(1)
       expect(result.current.shelfEntries[0].id).toBe('card-uuid')
       expect(result.current.entries).toHaveLength(1)
+      expect(result.current.entries[0].card.type).toBe('portal')
       expect(result.current.libraryEntries).toHaveLength(0)
     })
 
@@ -594,6 +702,46 @@ describe('useTabs', () => {
       const atRoot = result.current.libraryEntries.find((c) => c.id === 'card-b')
       expect(inFolder.folderId).toBe('folder-uuid')
       expect(atRoot.folderId).toBeNull()
+    })
+  })
+
+  describe('shelfTabs and libraryTabs', () => {
+    it('new tab is not in shelfTabs or libraryTabs', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(result.current.shelfTabs).toHaveLength(0)
+      expect(result.current.libraryTabs).toHaveLength(0)
+    })
+
+    it('saveTabToShelf adds tab to shelfTabs', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.saveTabToShelf('tab-uuid') })
+
+      expect(result.current.shelfTabs).toHaveLength(1)
+      expect(result.current.shelfTabs[0].id).toBe('tab-uuid')
+      expect(result.current.libraryTabs).toHaveLength(0)
+    })
+
+    it('moveTabToLibrary moves tab from shelfTabs to libraryTabs', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.saveTabToShelf('tab-uuid') })
+      await act(async () => { await result.current.moveTabToLibrary('tab-uuid', null) })
+
+      expect(result.current.shelfTabs).toHaveLength(0)
+      expect(result.current.libraryTabs).toHaveLength(1)
+      expect(result.current.libraryTabs[0].id).toBe('tab-uuid')
     })
   })
 
@@ -796,6 +944,86 @@ describe('useTabs', () => {
       // After runNow .then() runs, card was already in tabCards — no duplicate
       await waitFor(() => expect(result.current.entries).toHaveLength(1))
       expect(result.current.entries).toHaveLength(1)
+    })
+  })
+
+  describe('links', () => {
+    it('addPortalCard writes a link entry pointing at the target', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('portal-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.addPortalCard('target-card-id') })
+
+      const links = await db.links.toArray()
+      expect(links).toHaveLength(1)
+      expect(links[0].sourceCardId).toBe('portal-uuid')
+      expect(links[0].targetCardId).toBe('target-card-id')
+      expect(links[0].linkType).toBe('portal')
+    })
+
+    it('updateCard changing target_card_id replaces the old link with a new one', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('portal-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.addPortalCard('target-a') })
+
+      let links = await db.links.toArray()
+      expect(links).toHaveLength(1)
+      expect(links[0].targetCardId).toBe('target-a')
+
+      await act(async () => {
+        await result.current.updateCard('portal-uuid', { config: { target_card_id: 'target-b' } })
+      })
+
+      links = await db.links.toArray()
+      expect(links).toHaveLength(1)
+      expect(links[0].targetCardId).toBe('target-b')
+    })
+
+    it('removeCard deletes the outgoing link for the removed portal card', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('portal-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.addPortalCard('target-card-id') })
+      expect(await db.links.toArray()).toHaveLength(1)
+
+      await act(async () => { await result.current.removeCard('portal-uuid') })
+      expect(await db.links.toArray()).toHaveLength(0)
+    })
+
+    it('saveToShelf writes a link for the portal card that replaces the original', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+        .mockReturnValueOnce('portal-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+      await act(async () => { await result.current.saveToShelf('card-uuid') })
+
+      const links = await db.links.toArray()
+      expect(links).toHaveLength(1)
+      expect(links[0].sourceCardId).toBe('portal-uuid')
+      expect(links[0].targetCardId).toBe('card-uuid')
+      expect(links[0].linkType).toBe('portal')
     })
   })
 
