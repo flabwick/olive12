@@ -38,11 +38,21 @@ function MenuIcon() {
   )
 }
 
+function PromptIcon() {
+  return (
+    <svg width="13" height="15" viewBox="0 0 13 15" fill="none" aria-hidden="true">
+      <path d="M6.5 1L1.5 8H6L5 14L11.5 6H7L6.5 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export function Dock({
   onAdd,
   addDisabled = false,
   onScrollTop,
   onFolder,
+  onPrompt,
+  promptDisabled = false,
   onTabOverview,
   onMenu,
 }) {
@@ -73,6 +83,15 @@ export function Dock({
           onClick={onFolder}
         >
           <FolderIcon />
+        </button>
+        <button
+          type="button"
+          className="dock__btn"
+          aria-label="Prompt"
+          onClick={onPrompt}
+          disabled={promptDisabled}
+        >
+          <PromptIcon />
         </button>
       </div>
       <div className="dock__group dock__group--right">

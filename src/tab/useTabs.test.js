@@ -12,7 +12,11 @@ const syncMocks = vi.hoisted(() => ({
   createCardSyncScheduler: vi.fn(),
 }))
 
-vi.mock('../lib/supabaseClient', () => ({ supabase: {} }))
+const invokeMock = vi.hoisted(() => vi.fn())
+
+vi.mock('../lib/supabaseClient', () => ({
+  supabase: { functions: { invoke: invokeMock } },
+}))
 vi.mock('../sync/cardSupabaseStorage', () => ({
   makeCardSupabaseStorage: vi.fn(() => ({})),
 }))
@@ -733,6 +737,146 @@ describe('useTabs', () => {
       await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
       expect(result.current.entries).toHaveLength(1)
       expect(syncMocks.scheduleSync).not.toHaveBeenCalled()
+    })
+
+    it('creates a tab_card and shows a remote-pulled card in entries after runNow', async () => {
+      // Simulate a card that was pulled from Supabase into Dexie but has no tab_card yet
+      await db.tabs.put({
+        id: 'existing-tab', name: 'Main', kind: 'blank', order: 0,
+        createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000,
+      })
+      await db.cards.put({
+        id: 'remote-card-id', type: 'text', title: 'Remote Card', body: 'From server',
+        location: 'none', folderId: null,
+        createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000,
+        dirty: false,
+      })
+      // No tab_card entry — this card arrived via Supabase, not through addCard
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      // After runNow resolves, the .then() callback finds the orphan card and
+      // creates a tab_card for it, making it appear in entries.
+      await waitFor(() => expect(result.current.entries).toHaveLength(1))
+      expect(result.current.entries[0].card.title).toBe('Remote Card')
+      expect(result.current.entries[0].card.body).toBe('From server')
+    })
+
+    it('does not duplicate tab_cards for cards that already have one', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'Local', body: '' }) })
+
+      // After runNow .then() runs, card was already in tabCards — no duplicate
+      await waitFor(() => expect(result.current.entries).toHaveLength(1))
+      expect(result.current.entries).toHaveLength(1)
+    })
+  })
+
+  describe('runDockPrompt', () => {
+    beforeEach(() => {
+      invokeMock.mockClear()
+    })
+
+    it('calls supabase.functions.invoke with prompt and contextCards', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      invokeMock.mockResolvedValue({ data: { title: 'AI title', body: 'AI body' }, error: null })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'Context card', body: 'Some info' }) })
+
+      await act(async () => { await result.current.runDockPrompt('Summarise') })
+
+      expect(invokeMock).toHaveBeenCalledOnce()
+      const [fnName, opts] = invokeMock.mock.calls[0]
+      expect(fnName).toBe('dock-prompt')
+      expect(opts.body.prompt).toBe('Summarise')
+      expect(opts.body.contextCards).toEqual([
+        { id: 'card-uuid', title: 'Context card', body: 'Some info' },
+      ])
+    })
+
+    it('creates a new card from the AI response on success', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('existing-card')
+        .mockReturnValueOnce('new-card')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      invokeMock.mockResolvedValue({ data: { title: 'AI title', body: 'AI body' }, error: null })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'Context', body: '' }) })
+
+      await act(async () => { await result.current.runDockPrompt('Make a card') })
+
+      expect(result.current.entries).toHaveLength(2)
+      const aiCard = result.current.entries.find((e) => e.card.id === 'new-card')
+      expect(aiCard.card.title).toBe('AI title')
+      expect(aiCard.card.body).toBe('AI body')
+    })
+
+    it('returns true on success', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      invokeMock.mockResolvedValue({ data: { title: 'T', body: 'B' }, error: null })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      let returnValue
+      await act(async () => { returnValue = await result.current.runDockPrompt('test') })
+
+      expect(returnValue).toBe(true)
+      expect(result.current.promptLoading).toBe(false)
+      expect(result.current.promptError).toBe('')
+    })
+
+    it('sets promptError and returns false when invoke errors', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      invokeMock.mockResolvedValue({ data: null, error: { message: 'Network failure' } })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      let returnValue
+      await act(async () => { returnValue = await result.current.runDockPrompt('test') })
+
+      expect(returnValue).toBe(false)
+      expect(result.current.promptError).toBe('Network failure')
+      expect(result.current.promptLoading).toBe(false)
+    })
+
+    it('excludes hidden cards from contextCards', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('visible-card')
+        .mockReturnValueOnce('hidden-card')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      invokeMock.mockResolvedValue({ data: { title: 'T', body: 'B' }, error: null })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'Visible', body: 'A' }) })
+      await act(async () => { await result.current.addCard({ title: 'Hidden', body: 'B' }) })
+      await act(async () => { await result.current.hide('hidden-card') })
+
+      await act(async () => { await result.current.runDockPrompt('go') })
+
+      const { contextCards } = invokeMock.mock.calls[0][1].body
+      expect(contextCards).toHaveLength(1)
+      expect(contextCards[0].id).toBe('visible-card')
     })
   })
 })

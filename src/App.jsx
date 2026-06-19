@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { AuthForm } from './auth/AuthForm'
+import { FolderPanel } from './layout/FolderPanel'
+import { supabase } from './lib/supabaseClient'
 import { Dock } from './tab/Dock'
+import { DockPrompt } from './tab/DockPrompt'
 import { Tab } from './tab/Tab'
 import { TransientCard } from './tab/TransientCard'
-import { FolderPanel } from './layout/FolderPanel'
 import { useTabs } from './tab/useTabs'
 import './App.css'
 
-function App() {
+function AppShell({ userId }) {
   const {
     entries,
     shelfEntries,
@@ -23,14 +26,33 @@ function App() {
     saveToShelf,
     moveToLibrary,
     createFolder,
-  } = useTabs()
+    runDockPrompt,
+    promptLoading,
+    promptError,
+  } = useTabs({ userId })
 
   const [folderPanelOpen, setFolderPanelOpen] = useState(false)
   const [transientOpen, setTransientOpen] = useState(false)
+  const [promptOpen, setPromptOpen] = useState(false)
 
   function handleAddCard(fields) {
     addCard(fields)
     setTransientOpen(false)
+  }
+
+  function handleFolder() {
+    setPromptOpen(false)
+    setFolderPanelOpen((v) => !v)
+  }
+
+  function handlePromptToggle() {
+    setFolderPanelOpen(false)
+    setPromptOpen((v) => !v)
+  }
+
+  async function handlePromptSubmit(text) {
+    const ok = await runDockPrompt(text)
+    if (ok) setPromptOpen(false)
   }
 
   return (
@@ -67,14 +89,74 @@ function App() {
             onClose={() => setFolderPanelOpen(false)}
           />
         )}
+        {promptOpen && (
+          <DockPrompt
+            onSubmit={handlePromptSubmit}
+            onDismiss={() => setPromptOpen(false)}
+            loading={promptLoading}
+            error={promptError}
+          />
+        )}
         <Dock
           onAdd={() => setTransientOpen(true)}
           addDisabled={transientOpen}
-          onFolder={() => setFolderPanelOpen((v) => !v)}
+          onFolder={handleFolder}
+          onPrompt={handlePromptToggle}
+          promptDisabled={promptLoading}
         />
       </div>
     </div>
   )
+}
+
+function App() {
+  const [sessionChecked, setSessionChecked] = useState(false)
+  const [userId, setUserId] = useState(null)
+  const [authError, setAuthError] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setUserId(data.session?.user?.id ?? null)
+      setSessionChecked(true)
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUserId(session?.user?.id ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  async function handleSignIn(email, password) {
+    setAuthLoading(true)
+    setAuthError('')
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) setAuthError(error.message)
+    setAuthLoading(false)
+  }
+
+  async function handleSignUp(email, password) {
+    setAuthLoading(true)
+    setAuthError('')
+    const { error } = await supabase.auth.signUp({ email, password })
+    if (error) setAuthError(error.message)
+    else setAuthError('Check your email to confirm your account.')
+    setAuthLoading(false)
+  }
+
+  if (!sessionChecked) return null
+
+  if (!userId) {
+    return (
+      <AuthForm
+        onSignIn={handleSignIn}
+        onSignUp={handleSignUp}
+        error={authError}
+        loading={authLoading}
+      />
+    )
+  }
+
+  return <AppShell userId={userId} />
 }
 
 export default App

@@ -1,22 +1,80 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from './db/vaultDb'
 import App from './App'
 
+// ── Supabase auth mock ──────────────────────────────────────────────────────
+const authMocks = vi.hoisted(() => ({
+  getSession: vi.fn(),
+  signInWithPassword: vi.fn(),
+  signUp: vi.fn(),
+  onAuthStateChange: vi.fn(() => ({
+    data: { subscription: { unsubscribe: vi.fn() } },
+  })),
+}))
+
+const invokeMock = vi.hoisted(() => vi.fn())
+
+vi.mock('./lib/supabaseClient', () => ({
+  supabase: { auth: authMocks, functions: { invoke: invokeMock } },
+}))
+
+// ── Sync module mocks (prevent real Supabase calls from useTabs) ────────────
+const syncMocks = vi.hoisted(() => ({
+  scheduleSync: vi.fn(),
+  runNow: vi.fn().mockResolvedValue(undefined),
+  createCardSyncScheduler: vi.fn(),
+}))
+
+vi.mock('./sync/cardSync', () => ({
+  createCardSyncScheduler: syncMocks.createCardSyncScheduler,
+  syncDirtyCardsForUser: vi.fn(),
+}))
+
+vi.mock('./sync/cardSupabaseStorage', () => ({
+  makeCardSupabaseStorage: vi.fn(() => ({})),
+}))
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function mockLoggedIn(id = 'test-user') {
+  authMocks.getSession.mockResolvedValue({
+    data: { session: { user: { id } } },
+  })
+  syncMocks.createCardSyncScheduler.mockReturnValue({
+    scheduleSync: syncMocks.scheduleSync,
+    runNow: syncMocks.runNow,
+  })
+}
+
+function mockLoggedOut() {
+  authMocks.getSession.mockResolvedValue({ data: { session: null } })
+}
+
+// ── Test setup ───────────────────────────────────────────────────────────────
 describe('App', () => {
   beforeEach(async () => {
     await db.cards.clear()
     await db.tabs.clear()
     await db.tab_cards.clear()
+    await db.folders.clear()
+    authMocks.signInWithPassword.mockReset()
+    authMocks.signUp.mockReset()
+    syncMocks.scheduleSync.mockClear()
+    syncMocks.runNow.mockClear()
+    syncMocks.createCardSyncScheduler.mockClear()
+    invokeMock.mockClear()
+    mockLoggedIn()
   })
 
   afterEach(async () => {
     await db.cards.clear()
     await db.tabs.clear()
     await db.tab_cards.clear()
+    await db.folders.clear()
   })
 
+  // ── Existing app shell tests (unchanged behaviour) ───────────────────────
   it('renders the dock with an Add card button', async () => {
     render(<App />)
     await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
@@ -82,5 +140,123 @@ describe('App', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Folders' }))
     await userEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog', { name: 'Vault and Brain' })).not.toBeInTheDocument()
+  })
+
+  // ── Prompt mode tests ────────────────────────────────────────────────────
+  it('renders the Prompt button in the dock', async () => {
+    render(<App />)
+    await waitFor(() => screen.getByRole('button', { name: 'Prompt' }))
+    expect(screen.getByRole('button', { name: 'Prompt' })).toBeInTheDocument()
+  })
+
+  it('clicking Prompt opens the DockPrompt form', async () => {
+    render(<App />)
+    await waitFor(() => screen.getByRole('button', { name: 'Prompt' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Prompt' }))
+    expect(screen.getByRole('textbox', { name: 'Prompt input' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send →' })).toBeInTheDocument()
+  })
+
+  it('clicking Cancel in DockPrompt closes it', async () => {
+    render(<App />)
+    await waitFor(() => screen.getByRole('button', { name: 'Prompt' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Prompt' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('textbox', { name: 'Prompt input' })).not.toBeInTheDocument()
+  })
+
+  it('submitting DockPrompt calls invoke and creates a card on success', async () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+    invokeMock.mockResolvedValue({ data: { title: 'AI result', body: 'AI body' }, error: null })
+
+    render(<App />)
+    await waitFor(() => screen.getByRole('button', { name: 'Prompt' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Prompt' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Prompt input' }), 'Make a card')
+    await userEvent.click(screen.getByRole('button', { name: 'Send →' }))
+
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledOnce())
+    await waitFor(() => screen.getByRole('heading', { name: 'AI result' }))
+    expect(screen.getByRole('heading', { name: 'AI result' })).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Prompt input' })).not.toBeInTheDocument()
+  })
+
+  // ── Auth gate tests ──────────────────────────────────────────────────────
+  describe('auth gate', () => {
+    it('shows sign-in form when not logged in', async () => {
+      mockLoggedOut()
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Sign in' }))
+      expect(screen.getByLabelText('Email')).toBeInTheDocument()
+      expect(screen.getByLabelText('Password')).toBeInTheDocument()
+    })
+
+    it('does not show the dock when not logged in', async () => {
+      mockLoggedOut()
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Sign in' }))
+      expect(screen.queryByRole('button', { name: 'Add card' })).not.toBeInTheDocument()
+    })
+
+    it('shows the app shell when logged in', async () => {
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
+      expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument()
+    })
+
+    it('calls supabase.auth.signInWithPassword when Sign in is submitted', async () => {
+      mockLoggedOut()
+      authMocks.signInWithPassword.mockResolvedValue({ error: null })
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Sign in' }))
+      await userEvent.type(screen.getByLabelText('Email'), 'dev@example.com')
+      await userEvent.type(screen.getByLabelText('Password'), 'password123')
+      await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+      expect(authMocks.signInWithPassword).toHaveBeenCalledWith({
+        email: 'dev@example.com',
+        password: 'password123',
+      })
+    })
+
+    it('calls supabase.auth.signUp when Sign up is submitted', async () => {
+      mockLoggedOut()
+      authMocks.signUp.mockResolvedValue({ error: null })
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Sign up' }))
+      await userEvent.type(screen.getByLabelText('Email'), 'new@example.com')
+      await userEvent.type(screen.getByLabelText('Password'), 'newpass99')
+      await userEvent.click(screen.getByRole('button', { name: 'Sign up' }))
+      expect(authMocks.signUp).toHaveBeenCalledWith({
+        email: 'new@example.com',
+        password: 'newpass99',
+      })
+    })
+
+    it('displays auth error when sign-in fails', async () => {
+      mockLoggedOut()
+      authMocks.signInWithPassword.mockResolvedValue({
+        error: { message: 'Invalid login credentials' },
+      })
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Sign in' }))
+      await userEvent.type(screen.getByLabelText('Email'), 'bad@example.com')
+      await userEvent.type(screen.getByLabelText('Password'), 'wrongpass')
+      await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+      await waitFor(() => screen.getByRole('alert'))
+      expect(screen.getByRole('alert')).toHaveTextContent('Invalid login credentials')
+    })
+
+    it('shows confirmation message after sign-up', async () => {
+      mockLoggedOut()
+      authMocks.signUp.mockResolvedValue({ error: null })
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Sign up' }))
+      await userEvent.type(screen.getByLabelText('Email'), 'new@example.com')
+      await userEvent.type(screen.getByLabelText('Password'), 'newpass99')
+      await userEvent.click(screen.getByRole('button', { name: 'Sign up' }))
+      await waitFor(() => screen.getByRole('alert'))
+      expect(screen.getByRole('alert')).toHaveTextContent('Check your email')
+    })
   })
 })

@@ -4,6 +4,7 @@ import { createCard, updateCardFields } from '../card/createCard'
 import { createFolder as makeFolderObject } from '../folder/createFolder'
 import { getAllFolders, putFolder } from '../folder/folderStorage'
 import { supabase } from '../lib/supabaseClient'
+import { assembleContext } from '../prompt/assembleContext'
 import { createCardSyncScheduler } from '../sync/cardSync'
 import { makeCardSupabaseStorage } from '../sync/cardSupabaseStorage'
 import {
@@ -23,6 +24,8 @@ export function useTabs({ userId } = {}) {
   const [tabCards, setTabCards] = useState([])
   const [cardsById, setCardsById] = useState({})
   const [folders, setFolders] = useState([])
+  const [promptLoading, setPromptLoading] = useState(false)
+  const [promptError, setPromptError] = useState('')
   const schedulerRef = useRef(null)
 
   useEffect(() => {
@@ -36,7 +39,39 @@ export function useTabs({ userId } = {}) {
 
   useEffect(() => {
     if (!isReady || !userId || !schedulerRef.current) return
-    schedulerRef.current.runNow()
+
+    schedulerRef.current.runNow().then(async () => {
+      // Reload cards from Dexie — may include remote cards pulled by runNow
+      const [freshCards, allTabCards, allTabs] = await Promise.all([
+        getAllCards(),
+        getAllTabCards(),
+        getAllTabs(),
+      ])
+
+      const freshById = Object.fromEntries(freshCards.map((c) => [c.id, c]))
+      const activeTab = allTabs[0]
+
+      // Any card in Dexie that has no tab_card entry is new to this device —
+      // place it at the end of the active tab so it appears in the feed.
+      if (activeTab) {
+        const knownIds = new Set(allTabCards.map((tc) => tc.cardId))
+        const orphans = freshCards.filter((c) => !knownIds.has(c.id))
+
+        if (orphans.length > 0) {
+          const maxPos = allTabCards.reduce((m, tc) => Math.max(m, tc.position), -1)
+          const newTabCards = []
+          let pos = maxPos + 1
+          for (const card of orphans) {
+            const tc = createTabCard({ tabId: activeTab.id, cardId: card.id, position: pos++ })
+            newTabCards.push(tc)
+            await putTabCard(tc)
+          }
+          setTabCards((prev) => [...prev, ...newTabCards])
+        }
+      }
+
+      setCardsById(freshById)
+    })
   }, [isReady, userId])
 
   useEffect(() => {
@@ -213,5 +248,27 @@ export function useTabs({ userId } = {}) {
     .filter((c) => c.location === 'library')
     .sort((a, b) => b.updatedAt - a.updatedAt)
 
-  return { tab, isReady, entries, shelfEntries, libraryEntries, folders, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide, saveToShelf, moveToLibrary, createFolder }
+  const runDockPrompt = useCallback(
+    async (promptText) => {
+      setPromptLoading(true)
+      setPromptError('')
+      try {
+        const contextCards = assembleContext(entries)
+        const { data, error } = await supabase.functions.invoke('dock-prompt', {
+          body: { prompt: promptText, contextCards },
+        })
+        if (error) throw error
+        await addCard({ title: data?.title ?? '', body: data?.body ?? '' })
+        setPromptLoading(false)
+        return true
+      } catch (err) {
+        setPromptError(err.message || 'Something went wrong')
+        setPromptLoading(false)
+        return false
+      }
+    },
+    [entries, addCard],
+  )
+
+  return { tab, isReady, entries, shelfEntries, libraryEntries, folders, addCard, updateCard, removeCard, reorder, fold, unfold, hide, unhide, saveToShelf, moveToLibrary, createFolder, runDockPrompt, promptLoading, promptError }
 }

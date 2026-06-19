@@ -9,6 +9,8 @@ export default {
     addDisabled: false,
     onScrollTop: () => {},
     onFolder: () => {},
+    onPrompt: () => {},
+    promptDisabled: false,
     onTabOverview: () => {},
     onMenu: () => {},
   },
@@ -18,4 +20,8 @@ export const Default = {}
 
 export const AddDisabled = {
   args: { addDisabled: true },
+}
+
+export const PromptDisabled = {
+  args: { promptDisabled: true },
 }
