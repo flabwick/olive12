@@ -898,4 +898,156 @@ describe('useTabs', () => {
       expect(contextCards[0].id).toBe('visible-card')
     })
   })
+
+  describe('multi-tab', () => {
+    it('loads multiple tabs on mount sorted by order', async () => {
+      await db.tabs.put({ id: 'tab-b', name: 'B', kind: 'blank', order: 1, savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000 })
+      await db.tabs.put({ id: 'tab-a', name: 'A', kind: 'blank', order: 0, savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000 })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(result.current.tabs).toHaveLength(2)
+      expect(result.current.tabs[0].id).toBe('tab-a')
+      expect(result.current.tabs[1].id).toBe('tab-b')
+    })
+
+    it('creates a default tab on first mount when no tabs exist', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('default-tab')
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(result.current.tabs).toHaveLength(1)
+      expect(result.current.tabs[0].id).toBe('default-tab')
+      expect(result.current.activeTabId).toBe('default-tab')
+    })
+
+    it('addTab creates a new tab and switches to it', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('tab-2')
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.addTab() })
+
+      expect(result.current.tabs).toHaveLength(2)
+      expect(result.current.activeTabId).toBe('tab-2')
+    })
+
+    it('switchTab changes active tab', async () => {
+      await db.tabs.put({ id: 'tab-a', name: 'A', kind: 'blank', order: 0, savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000 })
+      await db.tabs.put({ id: 'tab-b', name: 'B', kind: 'blank', order: 1, savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000 })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      expect(result.current.activeTabId).toBe('tab-a')
+
+      act(() => { result.current.switchTab('tab-b') })
+      expect(result.current.activeTabId).toBe('tab-b')
+    })
+
+    it('entries are scoped to the active tab', async () => {
+      await db.tabs.put({ id: 'tab-a', name: 'A', kind: 'blank', order: 0, savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000 })
+      await db.tabs.put({ id: 'tab-b', name: 'B', kind: 'blank', order: 1, savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000 })
+      await db.cards.put({ id: 'card-a', type: 'text', title: 'In A', body: '', location: 'none', folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false })
+      await db.cards.put({ id: 'card-b', type: 'text', title: 'In B', body: '', location: 'none', folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false })
+      await db.tab_cards.put({ tabId: 'tab-a', cardId: 'card-a', position: 0, foldState: false, hiddenState: false })
+      await db.tab_cards.put({ tabId: 'tab-b', cardId: 'card-b', position: 0, foldState: false, hiddenState: false })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(result.current.entries).toHaveLength(1)
+      expect(result.current.entries[0].card.title).toBe('In A')
+
+      act(() => { result.current.switchTab('tab-b') })
+      expect(result.current.entries).toHaveLength(1)
+      expect(result.current.entries[0].card.title).toBe('In B')
+    })
+
+    it('removeTab removes the tab and its tab_cards', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('tab-2')
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.addTab() })
+      expect(result.current.tabs).toHaveLength(2)
+
+      await act(async () => { await result.current.removeTab('tab-2') })
+      expect(result.current.tabs).toHaveLength(1)
+      expect(result.current.tabs[0].id).toBe('tab-1')
+    })
+
+    it('removeTab switches to adjacent tab when active tab is removed', async () => {
+      await db.tabs.put({ id: 'tab-a', name: 'A', kind: 'blank', order: 0, savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000 })
+      await db.tabs.put({ id: 'tab-b', name: 'B', kind: 'blank', order: 1, savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000 })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      expect(result.current.activeTabId).toBe('tab-a')
+
+      await act(async () => { await result.current.removeTab('tab-a') })
+      expect(result.current.activeTabId).toBe('tab-b')
+    })
+
+    it('removeTab creates a default tab if removing the last tab', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('new-default')
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.removeTab('tab-1') })
+      expect(result.current.tabs).toHaveLength(1)
+      expect(result.current.activeTabId).toBe('new-default')
+    })
+
+    it('renameTab updates name in state and persists', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-1')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_001_000)
+      await act(async () => { await result.current.renameTab('tab-1', 'Renamed') })
+
+      expect(result.current.tabs[0].name).toBe('Renamed')
+      const stored = await getAllTabs()
+      expect(stored[0].name).toBe('Renamed')
+    })
+
+    it('saveTabToShelf sets savedLocation to shelf in state and persists', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-1')
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.saveTabToShelf('tab-1') })
+
+      expect(result.current.tabs[0].savedLocation).toBe('shelf')
+      const stored = await getAllTabs()
+      expect(stored[0].savedLocation).toBe('shelf')
+    })
+
+    it('moveTabToLibrary sets savedLocation to library and persists', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-1')
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.moveTabToLibrary('tab-1', 'folder-x') })
+
+      expect(result.current.tabs[0].savedLocation).toBe('library')
+      expect(result.current.tabs[0].savedFolderId).toBe('folder-x')
+      const stored = await getAllTabs()
+      expect(stored[0].savedLocation).toBe('library')
+    })
+  })
 })
