@@ -97,7 +97,13 @@ export function useTabs({ userId } = {}) {
       ])
       if (!active) return
 
-      const sortedTabs = [...storedTabs].sort((a, b) => a.order - b.order)
+      const sortedTabs = [...storedTabs]
+        .sort((a, b) => a.order - b.order)
+        .map((t) => ({
+          savedLocation: 'none',
+          savedFolderId: null,
+          ...t,
+        }))
 
       if (sortedTabs.length === 0) {
         const defaultTab = createTab({ name: 'Main', order: 0 })
