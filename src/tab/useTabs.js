@@ -133,66 +133,59 @@ export function useTabs({ userId } = {}) {
   }, [])
 
   const addTab = useCallback(async () => {
-    setTabs((prev) => {
-      const newTab = createTab({ name: 'New tab', order: prev.length })
-      putTab(newTab)
-      setActiveTabId(newTab.id)
-      return [...prev, newTab]
-    })
-  }, [])
+    const newTab = createTab({ name: 'New tab', order: tabs.length })
+    await putTab(newTab)
+    setTabs((prev) => [...prev, newTab])
+    setActiveTabId(newTab.id)
+  }, [tabs])
 
   const removeTab = useCallback(async (tabId) => {
     await deleteAllTabCards(tabId)
     await deleteTabStorage(tabId)
 
-    setTabs((prev) => {
-      const next = removeTabPure(prev, tabId)
-      if (next.length === 0) {
-        const defaultTab = createTab({ name: 'Main', order: 0 })
-        putTab(defaultTab)
-        setActiveTabId(defaultTab.id)
-        return [defaultTab]
+    const nextTabs = removeTabPure(tabs, tabId)
+
+    if (nextTabs.length === 0) {
+      const defaultTab = createTab({ name: 'Main', order: 0 })
+      await putTab(defaultTab)
+      setTabs([defaultTab])
+      setActiveTabId(defaultTab.id)
+    } else {
+      let nextActiveId = activeTabId
+      if (activeTabId === tabId) {
+        const removedIndex = tabs.findIndex((t) => t.id === tabId)
+        const adjacent = nextTabs[removedIndex] ?? nextTabs[removedIndex - 1] ?? nextTabs[0]
+        nextActiveId = adjacent.id
       }
-      setActiveTabId((currentActiveId) => {
-        if (currentActiveId !== tabId) return currentActiveId
-        const removedIndex = prev.findIndex((t) => t.id === tabId)
-        const adjacent = next[removedIndex] ?? next[removedIndex - 1] ?? next[0]
-        return adjacent.id
-      })
-      return next
-    })
+      setTabs(nextTabs)
+      setActiveTabId(nextActiveId)
+    }
 
     setTabCards((prev) => prev.filter((tc) => tc.tabId !== tabId))
-  }, [])
+  }, [tabs, activeTabId])
 
   const renameTab = useCallback(async (tabId, name) => {
-    setTabs((prev) => {
-      const next = setTabNamePure(prev, tabId, name)
-      const updated = next.find((t) => t.id === tabId)
-      if (updated) putTab(updated)
-      return next
-    })
-  }, [])
+    const nextTabs = setTabNamePure(tabs, tabId, name)
+    const updated = nextTabs.find((t) => t.id === tabId)
+    if (updated) await putTab(updated)
+    setTabs(nextTabs)
+  }, [tabs])
 
   const saveTabToShelf = useCallback(async (tabId) => {
-    setTabs((prev) => {
-      const tab = prev.find((t) => t.id === tabId)
-      if (!tab) return prev
-      const updated = saveTabToShelfPure(tab)
-      putTab(updated)
-      return prev.map((t) => (t.id === tabId ? updated : t))
-    })
-  }, [])
+    const tab = tabs.find((t) => t.id === tabId)
+    if (!tab) return
+    const updated = saveTabToShelfPure(tab)
+    await putTab(updated)
+    setTabs((prev) => prev.map((t) => (t.id === tabId ? updated : t)))
+  }, [tabs])
 
   const moveTabToLibrary = useCallback(async (tabId, folderId = null) => {
-    setTabs((prev) => {
-      const tab = prev.find((t) => t.id === tabId)
-      if (!tab) return prev
-      const updated = moveTabToLibraryPure(tab, folderId)
-      putTab(updated)
-      return prev.map((t) => (t.id === tabId ? updated : t))
-    })
-  }, [])
+    const tab = tabs.find((t) => t.id === tabId)
+    if (!tab) return
+    const updated = moveTabToLibraryPure(tab, folderId)
+    await putTab(updated)
+    setTabs((prev) => prev.map((t) => (t.id === tabId ? updated : t)))
+  }, [tabs])
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null
 
