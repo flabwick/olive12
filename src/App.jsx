@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AuthForm } from './auth/AuthForm'
+import { IndexDebugPanel } from './debug/IndexDebugPanel'
 import { FolderPanel } from './layout/FolderPanel'
 import { supabase } from './lib/supabaseClient'
 import { Dock } from './tab/Dock'
@@ -45,6 +46,13 @@ function AppShell({ userId }) {
     promptError,
     allTabCards,
     cardsById,
+    brainFeedItems,
+    onBrainAccept,
+    onBrainDismiss,
+    flipCard,
+    isFlipped,
+    getIndexEntry,
+    isIndexing,
   } = useTabs({ userId })
 
   const [folderPanelOpen, setFolderPanelOpen] = useState(false)
@@ -53,6 +61,7 @@ function AppShell({ userId }) {
   const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false)
   const [vaultInitialTab, setVaultInitialTab] = useState('shelf')
   const [highlightedCardId, setHighlightedCardId] = useState(null)
+  const [indexDebugOpen, setIndexDebugOpen] = useState(true)
 
   function handleAddCard(fields) {
     addCard(fields)
@@ -135,6 +144,8 @@ function AppShell({ userId }) {
           onSaveToShelf={saveToShelf}
           onMoveToLibrary={moveToLibrary}
           onLocate={handleLocate}
+          flipCard={flipCard}
+          isFlipped={isFlipped}
         />
         {transientOpen && (
           <TransientCard
@@ -154,12 +165,15 @@ function AppShell({ userId }) {
             shelfTabs={shelfTabs}
             libraryTabs={libraryTabs}
             folders={folders}
+            brainFeedItems={brainFeedItems}
             onMoveToLibrary={moveToLibrary}
             onMoveTabToLibrary={handleMoveTabToLibrary}
             onCreateFolder={createFolder}
             onClose={() => setFolderPanelOpen(false)}
             onOpenAsPortal={handleOpenAsPortal}
             onOpenTab={handleOpenSavedTab}
+            onBrainAccept={onBrainAccept}
+            onBrainDismiss={onBrainDismiss}
             initialTab={vaultInitialTab}
             highlightedCardId={highlightedCardId}
           />
@@ -179,8 +193,11 @@ function AppShell({ userId }) {
           onPrompt={handlePromptToggle}
           promptDisabled={promptLoading}
           onTabOverview={handleTabOverview}
+          onIndexDebug={() => setIndexDebugOpen((v) => !v)}
+          indexDebugActive={indexDebugOpen}
         />
       </div>
+      <IndexDebugPanel open={indexDebugOpen} onClose={() => setIndexDebugOpen(false)} />
       {tabSwitcherOpen && (
         <TabSwitcher
           tabs={tabs}

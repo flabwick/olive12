@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { BrainFeed } from '../brain/BrainFeed'
 import { ShelfRow } from '../vault/ShelfRow'
 import { FolderTree } from '../vault/FolderTree'
 import { VaultTabRow } from '../vault/VaultTabRow'
@@ -12,12 +13,15 @@ export function FolderPanel({
   shelfTabs = [],
   libraryTabs = [],
   folders = [],
+  brainFeedItems = [],
   onMoveToLibrary,
   onMoveTabToLibrary,
   onCreateFolder,
   onClose,
   onOpenAsPortal,
   onOpenTab,
+  onBrainAccept,
+  onBrainDismiss,
   initialTab = 'shelf',
   highlightedCardId,
 }) {
@@ -79,18 +83,11 @@ export function FolderPanel({
         )}
 
         {tab === 'brain' && (
-          <div className="folder-panel__brain">
-            <svg className="folder-panel__brain-icon" viewBox="0 0 40 32" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M20 28C11 28 4 22 4 16c0-3 1.5-5.5 4-7.5" />
-              <path d="M20 28c9 0 16-6 16-12 0-3-1.5-5.5-4-7.5" />
-              <path d="M12 8.5C12 5.4 15.6 3 20 3s8 2.4 8 5.5" />
-              <circle cx="11" cy="16" r="2.5" />
-              <circle cx="29" cy="16" r="2.5" />
-              <path d="M13.5 16h13" />
-              <path d="M20 13.5v5" />
-            </svg>
-            <p className="folder-panel__brain-text">Neural summaries, connections &amp; more — coming soon.</p>
-          </div>
+          <BrainFeed
+            items={brainFeedItems}
+            onAccept={onBrainAccept}
+            onDismiss={onBrainDismiss}
+          />
         )}
       </div>
 

@@ -261,6 +261,60 @@ describe('Tab', () => {
     })
   })
 
+  describe('flip', () => {
+    it('passes flipped=true to Card when isFlipped returns true for that card id', () => {
+      const isFlipped = (id) => id === 'card-1'
+      render(<Tab entries={[makeEntry()]} isFlipped={isFlipped} flipCard={() => {}} />)
+      const card = screen.getByRole('heading', { level: 3, name: 'Title' }).closest('.card')
+      expect(card).toHaveClass('card--flipped')
+    })
+
+    it('passes flipped=false when isFlipped returns false', () => {
+      const isFlipped = () => false
+      render(<Tab entries={[makeEntry()]} isFlipped={isFlipped} flipCard={() => {}} />)
+      const card = screen.getByRole('heading', { level: 3, name: 'Title' }).closest('.card')
+      expect(card).not.toHaveClass('card--flipped')
+    })
+
+    it('passes onFlip to Card which calls flipCard with the card id', async () => {
+      const flipCard = vi.fn()
+      const entry = makeEntry({
+        card: { id: 'card-1', title: 'Q', body: 'Body', type: 'text', location: 'none', back: 'Answer' },
+      })
+      render(<Tab entries={[entry]} isFlipped={() => false} flipCard={flipCard} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Flip card' }))
+      expect(flipCard).toHaveBeenCalledWith('card-1')
+    })
+
+    it('PortalCard receives flip button when flipCard is provided', () => {
+      const flipCard = vi.fn()
+      const portalEntry = {
+        card: { id: 'portal-1', type: 'portal', config: { target_card_id: null }, title: '', body: '', location: 'none' },
+        position: 0,
+        foldState: false,
+        hiddenState: false,
+      }
+      render(<Tab entries={[portalEntry]} isFlipped={() => false} flipCard={flipCard} />)
+      expect(screen.getByRole('button', { name: 'Flip card' })).toBeInTheDocument()
+    })
+
+    it('PortalCard flip button calls flipCard with portal card id', async () => {
+      const flipCard = vi.fn()
+      const cardsById = {
+        'target-1': { id: 'target-1', title: 'Target', body: 'Body', back: '', type: 'text', config: null },
+      }
+      const portalEntry = {
+        card: { id: 'portal-1', type: 'portal', config: { target_card_id: 'target-1' }, title: '', body: '', location: 'none' },
+        position: 0,
+        foldState: false,
+        hiddenState: false,
+      }
+      render(<Tab entries={[portalEntry]} cardsById={cardsById} isFlipped={() => false} flipCard={flipCard} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Flip card' }))
+      expect(flipCard).toHaveBeenCalledWith('portal-1')
+    })
+  })
+
   describe('inline update', () => {
     it('passes onUpdate to each Card', async () => {
       const onUpdate = vi.fn()

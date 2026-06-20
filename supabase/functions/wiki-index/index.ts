@@ -64,19 +64,72 @@ function buildMessages(
   ]
 }
 
-function parseIndexResult(content: string): { title: string; tags: string[]; summary: string; links: string[] } {
-  const cleaned = content.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '').trim()
+function parseIndexResult(
+  content: string,
+  card: Card,
+): { title: string; tags: string[]; summary: string; links: string[] } {
+  const cleaned = content.trim().replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '').trim()
+  let parsed: Record<string, unknown> | null = null
+
   try {
-    const parsed = JSON.parse(cleaned)
-    return {
-      title: typeof parsed.title === 'string' ? parsed.title.slice(0, 80) : '',
-      tags: Array.isArray(parsed.tags) ? parsed.tags.filter((t: unknown) => typeof t === 'string') : [],
-      summary: typeof parsed.summary === 'string' ? parsed.summary : '',
-      links: Array.isArray(parsed.links) ? parsed.links.filter((l: unknown) => typeof l === 'string') : [],
-    }
+    parsed = JSON.parse(cleaned)
   } catch {
-    return { title: '', tags: [], summary: content.slice(0, 200), links: [] }
+    const match = cleaned.match(/\{[\s\S]*\}/)
+    if (match) {
+      try {
+        parsed = JSON.parse(match[0])
+      } catch {
+        parsed = null
+      }
+    }
   }
+
+  if (parsed && typeof parsed === 'object') {
+    const title = typeof parsed.title === 'string' ? parsed.title.slice(0, 80) : ''
+    const tags = Array.isArray(parsed.tags)
+      ? parsed.tags.filter((t: unknown) => typeof t === 'string')
+      : []
+    let summary =
+      typeof parsed.summary === 'string'
+        ? parsed.summary
+        : typeof parsed.description === 'string'
+          ? parsed.description
+          : ''
+    const links = Array.isArray(parsed.links)
+      ? parsed.links.filter((l: unknown) => typeof l === 'string')
+      : []
+
+    if (!summary.trim() && card.body?.trim()) {
+      summary = summarizeFromBody(card.body)
+    }
+
+    return {
+      title: title || card.title || '',
+      tags,
+      summary,
+      links,
+    }
+  }
+
+  return {
+    title: card.title || '',
+    tags: [],
+    summary: card.body?.trim() ? summarizeFromBody(card.body) : content.slice(0, 200),
+    links: [],
+  }
+}
+
+function summarizeFromBody(body: string): string {
+  const text = body.trim().replace(/\s+/g, ' ')
+  if (!text) return ''
+
+  const sentences = text.match(/[^.!?]+[.!?]+/g)
+  if (sentences?.length) {
+    const joined = sentences.slice(0, 2).join(' ').trim()
+    return joined.length <= 280 ? joined : joined.slice(0, 277) + '…'
+  }
+
+  return text.length <= 280 ? text : text.slice(0, 277) + '…'
 }
 
 Deno.serve(async (req: Request) => {
@@ -139,7 +192,7 @@ Deno.serve(async (req: Request) => {
     const rawContent: string = completion.choices?.[0]?.message?.content ?? ''
     console.log('[wiki-index] raw content:', JSON.stringify(rawContent))
 
-    const result = parseIndexResult(rawContent)
+    const result = parseIndexResult(rawContent, card as Card)
     console.log('[wiki-index] parsed result:', JSON.stringify(result))
 
     return new Response(

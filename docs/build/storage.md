@@ -87,7 +87,7 @@ db.version(6).stores({
 
 | Table | Primary key | Secondary index | Notes |
 |---|---|---|---|
-| `cards` | `id` | — | Stores card records including `location`, `folderId`, `dirty`; none are indexed |
+| `cards` | `id` | — | Card records: `title`, `body`, `back`, `location`, `folderId`, `dirty`; none indexed |
 | `tabs` | `id` | — | Stores tab records including `savedLocation`, `savedFolderId` |
 | `tab_cards` | `[tabId+cardId]` compound | `tabId` | Compound PK; `tabId` index enables per-tab queries |
 | `folders` | `id` | — | Stores folder records including `parentId`; not indexed |

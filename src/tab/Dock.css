@@ -62,6 +62,12 @@
   cursor: default;
 }
 
+.dock__btn--active {
+  background: var(--olive-amber, #c8a87a);
+  color: #2c1810;
+  border-color: #7a5c3a;
+}
+
 .dock__tabs-back {
   fill: var(--olive-parchment, #f5ede0);
 }

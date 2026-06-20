@@ -10,9 +10,10 @@ Supabase card sync: pure conflict-resolution logic, Supabase storage adapter, sy
 | Portal card `config` (`target_card_id`) | Yes — portal cards go through the same `putCard` path |
 | Card deletion | Yes — immediate on `removeCard` |
 | Card `folderId` | No — local only |
-| Tabs, tab_card order, `foldState`, `hiddenState` | No — Dexie only |
+| Tabs (saved to shelf/library) | Yes — `user_tabs` via `tabSupabaseStorage` when authenticated |
+| Tab_card order, `foldState`, `hiddenState` | No — Dexie only |
 | Folders | No — Dexie only |
-| Index entries (`index_entries`) | Yes — written directly via `supabase.from('index_entries').upsert(...)` inside `moveToLibrary`; not through the debounced scheduler |
+| Index entries (`index_entries`) | Yes — via `indexCard.js` → Dexie + Supabase upsert on library promotion or flip ensure; not through the debounced card scheduler |
 
 ## File map
 
@@ -27,6 +28,12 @@ src/
     cardSupabaseStorage.test.js     # [TEST] 9 tests
     cardSync.js                     # Orchestration: syncDirty, pullRemote, scheduler
     cardSync.test.js                # [TEST] 14 tests
+  brain/
+    indexCard.js                    # wiki-index invoke, finishIndexResult, Dexie + Supabase persist
+    indexCard.test.js
+  tab/
+    tabSupabaseStorage.js           # user_tabs upsert for saved tabs
+    tabSupabaseStorage.test.js
   prompt/
     assembleContext.js              # Pure: filters entries to visible contextCards
     assembleContext.test.js         # [TEST] 6 tests
@@ -41,7 +48,12 @@ supabase/
   migrations/
     20260618000000_create_cards.sql           # Cards table + RLS
     20260620000000_create_index_entries.sql   # index_entries table + RLS
+    20260620120000_create_user_tabs.sql       # user_tabs table + RLS
 ```
+
+## Saved tab sync (`user_tabs`)
+
+When a tab has `savedLocation !== 'none'` and the user is authenticated, `useTabs` debounces upserts to Supabase `user_tabs` (id, name, saved_location, saved_folder_id, card_ids). Tab_card order and fold state remain local-only.
 
 ## Supabase client
 
@@ -154,7 +166,7 @@ See [prompt.md](prompt.md) for full detail on `assembleContext`, `buildPrompt`, 
 
 ## Wiki Index — AI knowledge indexing
 
-See [brain.md](../brain.md) for full detail on `createIndexEntry`, `indexEntryStorage`, the `wiki-index` edge function, and the `moveToLibrary` wiring.
+See [brain.md](./brain.md) for `indexCard`, `finishIndexResult`, library-only rules, CardBack display, and Brain feed. See [debug.md](./debug.md) for pipeline tracing.
 
 ## Auth (App.jsx)
 
@@ -182,7 +194,7 @@ Sign-up shows a "Check your email" confirmation; sign-in logs in immediately on 
 ## Not built yet
 
 - Conflict UI (currently `REMOTE_NEWER` always wins)
-- Tab, tab_card, or folder sync
+- Tab_card or folder sync to Supabase (saved tab metadata syncs via `user_tabs`)
 - Optimistic rollback on sync failure
 - Real-time Supabase subscriptions
 - Streaming dock-prompt responses

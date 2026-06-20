@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { deleteCard, getAllCards, putCard } from '../card/cardStorage'
-import { deleteLinksForSource, rebuildLinksForCard } from '../card/linkStorage'
+import { deleteLinksForSource, getAllLinks, rebuildLinksForCard } from '../card/linkStorage'
 import { createCard, updateCardFields } from '../card/createCard'
 import { createFolder as makeFolderObject } from '../folder/createFolder'
 import { getAllFolders, putFolder } from '../folder/folderStorage'
@@ -8,9 +8,12 @@ import { supabase } from '../lib/supabaseClient'
 import { assembleContext } from '../prompt/assembleContext'
 import { createCardSyncScheduler } from '../sync/cardSync'
 import { makeCardSupabaseStorage } from '../sync/cardSupabaseStorage'
-import { computeContentHash } from '../sync/cardSyncLogic'
-import { createIndexEntry } from '../brain/createIndexEntry'
-import { getAllIndexEntries, putIndexEntry } from '../brain/indexEntryStorage'
+import { makeTabSupabaseStorage } from './tabSupabaseStorage'
+import { indexCard } from '../brain/indexCard'
+import { enrichIndexEntry } from '../brain/finishIndexResult'
+import { getAllIndexEntries, getIndexEntry as getStoredIndexEntry, putIndexEntry } from '../brain/indexEntryStorage'
+import { INDEX_STAGES, logIndexEvent } from '../debug/indexPipelineDebug'
+import { detectStaleEntries } from '../brain/brainFeedLogic'
 import {
   createTab,
   createTabCard,
@@ -36,6 +39,30 @@ import {
 
 const ACTIVE_TAB_KEY = 'olive12:activeTabId'
 
+function resolveIndexTargetId(card) {
+  if (!card) return null
+  if (card.type === 'portal') return card.config?.target_card_id ?? null
+  return card.id
+}
+
+function resolveIndexTarget(card, cardsById) {
+  const targetId = resolveIndexTargetId(card)
+  return targetId ? cardsById[targetId] : null
+}
+
+function buildTabRow(tab, cardIds, userId) {
+  return {
+    id: tab.id,
+    user_id: userId,
+    name: tab.name,
+    saved_location: tab.savedLocation,
+    saved_folder_id: tab.savedFolderId ?? null,
+    card_ids: cardIds,
+    created_at: new Date(tab.createdAt).toISOString(),
+    updated_at: new Date(tab.updatedAt).toISOString(),
+  }
+}
+
 export function useTabs({ userId } = {}) {
   const [isReady, setIsReady] = useState(false)
   const [tabs, setTabs] = useState([])
@@ -43,20 +70,33 @@ export function useTabs({ userId } = {}) {
   const [tabCards, setTabCards] = useState([])
   const [cardsById, setCardsById] = useState({})
   const [folders, setFolders] = useState([])
+  const [indexEntries, setIndexEntries] = useState([])
+  const [allLinks, setAllLinks] = useState([])
   const [promptLoading, setPromptLoading] = useState(false)
   const [promptError, setPromptError] = useState('')
   const schedulerRef = useRef(null)
   const storageRef = useRef(null)
+  const tabStorageRef = useRef(null)
+  const [dismissedBrainIds, setDismissedBrainIds] = useState(() => new Set())
+  const [flippedCardIds, setFlippedCardIds] = useState(() => new Set())
+  const [indexingCardIds, setIndexingCardIds] = useState(() => new Set())
+
+  const indexEntriesById = useMemo(
+    () => Object.fromEntries(indexEntries.map((e) => [e.cardId, e])),
+    [indexEntries],
+  )
 
   useEffect(() => {
     if (!userId) {
       schedulerRef.current = null
       storageRef.current = null
+      tabStorageRef.current = null
       return
     }
     const storage = makeCardSupabaseStorage(supabase)
     storageRef.current = storage
     schedulerRef.current = createCardSyncScheduler({ userId, debounceMs: 3000, storage })
+    tabStorageRef.current = makeTabSupabaseStorage(supabase)
   }, [userId])
 
   useEffect(() => {
@@ -91,6 +131,78 @@ export function useTabs({ userId } = {}) {
       }
 
       setCardsById(freshById)
+
+      if (tabStorageRef.current) {
+        try {
+          const remoteSavedTabs = await tabStorageRef.current.fetchSavedTabsForUser(userId)
+          const localTabIdSet = new Set(allTabs.map((t) => t.id))
+          const freshCardIdSet = new Set(freshCards.map((c) => c.id))
+          const existingTabCardIds = new Set(allTabCards.map((tc) => tc.cardId))
+
+          const newTabs = []
+          for (const remote of remoteSavedTabs) {
+            if (localTabIdSet.has(remote.id)) {
+              const local = allTabs.find((t) => t.id === remote.id)
+              const remoteTs = new Date(remote.updated_at).getTime()
+              if (local && remoteTs > local.updatedAt) {
+                const updatedTab = {
+                  ...local,
+                  name: remote.name,
+                  savedLocation: remote.saved_location,
+                  savedFolderId: remote.saved_folder_id ?? null,
+                  updatedAt: remoteTs,
+                }
+                await putTab(updatedTab)
+                setTabs((prev) => prev.map((t) => (t.id === remote.id ? updatedTab : t)))
+              }
+              continue
+            }
+
+            const newTab = {
+              id: remote.id,
+              name: remote.name,
+              kind: 'blank',
+              order: allTabs.length + newTabs.length,
+              savedLocation: remote.saved_location,
+              savedFolderId: remote.saved_folder_id ?? null,
+              createdAt: new Date(remote.created_at).getTime(),
+              updatedAt: new Date(remote.updated_at).getTime(),
+            }
+            await putTab(newTab)
+
+            const newTabCards = []
+            for (let i = 0; i < remote.card_ids.length; i++) {
+              const cardId = remote.card_ids[i]
+              if (freshCardIdSet.has(cardId) && !existingTabCardIds.has(cardId)) {
+                const tc = createTabCard({ tabId: remote.id, cardId, position: i })
+                await putTabCard(tc)
+                newTabCards.push(tc)
+                existingTabCardIds.add(cardId)
+              }
+            }
+            if (newTabCards.length > 0) {
+              setTabCards((prev) => [...prev, ...newTabCards])
+            }
+            newTabs.push(newTab)
+          }
+          if (newTabs.length > 0) {
+            setTabs((prev) => [...prev, ...newTabs])
+          }
+
+          const remoteIdSet = new Set(remoteSavedTabs.map((t) => t.id))
+          for (const localTab of allTabs.filter((t) => t.savedLocation !== 'none')) {
+            if (!remoteIdSet.has(localTab.id)) {
+              const cardIds = allTabCards
+                .filter((tc) => tc.tabId === localTab.id)
+                .sort((a, b) => a.position - b.position)
+                .map((tc) => tc.cardId)
+              await tabStorageRef.current.upsertSavedTab(buildTabRow(localTab, cardIds, userId))
+            }
+          }
+        } catch (err) {
+          console.error('[useTabs] tab sync error:', err)
+        }
+      }
     })
   }, [isReady, userId])
 
@@ -98,8 +210,9 @@ export function useTabs({ userId } = {}) {
     let active = true
 
     async function init() {
-      const [storedTabs, tcs, cards, fds] = await Promise.all([
+      const [storedTabs, tcs, cards, fds, entries, links] = await Promise.all([
         getAllTabs(), getAllTabCards(), getAllCards(), getAllFolders(),
+        getAllIndexEntries(), getAllLinks(),
       ])
       if (!active) return
 
@@ -112,7 +225,7 @@ export function useTabs({ userId } = {}) {
         }))
 
       if (sortedTabs.length === 0) {
-        const defaultTab = createTab({ name: 'Main', order: 0 })
+        const defaultTab = createTab({ order: 0 })
         await putTab(defaultTab)
         if (!active) return
         setTabs([defaultTab])
@@ -131,6 +244,8 @@ export function useTabs({ userId } = {}) {
       }
 
       setFolders(fds)
+      setIndexEntries(entries)
+      setAllLinks(links)
       setIsReady(true)
     }
 
@@ -147,7 +262,7 @@ export function useTabs({ userId } = {}) {
   }, [])
 
   const addTab = useCallback(async () => {
-    const newTab = createTab({ name: 'New tab', order: tabs.length })
+    const newTab = createTab({ order: tabs.length })
     await putTab(newTab)
     setTabs((prev) => [...prev, newTab])
     setActiveTabId(newTab.id)
@@ -160,7 +275,7 @@ export function useTabs({ userId } = {}) {
     const nextTabs = removeTabPure(tabs, tabId)
 
     if (nextTabs.length === 0) {
-      const defaultTab = createTab({ name: 'Main', order: 0 })
+      const defaultTab = createTab({ order: 0 })
       await putTab(defaultTab)
       setTabs([defaultTab])
       setActiveTabId(defaultTab.id)
@@ -181,9 +296,20 @@ export function useTabs({ userId } = {}) {
   const renameTab = useCallback(async (tabId, name) => {
     const nextTabs = setTabNamePure(tabs, tabId, name)
     const updated = nextTabs.find((t) => t.id === tabId)
-    if (updated) await putTab(updated)
+    if (updated) {
+      await putTab(updated)
+      if (userId && tabStorageRef.current && updated.savedLocation !== 'none') {
+        const cardIds = tabCards
+          .filter((tc) => tc.tabId === tabId)
+          .sort((a, b) => a.position - b.position)
+          .map((tc) => tc.cardId)
+        tabStorageRef.current
+          .upsertSavedTab(buildTabRow(updated, cardIds, userId))
+          .catch((err) => console.error('[useTabs] tab push:', err))
+      }
+    }
     setTabs(nextTabs)
-  }, [tabs])
+  }, [tabs, tabCards, userId])
 
   const saveTabToShelf = useCallback(async (tabId) => {
     const tab = tabs.find((t) => t.id === tabId)
@@ -191,7 +317,16 @@ export function useTabs({ userId } = {}) {
     const updated = saveTabToShelfPure(tab)
     await putTab(updated)
     setTabs((prev) => prev.map((t) => (t.id === tabId ? updated : t)))
-  }, [tabs])
+    if (userId && tabStorageRef.current) {
+      const cardIds = tabCards
+        .filter((tc) => tc.tabId === tabId)
+        .sort((a, b) => a.position - b.position)
+        .map((tc) => tc.cardId)
+      tabStorageRef.current
+        .upsertSavedTab(buildTabRow(updated, cardIds, userId))
+        .catch((err) => console.error('[useTabs] tab push:', err))
+    }
+  }, [tabs, tabCards, userId])
 
   const moveTabToLibrary = useCallback(async (tabId, folderId = null) => {
     const tab = tabs.find((t) => t.id === tabId)
@@ -199,7 +334,16 @@ export function useTabs({ userId } = {}) {
     const updated = moveTabToLibraryPure(tab, folderId)
     await putTab(updated)
     setTabs((prev) => prev.map((t) => (t.id === tabId ? updated : t)))
-  }, [tabs])
+    if (userId && tabStorageRef.current) {
+      const cardIds = tabCards
+        .filter((tc) => tc.tabId === tabId)
+        .sort((a, b) => a.position - b.position)
+        .map((tc) => tc.cardId)
+      tabStorageRef.current
+        .upsertSavedTab(buildTabRow(updated, cardIds, userId))
+        .catch((err) => console.error('[useTabs] tab push:', err))
+    }
+  }, [tabs, tabCards, userId])
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null
 
@@ -362,41 +506,74 @@ export function useTabs({ userId } = {}) {
     async (cardId, folderId = null) => {
       const card = cardsById[cardId]
       if (!card) return
+
+      logIndexEvent({
+        stage: INDEX_STAGES.MOVE_TO_LIBRARY,
+        cardId,
+        status: 'start',
+        detail: { folderId, title: card.title },
+      })
+
       const updated = updateCardFields(card, { location: 'library', folderId })
       setCardsById((prev) => ({ ...prev, [cardId]: updated }))
       await putCard(updated)
       schedulerRef.current?.scheduleSync()
 
+      setIndexingCardIds((prev) => new Set([...prev, cardId]))
       try {
-        const neighborEntries = (await getAllIndexEntries()).slice(0, 10)
-        const { data, error } = await supabase.functions.invoke('wiki-index', {
-          body: { card: updated, neighborEntries },
+        const entry = await indexCard(updated, { userId })
+        setIndexEntries((prev) => {
+          const next = prev.filter((e) => e.cardId !== cardId)
+          return [...next, entry]
         })
-        if (!error && data) {
-          const entry = createIndexEntry({
-            cardId,
-            title: data.title || updated.title || '',
-            tags: data.tags ?? [],
-            summary: data.summary ?? '',
-            links: data.links ?? [],
-            contentHash: computeContentHash(updated),
-          })
-          await putIndexEntry(entry)
-          if (userId) {
-            await supabase.from('index_entries').upsert({
-              card_id: cardId,
-              user_id: userId,
-              title: entry.title,
-              tags: entry.tags,
-              summary: entry.summary,
-              links: entry.links,
-              content_hash: entry.contentHash,
-              updated_at: new Date(entry.updatedAt).toISOString(),
+        if (!entry.summary?.trim() && updated.body?.trim()) {
+          const enriched = enrichIndexEntry(entry, updated)
+          if (enriched.summary !== entry.summary) {
+            await putIndexEntry(enriched)
+            setIndexEntries((prev) => {
+              const next = prev.filter((e) => e.cardId !== cardId)
+              return [...next, enriched]
             })
           }
         }
+        logIndexEvent({
+          stage: INDEX_STAGES.STATE_UPDATE,
+          cardId,
+          status: 'ok',
+          detail: {
+            title: entry.title,
+            summaryLen: entry.summary.length,
+            summaryPreview: entry.summary.slice(0, 120),
+            tags: entry.tags,
+          },
+        })
       } catch (err) {
+        logIndexEvent({
+          stage: INDEX_STAGES.MOVE_TO_LIBRARY,
+          cardId,
+          status: 'error',
+          error: err,
+        })
+        const stored = await getStoredIndexEntry(cardId)
+        if (stored) {
+          setIndexEntries((prev) => {
+            const next = prev.filter((e) => e.cardId !== cardId)
+            return [...next, stored]
+          })
+          logIndexEvent({
+            stage: INDEX_STAGES.DEXIE_RELOAD,
+            cardId,
+            status: 'ok',
+            detail: { note: 'Recovered entry from Dexie after invoke failure' },
+          })
+        }
         console.error('[useTabs] wiki-index error:', err)
+      } finally {
+        setIndexingCardIds((prev) => {
+          const next = new Set(prev)
+          next.delete(cardId)
+          return next
+        })
       }
     },
     [cardsById, userId],
@@ -412,12 +589,25 @@ export function useTabs({ userId } = {}) {
   const entries = tabCards
     .filter((tc) => tc.tabId === activeTabId)
     .sort((a, b) => a.position - b.position)
-    .map((tc) => ({
-      card: cardsById[tc.cardId],
-      position: tc.position,
-      foldState: tc.foldState,
-      hiddenState: tc.hiddenState,
-    }))
+    .map((tc) => {
+      const card = cardsById[tc.cardId]
+      const targetId = resolveIndexTargetId(card)
+      const target = targetId ? cardsById[targetId] : null
+      const indexLocation = target?.location ?? card?.location ?? 'none'
+      const isLibrary = indexLocation === 'library'
+      return {
+        card,
+        position: tc.position,
+        foldState: tc.foldState,
+        hiddenState: tc.hiddenState,
+        indexTargetId: targetId,
+        indexEntry: isLibrary && targetId
+          ? enrichIndexEntry(indexEntriesById[targetId], target ?? card)
+          : undefined,
+        indexLocation,
+        indexLoading: isLibrary && targetId ? indexingCardIds.has(targetId) : false,
+      }
+    })
     .filter((entry) => entry.card !== undefined)
 
   const shelfEntries = Object.values(cardsById)
@@ -430,6 +620,164 @@ export function useTabs({ userId } = {}) {
 
   const shelfTabs = tabs.filter((t) => t.savedLocation === 'shelf')
   const libraryTabs = tabs.filter((t) => t.savedLocation === 'library')
+
+  const rawBrainFeedFlags = detectStaleEntries(Object.values(cardsById), indexEntries, allLinks)
+  const brainFeedItems = rawBrainFeedFlags
+    .filter((f) => !dismissedBrainIds.has(f.cardId))
+    .map((f) => ({
+      cardId: f.cardId,
+      title: cardsById[f.cardId]?.title ?? '',
+      reason: f.reason,
+    }))
+
+  const dismissBrainItem = useCallback((cardId) => {
+    setDismissedBrainIds((prev) => new Set([...prev, cardId]))
+  }, [])
+
+  const onBrainAccept = useCallback((cardId) => {
+    console.log('[useTabs] onBrainAccept (stub):', cardId)
+  }, [])
+
+  const getIndexEntry = useCallback(
+    (cardId) => indexEntriesById[cardId],
+    [indexEntriesById],
+  )
+
+  const isIndexing = useCallback(
+    (cardId) => indexingCardIds.has(cardId),
+    [indexingCardIds],
+  )
+
+  const ensureIndexEntry = useCallback(
+    async (cardId) => {
+      const card = cardsById[cardId]
+      if (!card || card.location !== 'library') {
+        logIndexEvent({
+          stage: INDEX_STAGES.ENSURE_INDEX,
+          cardId,
+          status: 'skip',
+          detail: { reason: !card ? 'card not found' : `location=${card.location}` },
+        })
+        return
+      }
+
+      if (indexEntriesById[cardId]) {
+        const existing = indexEntriesById[cardId]
+        if (!existing.summary?.trim() && card.body?.trim()) {
+          const enriched = enrichIndexEntry(existing, card)
+          if (enriched.summary !== existing.summary) {
+            await putIndexEntry(enriched)
+            setIndexEntries((prev) => {
+              const next = prev.filter((e) => e.cardId !== cardId)
+              return [...next, enriched]
+            })
+            logIndexEvent({
+              stage: INDEX_STAGES.DEXIE_RELOAD,
+              cardId,
+              status: 'ok',
+              detail: { source: 'body-fallback-on-flip', summaryLen: enriched.summary.length },
+            })
+            return
+          }
+        }
+        logIndexEvent({
+          stage: INDEX_STAGES.LOOKUP,
+          cardId,
+          status: 'ok',
+          detail: { source: 'react-state', summaryLen: existing.summary?.length ?? 0 },
+        })
+        return
+      }
+
+      const stored = await getStoredIndexEntry(cardId)
+      if (stored) {
+        setIndexEntries((prev) => {
+          const next = prev.filter((e) => e.cardId !== cardId)
+          return [...next, stored]
+        })
+        logIndexEvent({
+          stage: INDEX_STAGES.DEXIE_RELOAD,
+          cardId,
+          status: 'ok',
+          detail: { source: 'dexie-on-flip', summaryLen: stored.summary.length },
+        })
+        return
+      }
+
+      if (indexingCardIds.has(cardId)) {
+        logIndexEvent({
+          stage: INDEX_STAGES.ENSURE_INDEX,
+          cardId,
+          status: 'skip',
+          detail: { reason: 'already indexing' },
+        })
+        return
+      }
+
+      setIndexingCardIds((prev) => new Set([...prev, cardId]))
+      try {
+        const entry = await indexCard(card, { userId })
+        setIndexEntries((prev) => {
+          const next = prev.filter((e) => e.cardId !== cardId)
+          return [...next, entry]
+        })
+        logIndexEvent({
+          stage: INDEX_STAGES.STATE_UPDATE,
+          cardId,
+          status: 'ok',
+          detail: { trigger: 'flip', title: entry.title, summaryLen: entry.summary.length, summaryPreview: entry.summary.slice(0, 120) },
+        })
+      } catch (err) {
+        logIndexEvent({
+          stage: INDEX_STAGES.ENSURE_INDEX,
+          cardId,
+          status: 'error',
+          error: err,
+        })
+        console.error('[useTabs] wiki-index error on flip:', err)
+      } finally {
+        setIndexingCardIds((prev) => {
+          const next = new Set(prev)
+          next.delete(cardId)
+          return next
+        })
+      }
+    },
+    [cardsById, indexEntriesById, indexingCardIds, userId],
+  )
+
+  const flipCard = useCallback(
+    (cardId) => {
+      const wasFlipped = flippedCardIds.has(cardId)
+      setFlippedCardIds((prev) => {
+        const next = new Set(prev)
+        if (next.has(cardId)) next.delete(cardId)
+        else next.add(cardId)
+        return next
+      })
+
+      const card = cardsById[cardId]
+      const targetId =
+        card?.type === 'portal' ? card.config?.target_card_id : cardId
+
+      logIndexEvent({
+        stage: INDEX_STAGES.FLIP,
+        cardId: targetId ?? cardId,
+        status: 'info',
+        detail: {
+          portalId: card?.type === 'portal' ? cardId : null,
+          wasFlipped,
+          nowFlipped: !wasFlipped,
+          targetLocation: targetId ? cardsById[targetId]?.location : card?.location,
+        },
+      })
+
+      if (!wasFlipped && targetId) ensureIndexEntry(targetId)
+    },
+    [cardsById, flippedCardIds, ensureIndexEntry],
+  )
+
+  const isFlipped = useCallback((cardId) => flippedCardIds.has(cardId), [flippedCardIds])
 
   const runDockPrompt = useCallback(
     async (promptText) => {
@@ -503,5 +851,12 @@ export function useTabs({ userId } = {}) {
     runDockPrompt,
     promptLoading,
     promptError,
+    brainFeedItems,
+    onBrainAccept,
+    onBrainDismiss: dismissBrainItem,
+    flipCard,
+    isFlipped,
+    getIndexEntry,
+    isIndexing,
   }
 }

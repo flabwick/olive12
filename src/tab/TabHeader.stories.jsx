@@ -42,3 +42,12 @@ export const NoSaveButton = {
     onRename: (name) => console.log('rename:', name),
   },
 }
+
+export const Untitled = {
+  args: {
+    name: '',
+    savedLocation: 'none',
+    onRename: (name) => console.log('rename:', name),
+    onSaveToShelf: () => console.log('save to shelf'),
+  },
+}

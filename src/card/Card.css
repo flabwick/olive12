@@ -20,6 +20,43 @@
   opacity: 0.38;
 }
 
+.card--flipped {
+  /* marker class for styling hooks and test assertions */
+}
+
+.card__flip {
+  position: absolute;
+  bottom: 0.3125rem;
+  right: 0.4375rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #6b5d54;
+  opacity: 0.6;
+  padding: 0.125rem;
+  line-height: 1;
+}
+
+.card__flip:hover {
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .card__flip {
+    color: #9e8e80;
+  }
+}
+
+.card--flipped .card__body-area {
+  overflow-y: auto;
+  max-height: min(70vh, 32rem);
+}
+
+.card__body-area {
+  position: relative;
+}
+
 .card__body {
   font-size: 0.8125rem;
   line-height: 1.6;

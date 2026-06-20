@@ -166,4 +166,28 @@ describe('CardHeader', () => {
       expect(onSaveToShelf).toHaveBeenCalledOnce()
     })
   })
+
+  describe('flip', () => {
+    it('renders Flip card button when onFlip is provided', () => {
+      render(<CardHeader title="Q" onFlip={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Flip card' })).toBeInTheDocument()
+    })
+
+    it('does not render Flip card button when onFlip is absent', () => {
+      render(<CardHeader title="Q" />)
+      expect(screen.queryByRole('button', { name: 'Flip card' })).not.toBeInTheDocument()
+    })
+
+    it('calls onFlip when Flip card is clicked', async () => {
+      const onFlip = vi.fn()
+      render(<CardHeader title="Q" onFlip={onFlip} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Flip card' }))
+      expect(onFlip).toHaveBeenCalledOnce()
+    })
+
+    it('flip button has aria-pressed=true when flipped', () => {
+      render(<CardHeader title="Q" onFlip={() => {}} flipped={true} />)
+      expect(screen.getByRole('button', { name: 'Flip card' })).toHaveAttribute('aria-pressed', 'true')
+    })
+  })
 })

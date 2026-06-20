@@ -82,4 +82,9 @@ describe('TabHeader', () => {
     render(<TabHeader name="Tab" savedLocation="none" />)
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
+
+  it('shows (untitled) placeholder when name is empty', () => {
+    render(<TabHeader name="" savedLocation="none" />)
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('(untitled)')
+  })
 })

@@ -27,6 +27,11 @@ src/
     PortalCard.css
     PortalCard.test.jsx         # [TEST]
     PortalCard.stories.jsx      # [STORY]
+    flipLogic.js                # Pure: toggle flip set, isFlipped
+    flipLogic.test.js           # [TEST]
+    CardBack.jsx                # Back face: notes, metadata, wiki index (library only)
+    CardBack.css
+    CardBack.test.jsx           # [TEST]
     LocationButton.jsx          # Dumb: save-to-shelf / move-to-library / in-library button
     LocationButton.css
     LocationButton.test.jsx     # [TEST]
@@ -51,10 +56,11 @@ src/
 | `config` | object \| null | `null` for text cards; `{ target_card_id: string \| null }` for portal cards |
 | `location` | string | `'none' \| 'shelf' \| 'library'`; default `'none'` |
 | `folderId` | string \| null | Library folder id; `null` for root-level or unplaced |
+| `back` | string | Freeform notes on the card back face; default `''` |
 | `createdAt` | number | `Date.now()` at creation |
 | `updatedAt` | number | Updated by `updateCardFields` |
 
-`updateCardFields(card, { title, body, location, folderId, config })` — returns a new card with updated fields and a refreshed `updatedAt`. Unspecified fields keep their existing values.
+`updateCardFields(card, { title, body, back, location, folderId, config })` — returns a new card with updated fields and a refreshed `updatedAt`. Unspecified fields keep their existing values.
 
 **`location` semantics:**
 - `'none'` — card lives in its tab; not committed to the vault.
@@ -116,9 +122,11 @@ Dumb header strip at the top of every card. Props:
 | `onToggleHide` | function \| undefined | If provided, renders the eye button |
 | `onMoveUp` | function \| undefined | If provided, renders the up-arrow button |
 | `onMoveDown` | function \| undefined | If provided, renders the down-arrow button |
+| `onFlip` | function \| undefined | If provided, renders the flip button (≡ three-line icon) |
+| `flipped` | boolean | When true, flip button gets active styling |
 | `onClose` | function \| undefined | If provided, renders the X close button |
 
-Layout: `[fold-caret] [title or input] [LocationButton] [up] [down] [eye] [X]`
+Layout: `[fold-caret] [title or input] [LocationButton] [flip] [up] [down] [eye] [X]`
 
 Aria labels: **Collapse card / Expand card** (fold), **Dim card / Show card** (hide), **Move card up**, **Move card down**, **Remove card**.
 
@@ -154,11 +162,36 @@ Key props: `title`, `body`, `foldState`, `hiddenState`, `location`, `folders`, `
 
 **Body auto-resize in edit mode:** The textarea grows with content using `scrollHeight`.
 
+**Flip:** When `flipped` is true, the front face (header + body) is hidden and `CardBack` is shown instead. Flip is toggled from `CardHeader` via `onFlip`; state lives in `useTabs` (`flippedCardIds` Set). See [brain.md](./brain.md) for wiki index on the back (library only).
+
+## CardBack component
+
+Back face rendered when a card is flipped. Props include `cardId`, `back`, `location`, `createdAt`, `updatedAt`, `indexEntry`, `indexLoading`, `onUpdateBack`.
+
+| Section | When shown |
+|---|---|
+| Notes | Always — editable textarea when `onUpdateBack` provided |
+| Metadata | Created / updated timestamps |
+| Index | Only when `location === 'library'` — title, summary, tags from `indexEntry`; spinner when `indexLoading` |
+| Index debug | Collapsible `<details>` with pipeline state (see [debug.md](./debug.md)) |
+
+Portal cards pass the **target** card's location and index fields (resolved in `useTabs` / `Tab.jsx`).
+
+## flipLogic.js
+
+Pure helper (exported, not yet wired to hide the flip button in UI):
+
+| Function | Behaviour |
+|---|---|
+| `canFlip(card)` | `true` when `type === 'text'` and `back` is non-empty after trim |
+
+Flip state lives in `useTabs` as `flippedCardIds` (Set). `flipCard(cardId)` toggles membership; `isFlipped(cardId)` reads it. The flip button renders whenever `onFlip` is passed to `CardHeader`, regardless of `canFlip`.
+
 ## PortalCard component
 
 `PortalCard` is a thin wrapper around `Card`. It resolves the portal target and delegates all rendering to `Card`, so portal cards are visually identical to text cards.
 
-Props: `config`, `cardsById`, `foldState`, `hiddenState`, `location`, `folders`, `onToggleFold`, `onToggleHide`, `onMoveUp`, `onMoveDown`, `onClose`, `onUpdate`, `onLocate`.
+Props: `config`, `cardsById`, `foldState`, `hiddenState`, `location`, `folders`, `flipped`, `indexEntry`, `indexLoading`, `onToggleFold`, `onToggleHide`, `onMoveUp`, `onMoveDown`, `onClose`, `onUpdate`, `onUpdateBack`, `onFlip`, `onLocate`.
 
 **Resolution:** `resolvePortalTarget` is called with `{ config }` and `cardsById`. When the target exists, `Card` receives the target's `title` and `body`. When the target is absent (null target_card_id, or id not found in `cardsById`), `Card` renders `title="Portal — no target"` and `body="No card linked."`.
 
@@ -181,12 +214,14 @@ The `.portal-card` wrapper has `position: relative`; the `.portal-card__locate` 
 | `FolderPickerOverlay.test.jsx` | Renders folder list; root option; onSelect called with folderId; onDismiss called |
 | `Card.test.jsx` | Renders title/body; fold hides body and resize handle; hidden applies `.card--hidden`; resize handle present/absent; inline editing (click title, click body, commit on blur, cancel on Escape, no save if unchanged) |
 | `PortalCard.test.jsx` | Renders target title/body when resolved; placeholder when target null; placeholder when cardsById missing target; fold hides body; hiddenState applies card--hidden; onClose/onMoveUp/onMoveDown callbacks; onUpdate called with edited fields (committed on blur); null target not editable; Show in vault button present/absent (requires both target and onLocate); calls onLocate on click |
+| `flipLogic.test.js` | canFlip for text/portal/empty back |
+| `CardBack.test.jsx` | Notes render; index section library-only; loading state; debug details |
 
 ## Not built yet
 
 - Process and container card types
 - Rich text (Tiptap), embeds
-- Per-card colour, tags, or metadata
+- Per-card colour or tags on front face (index tags are on back only)
 - Card deletion sync to Supabase
 - `user_id` on local card records
 - Portal → portal chaining (portal targeting another portal)

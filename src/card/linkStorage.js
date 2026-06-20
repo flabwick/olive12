@@ -17,6 +17,10 @@ export async function deleteLinksForSource(cardId) {
   await db.links.where('sourceCardId').equals(cardId).delete()
 }
 
+export async function getAllLinks() {
+  return db.links.toArray()
+}
+
 export async function rebuildLinksForCard(card) {
   await deleteLinksForSource(card.id)
   const newLinks = extractLinks(card)

@@ -17,6 +17,7 @@ describe('createCard', () => {
       type: 'text',
       title: '',
       body: '',
+      back: '',
       config: null,
       location: 'none',
       folderId: null,
@@ -31,6 +32,7 @@ describe('createCard', () => {
       type: 'text',
       title: 'Notes',
       body: 'Buy milk',
+      back: '',
       config: null,
       location: 'none',
       folderId: null,
@@ -45,12 +47,21 @@ describe('createCard', () => {
       type: 'portal',
       title: '',
       body: '',
+      back: '',
       config: { target_card_id: 'card-xyz' },
       location: 'none',
       folderId: null,
       createdAt: 1_700_000_000_000,
       updatedAt: 1_700_000_000_000,
     })
+  })
+
+  it('default back is empty string', () => {
+    expect(createCard().back).toBe('')
+  })
+
+  it('accepts a custom back value', () => {
+    expect(createCard({ back: 'Answer here' }).back).toBe('Answer here')
   })
 
   it('defaults location to "none"', () => {
@@ -76,6 +87,7 @@ describe('updateCardFields', () => {
     type: 'text',
     title: 'Old title',
     body: 'Old body',
+    back: '',
     config: null,
     location: 'none',
     folderId: null,
@@ -156,5 +168,15 @@ describe('updateCardFields', () => {
     const portalBase = { ...base, type: 'portal', config: { target_card_id: 'abc' } }
     const result = updateCardFields(portalBase, { config: { target_card_id: 'xyz' } })
     expect(result.config).toEqual({ target_card_id: 'xyz' })
+  })
+
+  it('preserves back when not provided', () => {
+    const card = { ...base, back: 'The answer' }
+    expect(updateCardFields(card, { title: 'New' }).back).toBe('The answer')
+  })
+
+  it('updates back when provided', () => {
+    const result = updateCardFields(base, { back: 'New back' })
+    expect(result.back).toBe('New back')
   })
 })

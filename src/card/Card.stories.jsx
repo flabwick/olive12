@@ -75,3 +75,32 @@ export const NoControls = {
     onUpdate: undefined,
   },
 }
+
+export const FlippableCard = {
+  args: {
+    title: 'What is the capital of France?',
+    body: 'A geography question.',
+    back: 'Paris',
+    flipped: false,
+    onFlip: () => console.log('flip'),
+  },
+}
+
+export const FlippedCard = {
+  args: {
+    title: 'What is the capital of France?',
+    body: 'A geography question.',
+    back: 'Paris',
+    flipped: true,
+    onFlip: () => console.log('flip back'),
+  },
+}
+
+export const NoBackCard = {
+  args: {
+    title: 'Regular card',
+    body: 'This card has no back face — flip button is absent.',
+    back: '',
+    onFlip: () => console.log('flip'),
+  },
+}

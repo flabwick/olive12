@@ -1,5 +1,7 @@
 # Vault System — Build Spec
 
+> **Implementation status:** This document describes the target system. For what is actually built in the primary agent, see [README.md](../../README.md) and [docs/build/](../build/) — notably [cards.md](../build/cards.md) (flip/back), [brain.md](../build/brain.md) (wiki index, library-only), [debug.md](../build/debug.md), and [tabs.md](../build/tabs.md).
+
 ## Stack
 
 - React + Vite + Tailwind. Capacitor (mobile). Tauri (desktop).

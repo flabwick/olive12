@@ -47,7 +47,9 @@ src/
     createTab.test.js         # [TEST]
     tabStorage.js             # Per-record tab and tab_card operations (pure, no React)
     tabStorage.test.js        # [TEST]
-    useTabs.js                # React hook: Dexie init, card/tab/folder state, sync wiring, prompt
+    tabSupabaseStorage.js     # Supabase adapter for saved tabs (user_tabs)
+    tabSupabaseStorage.test.js # [TEST]
+    useTabs.js                # React hook: Dexie init, card/tab/folder/index/brain/flip state
     useTabs.test.js           # [TEST]
     TabHeader.jsx             # Dumb: inline-editable tab name + 3-state save button
     TabHeader.css
@@ -61,7 +63,7 @@ src/
     Tab.css
     Tab.test.jsx              # [TEST]
     Tab.stories.jsx           # [STORY]
-    Dock.jsx                  # Bottom toolbar: scroll-top, add, folders, prompt, tab-overview, menu
+    Dock.jsx                  # Bottom toolbar: scroll-top, add, folders, prompt, Idx, tab-overview, menu
     Dock.css
     Dock.test.jsx             # [TEST]
     Dock.stories.jsx          # [STORY]
@@ -77,8 +79,24 @@ src/
   brain/
     createIndexEntry.js       # Pure: IndexEntry data shape factory
     createIndexEntry.test.js  # [TEST]
+    finishIndexResult.js      # Normalize LLM JSON + body fallback
+    finishIndexResult.test.js # [TEST]
+    indexCard.js              # wiki-index invoke + persist
+    indexCard.test.js         # [TEST]
     indexEntryStorage.js      # Dexie-backed index_entries operations (pure, no React)
     indexEntryStorage.test.js # [TEST]
+    brainFeedLogic.js         # detectStaleEntries
+    brainFeedLogic.test.js    # [TEST]
+    BrainFeed.jsx             # FolderPanel Brain tab list
+    BrainFeedItem.jsx
+  debug/
+    indexPipelineDebug.js     # Event log for index pipeline
+    indexPipelineDebug.test.js
+    IndexDebugPanel.jsx       # Floating debug panel (toggled from Dock)
+    IndexDebugPanel.css
+  card/
+    flipLogic.js              # Pure flip set helpers
+    CardBack.jsx              # Back face (composed by Card / PortalCard)
   App.jsx                     # App (session gate) + AppShell (composes all UI)
   App.css
   CardShell.jsx               # Thin wrapper used in CardShell-only contexts
@@ -92,6 +110,7 @@ supabase/
   migrations/
     20260618000000_create_cards.sql
     20260620000000_create_index_entries.sql
+    20260620120000_create_user_tabs.sql
 playwright.config.js          # Playwright config; webServer → http://localhost:5173
 e2e/
   tabs.spec.js                # [E2E] Full tab management flow (requires TEST_EMAIL / TEST_PASSWORD)
@@ -165,12 +184,18 @@ e2e/
 | `isReady` | `boolean` | `true` once Dexie init is complete |
 | `promptLoading` | `boolean` | `true` while the dock-prompt edge function is in flight |
 | `promptError` | `string` | Error message from last failed prompt call; `''` when no error |
+| `indexEntries` | `IndexEntry[]` | Wiki index records loaded from Dexie |
+| `indexLoadingIds` | `Set<string>` | Card ids currently being indexed |
+| `flippedCardIds` | `Set<string>` | Tab entry card ids showing back face |
+| `dismissedBrainIds` | `Set<string>` | Brain feed items dismissed this session |
+| `indexDebugOpen` | `boolean` | Whether IndexDebugPanel is visible (AppShell; default true) |
 
 ### Three `useEffect` hooks
 
 1. **Scheduler setup** — runs when `userId` changes. Creates a `makeCardSupabaseStorage` adapter (stored in `storageRef`) and a `createCardSyncScheduler` (stored in `schedulerRef`). Sets both to `null` when `userId` is absent.
 2. **Initial reconcile** — runs once when `isReady` and `userId` are both truthy. Calls `runNow()` (pull remote → sync dirty), then detects **orphan cards** (cards in Dexie with no `tab_cards` entry — pulled from Supabase on another device) and auto-creates `tab_card` entries on the first tab.
-3. **Dexie init** — on mount, loads all tabs/tab_cards/cards/folders in parallel; sets `isReady: true`. If no tabs exist, creates a default `'Main'` tab. Otherwise restores `activeTabId` from `localStorage` (falls back to the first tab if the saved id no longer exists).
+3. **Dexie init** — on mount, loads all tabs/tab_cards/cards/folders/index_entries in parallel; sets `isReady: true`. If no tabs exist, creates a default `'Main'` tab. Otherwise restores `activeTabId` from `localStorage` (falls back to the first tab if the saved id no longer exists).
+4. **Tab Supabase sync** — when `userId` is set, saved tabs (`savedLocation !== 'none'`) sync to `user_tabs` via `tabSupabaseStorage` (debounced upsert on tab mutations).
 
 ### localStorage persistence
 
@@ -203,7 +228,7 @@ All tab mutation functions (`addTab`, `removeTab`, `renameTab`, `saveTabToShelf`
 
 | Property | Type | Description |
 |---|---|---|
-| `entries` | `Entry[]` | Cards for the active tab in position order: `{ card, position, foldState, hiddenState }` |
+| `entries` | `Entry[]` | Cards for the active tab in position order: `{ card, position, foldState, hiddenState, indexEntry?, indexLocation?, indexLoading? }` |
 | `shelfEntries` | `Card[]` | All `location === 'shelf'` cards, sorted by `createdAt` asc |
 | `libraryEntries` | `Card[]` | All `location === 'library'` cards, sorted by `updatedAt` desc |
 | `shelfTabs` | `Tab[]` | All tabs with `savedLocation === 'shelf'` |
@@ -219,11 +244,18 @@ All tab mutation functions (`addTab`, `removeTab`, `renameTab`, `saveTabToShelf`
 | `hide` | function | `(cardId)` — sets `hiddenState: true` |
 | `unhide` | function | `(cardId)` — sets `hiddenState: false` |
 | `saveToShelf` | function | `(cardId)` — see behaviour below |
-| `moveToLibrary` | function | `(cardId, folderId?)` — sets `location: 'library'` + `folderId`, schedules sync, then triggers wiki-index and writes the result to Dexie + Supabase (non-blocking) |
+| `moveToLibrary` | function | `(cardId, folderId?)` — sets `location: 'library'` + `folderId`, schedules sync, then invokes `indexCard` (wiki-index) for library cards only |
 | `createFolder` | function | `({ name?, parentId? }) → folder` — creates and persists folder |
 | `runDockPrompt` | function | `async (promptText) → boolean` — invokes `dock-prompt` edge function, creates card on success |
 | `promptLoading` | `boolean` | `true` while the edge function call is in flight |
 | `promptError` | `string` | Error message from the last failed call; `''` when no error |
+| `brainFeedItems` | `BrainFeedItem[]` | `{ cardId, title, reason: 'stale'\|'orphan' }` derived from library cards + index entries |
+| `onBrainAccept` | function | `(cardId)` — **stub** (console.log); intended to re-index |
+| `onBrainDismiss` | function | `(cardId)` — hides item from feed for session |
+| `flipCard` | function | `(cardId)` — toggles flip; on library cards without index, may trigger `indexCard` |
+| `isFlipped` | function | `(cardId) → boolean` |
+| `getIndexEntry` | function | `(cardId) → IndexEntry \| undefined` |
+| `isIndexing` | function | `(cardId) → boolean` |
 
 `shelfEntries`, `libraryEntries`, `shelfTabs`, and `libraryTabs` are derived — no extra storage calls.
 
@@ -261,7 +293,8 @@ This prevents duplicate representations of the same content in a single tab, reg
 - `transientOpen` — whether `TransientCard` form is open
 - `promptOpen` — whether `DockPrompt` form is visible
 - `tabSwitcherOpen` — whether `TabSwitcher` overlay is visible
-- `vaultInitialTab` — which vault pane (`'shelf'` or `'library'`) to open to when `handleLocate` fires
+- `indexDebugOpen` — AppShell state; toggled via Dock **Idx** (`onIndexDebug` / `indexDebugActive`)
+- `vaultInitialTab` — which vault pane (`'shelf'`, `'library'`, or `'brain'`) to open when locating
 - `highlightedCardId` — card id to highlight in the vault after a locate action
 
 Opening `DockPrompt` closes `FolderPanel` and vice versa. `TabSwitcher` is independent and overlays the entire shell. Structure:
@@ -275,6 +308,7 @@ app-shell
   app-shell__dock-area       ← position: relative
     FolderPanel?             ← position: absolute, bottom: calc(100% - 2px)
     DockPrompt?              ← same slot, mutual exclusive with FolderPanel
+    IndexDebugPanel?         ← fixed overlay when indexDebugOpen
     Dock
 TabSwitcher?                 ← fixed full-screen overlay, outside app-shell flow
 ```
@@ -317,7 +351,9 @@ TabSwitcher?                 ← fixed full-screen overlay, outside app-shell fl
 
 ### Tab
 
-`Tab({ entries, folders, cardsById, onReorder, onUpdate, onRemove, onFold, onUnfold, onHide, onUnhide, onSaveToShelf, onMoveToLibrary, onLocate })` — presentational. Renders cards in position order. Each card receives all callbacks with the relevant cardId bound. Empty state renders `"No cards yet."`.
+`Tab({ entries, folders, cardsById, onReorder, onUpdate, onUpdateBack, onRemove, onFold, onUnfold, onHide, onUnhide, onSaveToShelf, onMoveToLibrary, onLocate, onFlip, isFlipped })` — presentational. Renders cards in position order. Each entry may include `indexEntry`, `indexLocation`, `indexLoading` for portal target resolution.
+
+**Flip:** `onFlip(cardId)` and `isFlipped(cardId)` passed to `Card` / `PortalCard`. When flipped, front body hidden and `CardBack` shown.
 
 **Portal card branching:** for each entry with `card.type === 'portal'`, renders `PortalCard` instead of `Card`:
 - Resolves target from `cardsById` using `card.config.target_card_id`.
@@ -326,8 +362,8 @@ TabSwitcher?                 ← fixed full-screen overlay, outside app-shell fl
 
 ### Dock
 
-`Dock({ onAdd, addDisabled, onScrollTop, onFolder, onPrompt, promptDisabled, onTabOverview, onMenu })` — fixed bottom toolbar, `role="toolbar"`.
-- Left group: scroll-top caret, add card (`+`), folders, prompt (lightning bolt icon).
+`Dock({ onAdd, addDisabled, onScrollTop, onFolder, onPrompt, promptDisabled, onTabOverview, onMenu, onIndexDebug, indexDebugActive })` — fixed bottom toolbar, `role="toolbar"`.
+- Left group: scroll-top caret, add card (`+`), folders, prompt (lightning bolt icon), **Idx** (index pipeline debug toggle; `indexDebugActive` + `onIndexDebug` from AppShell).
 - Right group: tab overview (`aria-label="Tab overview"`), menu.
 - `addDisabled` disables the `+` button while `TransientCard` is open.
 - `promptDisabled` disables the prompt button while a prompt call is in flight.
@@ -347,7 +383,7 @@ TabSwitcher?                 ← fixed full-screen overlay, outside app-shell fl
 
 ### FolderPanel
 
-Slide-up panel. Three tabs: **Shelf** (VaultTabRow tab entries + ShelfRow card entries), **Library** (VaultTabRow library tabs + FolderTree), **Brain** (placeholder). X button calls `onClose`. See vault.md for full prop detail.
+Slide-up panel. Three tabs: **Shelf** (VaultTabRow tab entries + ShelfRow card entries), **Library** (VaultTabRow library tabs + FolderTree), **Brain** (`BrainFeed` with stale/orphan items). Props include `brainFeedItems`, `onBrainAccept`, `onBrainDismiss`. X button calls `onClose`. See [vault.md](./vault.md) and [brain.md](./brain.md).
 
 ## Tests
 
@@ -355,7 +391,7 @@ Slide-up panel. Three tabs: **Shelf** (VaultTabRow tab entries + ShelfRow card e
 |---|---|
 | `createTab.test.js` | `createTab` defaults/custom/unique ids; `savedLocation`/`savedFolderId` defaults; `createTabCard` defaults; `nextPosition`; `reorderTabCard`; `setTabCardFold`; `setTabCardHidden`; `removeTabCard`; `updateTabFields`; `setTabName`; `removeTab` (removes and renumbers); `reorderTabs`; `saveTabToShelf`; `moveTabToLibrary` |
 | `tabStorage.test.js` | Empty reads; `putTab` round-trip + upsert; `deleteTab`; `putTabCard` round-trip, foldState/hiddenState, position upsert; `deleteTabCard`; `deleteAllTabCards` |
-| `useTabs.test.js` | Default tab on first mount; state loaded on mount; `addCard`; `addPortalCard` (creates portal, appends at end, dedup — same target twice is no-op, target card already in tab is no-op); `updateCard`; `removeCard`; `reorder`; `fold`/`unfold`; `hide`/`unhide`; `saveToShelf` (moves card to shelf, replaces tab instance with portal at same position, persists); `moveToLibrary` (state + Dexie); `shelfEntries`/`libraryEntries` derivation + sort; `shelfTabs`/`libraryTabs` derivation; `createFolder`; `moveToLibrary` with folderId; remount persistence; multi-tab: `addTab`, `removeTab`, `renameTab`, `saveTabToShelf`, `moveTabToLibrary`, `switchTab`; localStorage: `activeTabId` persisted on switch, restored on remount; sync wiring: scheduler created, `runNow` called, `scheduleSync` on mutations, orphan card detection, `removeCard` with userId calls `deleteRemoteCard`; `runDockPrompt`: invoke args, card created, returns true/false, excludes hidden cards. **Note:** the `wiki-index` invocation path inside `moveToLibrary` is not covered in the test suite — the AI call is fire-and-forget and the tests exercise card-state changes only. |
+| `useTabs.test.js` | Default tab on first mount; state loaded on mount; `addCard`; `addPortalCard` (creates portal, appends at end, dedup — same target twice is no-op, target card already in tab is no-op); `updateCard`; `removeCard`; `reorder`; `fold`/`unfold`; `hide`/`unhide`; `saveToShelf` (moves card to shelf, replaces tab instance with portal at same position, persists); `moveToLibrary` (state + Dexie + wiki-index invoke); flip triggers index on library card; shelf flip does not invoke wiki-index; `shelfEntries`/`libraryEntries` derivation + sort; `shelfTabs`/`libraryTabs` derivation; `createFolder`; `moveToLibrary` with folderId; remount persistence; multi-tab: `addTab`, `removeTab`, `renameTab`, `saveTabToShelf`, `moveTabToLibrary`, `switchTab`; localStorage: `activeTabId` persisted on switch, restored on remount; sync wiring: scheduler created, `runNow` called, `scheduleSync` on mutations, orphan card detection, `removeCard` with userId calls `deleteRemoteCard`; `runDockPrompt`: invoke args, card created, returns true/false, excludes hidden cards; `brainFeedItems` stale/orphan; `flipCard`/`isFlipped`; index fields on entries for portal targets |
 | `TabHeader.test.jsx` | Renders name and save button; click → edit mode; Enter commits; blur commits; Escape cancels; shelf state button; library state button (disabled); no button when no handlers |
 | `TabSwitcher.test.jsx` | Renders all tiles; active tile highlighted; card counts; shelf/library badges; switch on tile click; add tile; close on × click; close on backdrop click; Escape closes; remove tile calls `onRemoveTab`; save button calls `onSaveTab` |
 | `Tab.test.jsx` | Empty state; renders title+body; fold hides body; hidden card class; position order; all callbacks; portal card renders target title/body; portal placeholder when null target; portal onUpdate routes to target id; null target not editable; onLocate called with target id |
@@ -374,9 +410,8 @@ Slide-up panel. Three tabs: **Shelf** (VaultTabRow tab entries + ShelfRow card e
 - Drag-and-drop card reorder
 - Bulk-reveal hidden cards
 - Search, tagging, filters
-- Tab, tab_card, or folder sync to Supabase
+- Tab or tab_card Dexie-only sync (saved tabs sync via `user_tabs` when authenticated)
 - Conflict UI (remote always wins on timestamp difference)
 - Dock Prompt streaming, job queue, credits
-- Brain feed content (FolderPanel Brain pane is a "coming soon" placeholder — see [brain.md](./brain.md))
-- Moving a saved tab to a specific library folder (currently `moveTabToLibrary` always uses root)
-- wiki-index test coverage for the `moveToLibrary` wiring path
+- `onBrainAccept` re-index workflow (see [brain.md](./brain.md))
+- Index debug off by default in production builds

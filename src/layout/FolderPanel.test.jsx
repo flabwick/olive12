@@ -47,10 +47,26 @@ describe('FolderPanel', () => {
     expect(screen.getByRole('tree', { name: 'Library' })).toBeInTheDocument()
   })
 
-  it('switches to Brain tab and shows placeholder', async () => {
+  it('switches to Brain tab and shows empty state when no items', async () => {
     render(<FolderPanel {...baseProps} />)
     await userEvent.click(screen.getByRole('tab', { name: 'Brain' }))
-    expect(screen.getByText(/coming soon/)).toBeInTheDocument()
+    expect(screen.getByText('No maintenance needed.')).toBeInTheDocument()
+  })
+
+  it('switches to Brain tab and renders feed items', async () => {
+    const brainFeedItems = [{ cardId: 'c1', title: 'My note', reason: 'stale' }]
+    render(<FolderPanel {...baseProps} brainFeedItems={brainFeedItems} onBrainAccept={() => {}} onBrainDismiss={() => {}} />)
+    await userEvent.click(screen.getByRole('tab', { name: 'Brain' }))
+    expect(screen.getByText('My note')).toBeInTheDocument()
+  })
+
+  it('calls onBrainDismiss with cardId when Dismiss is clicked', async () => {
+    const onBrainDismiss = vi.fn()
+    const brainFeedItems = [{ cardId: 'c1', title: 'My note', reason: 'stale' }]
+    render(<FolderPanel {...baseProps} brainFeedItems={brainFeedItems} onBrainAccept={() => {}} onBrainDismiss={onBrainDismiss} />)
+    await userEvent.click(screen.getByRole('tab', { name: 'Brain' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(onBrainDismiss).toHaveBeenCalledWith('c1')
   })
 
   it('calls onMoveToLibrary with card id and null folderId', async () => {

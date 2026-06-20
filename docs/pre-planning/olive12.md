@@ -1,4 +1,6 @@
 
+> **Build progress:** Primary agent implementation docs live in [docs/build/](../build/). Card flip, wiki index (library-only), Brain feed UI, and index debug are documented in [cards.md](../build/cards.md), [brain.md](../build/brain.md), and [debug.md](../build/debug.md).
+
 ## Problems
 
 Ultimately I think that chat interfaces are outdated. I currently have a workflow which connects by written work on Obsidian with a chatbot like claude or chatgpt. It sucks, but no app exists that's any better. That's why I want to create it. I want to create it because I want it to exist, not because I want to necessarily be an entrepeneur or startup tech founder, although I do want to be smart.

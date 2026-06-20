@@ -37,6 +37,13 @@ Migration file: `supabase/migrations/20260618000000_create_cards.sql`
 
 The linked GitHub repo does not auto-apply migrations. It enables database branching (preview branches per PR) but still requires `supabase db push` or the SQL editor for the initial schema.
 
+Additional migrations in this repo:
+
+| File | Table |
+|---|---|
+| `20260620000000_create_index_entries.sql` | `index_entries` — wiki index records |
+| `20260620120000_create_user_tabs.sql` | `user_tabs` — saved tab metadata sync |
+
 ## Auth
 
 Email auth is on by default in Supabase. No additional provider setup is needed.
@@ -58,23 +65,37 @@ The model is configured at the top of `supabase/functions/dock-prompt/index.ts` 
 
 The system prompt instructs the model to write a title on the first line, leave a blank line, then write the response as plain text. This format is used instead of JSON because small models (including llama-3.2-3b) enter tool-call mode when asked for JSON output, returning `null` content. The `parseContent` function in the edge function splits on the first newline to extract title and body.
 
+## Deploying the wiki-index Edge Function
+
+```bash
+supabase functions deploy wiki-index
+```
+
+Uses the same `OPENROUTER_API_KEY` secret as dock-prompt. Invoked from `src/brain/indexCard.js` when a card is promoted to library (or on flip if no entry exists). Returns JSON `{ title, tags, summary, links }`. The edge function and client both apply a **body fallback** when the model returns an empty summary.
+
+See [brain.md](./brain.md) and [debug.md](./debug.md) for indexing behaviour and troubleshooting.
+
 ## Sync flow
 
 1. On authenticated load, `useTabs` calls `runNow()`:
    - **Pulls** all remote cards into Dexie (skips dirty locals, skips when local is newer)
    - **Detects orphan cards** — cards in Dexie `cards` with no `tab_cards` entry (arrived from another device) — and auto-creates `tab_cards` so they appear in the tab feed
    - **Pushes** dirty local cards to Supabase
-2. After each mutation (`addCard`, `updateCard`, `saveToShelf`, `moveToLibrary`), a debounced push fires after 3 seconds of inactivity.
+2. After each card mutation (`addCard`, `updateCard`, `saveToShelf`, `moveToLibrary`), a debounced push fires after 3 seconds of inactivity.
+3. Saved tabs (`savedLocation !== 'none'`) upsert to `user_tabs` when authenticated (see [sync.md](./sync.md)).
+4. Library promotion triggers wiki-index via `indexCard` (Dexie + `index_entries` upsert, not the card debounce scheduler).
 
 ## What syncs (and what doesn't)
 
 | Data | Syncs to Supabase |
 |---|---|
-| Card `title`, `body`, `location` | Yes — debounced 3 s after mutation |
+| Card `title`, `body`, `location`, portal `config` | Yes — debounced 3 s after mutation |
 | Card deletion | Yes — immediate on `removeCard` |
-| Card `folderId` | No — local only |
-| Tabs, tab order, `foldState`, `hiddenState` | No — Dexie only |
+| Card `folderId`, card `back` (notes) | No — local only |
+| Saved tab metadata | Yes — `user_tabs` when tab saved to shelf/library |
+| Tab_card order, `foldState`, `hiddenState` | No — Dexie only |
 | Folders | No — Dexie only |
+| Index entries | Yes — on library index via `indexCard.js` |
 
 ## `@supabase/supabase-client-react-router`
 

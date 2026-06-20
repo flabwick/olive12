@@ -14,6 +14,11 @@ const syncMocks = vi.hoisted(() => ({
 
 const invokeMock = vi.hoisted(() => vi.fn())
 const deleteRemoteMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
+const tabStorageMock = vi.hoisted(() => ({
+  fetchSavedTabsForUser: vi.fn().mockResolvedValue([]),
+  upsertSavedTab: vi.fn().mockResolvedValue(undefined),
+  deleteSavedTab: vi.fn().mockResolvedValue(undefined),
+}))
 
 vi.mock('../lib/supabaseClient', () => ({
   supabase: { functions: { invoke: invokeMock } },
@@ -25,6 +30,9 @@ vi.mock('../sync/cardSync', () => ({
   createCardSyncScheduler: syncMocks.createCardSyncScheduler,
   syncDirtyCardsForUser: vi.fn(),
 }))
+vi.mock('../tab/tabSupabaseStorage', () => ({
+  makeTabSupabaseStorage: vi.fn(() => tabStorageMock),
+}))
 
 describe('useTabs', () => {
   beforeEach(async () => {
@@ -33,6 +41,7 @@ describe('useTabs', () => {
     await db.tab_cards.clear()
     await db.folders.clear()
     await db.links.clear()
+    await db.index_entries.clear()
     localStorage.clear()
   })
 
@@ -47,7 +56,7 @@ describe('useTabs', () => {
     const { result } = renderHook(() => useTabs())
     await waitFor(() => expect(result.current.isReady).toBe(true))
 
-    expect(result.current.tab.name).toBe('Main')
+    expect(result.current.tab.name).toBe('')
     expect(result.current.tab.id).toBe('default-tab-uuid')
     const tabs = await getAllTabs()
     expect(tabs).toHaveLength(1)
@@ -463,6 +472,94 @@ describe('useTabs', () => {
     expect(result.current.entries[0].card.location).toBe('library')
   })
 
+  it('moveToLibrary calls wiki-index and stores the index entry', async () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('tab-uuid')
+      .mockReturnValueOnce('card-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    invokeMock.mockResolvedValue({
+      data: { title: 'Indexed A', tags: ['note'], summary: 'Summary text.', links: [] },
+      error: null,
+    })
+
+    const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+    await act(async () => { await result.current.addCard({ title: 'A', body: 'Body content' }) })
+    await act(async () => { await result.current.moveToLibrary('card-uuid') })
+
+    expect(invokeMock).toHaveBeenCalledWith('wiki-index', expect.objectContaining({
+      body: expect.objectContaining({
+        card: expect.objectContaining({ id: 'card-uuid', location: 'library' }),
+      }),
+    }))
+    expect(result.current.getIndexEntry('card-uuid')).toMatchObject({
+      title: 'Indexed A',
+      summary: 'Summary text.',
+    })
+  })
+
+  it('flipCard triggers wiki-index for library card missing an index entry', async () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('tab-uuid')
+      .mockReturnValueOnce('card-uuid')
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    invokeMock.mockResolvedValue({
+      data: { title: 'On flip', tags: [], summary: 'Generated on flip.', links: [] },
+      error: null,
+    })
+
+    await db.cards.put({
+      id: 'card-uuid', type: 'text', title: 'Lib card', body: 'Content',
+      location: 'library', createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000,
+    })
+    await db.tabs.put({
+      id: 'seed-tab', name: 'Main', kind: 'blank', order: 0,
+      savedLocation: 'none', savedFolderId: null,
+      createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000,
+    })
+    await db.tab_cards.put({
+      tabId: 'seed-tab', cardId: 'card-uuid', position: 0,
+      foldState: false, hiddenState: false,
+    })
+
+    const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+
+    act(() => { result.current.flipCard('card-uuid') })
+    await waitFor(() => {
+      expect(result.current.getIndexEntry('card-uuid')?.summary).toBe('Generated on flip.')
+    })
+  })
+
+  it('flipCard does not invoke wiki-index for shelf cards', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    await db.cards.put({
+      id: 'card-uuid', type: 'text', title: 'Shelf card', body: 'Content',
+      location: 'shelf', createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000,
+    })
+    await db.tabs.put({
+      id: 'seed-tab', name: 'Main', kind: 'blank', order: 0,
+      savedLocation: 'none', savedFolderId: null,
+      createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000,
+    })
+    await db.tab_cards.put({
+      tabId: 'seed-tab', cardId: 'card-uuid', position: 0,
+      foldState: false, hiddenState: false,
+    })
+
+    const { result } = renderHook(() => useTabs())
+    await waitFor(() => expect(result.current.isReady).toBe(true))
+
+    invokeMock.mockClear()
+    act(() => { result.current.flipCard('card-uuid') })
+
+    expect(invokeMock).not.toHaveBeenCalled()
+    expect(result.current.getIndexEntry('card-uuid')).toBeUndefined()
+  })
+
   it('moveToLibrary persists across remount', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
@@ -771,6 +868,10 @@ describe('useTabs', () => {
       syncMocks.runNow.mockClear()
       syncMocks.createCardSyncScheduler.mockClear()
       deleteRemoteMock.mockClear()
+      tabStorageMock.fetchSavedTabsForUser.mockClear()
+      tabStorageMock.upsertSavedTab.mockClear()
+      tabStorageMock.deleteSavedTab.mockClear()
+      tabStorageMock.fetchSavedTabsForUser.mockResolvedValue([])
       syncMocks.createCardSyncScheduler.mockReturnValue({
         scheduleSync: syncMocks.scheduleSync,
         runNow: syncMocks.runNow,
@@ -944,6 +1045,113 @@ describe('useTabs', () => {
       // After runNow .then() runs, card was already in tabCards — no duplicate
       await waitFor(() => expect(result.current.entries).toHaveLength(1))
       expect(result.current.entries).toHaveLength(1)
+    })
+
+    it('saveTabToShelf pushes the tab to Supabase when userId is provided', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-1')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      tabStorageMock.upsertSavedTab.mockClear()
+      await act(async () => { await result.current.saveTabToShelf('tab-1') })
+
+      expect(tabStorageMock.upsertSavedTab).toHaveBeenCalledOnce()
+      const row = tabStorageMock.upsertSavedTab.mock.calls[0][0]
+      expect(row.id).toBe('tab-1')
+      expect(row.user_id).toBe('user-1')
+      expect(row.saved_location).toBe('shelf')
+    })
+
+    it('saveTabToShelf does not push to Supabase when userId is absent', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-1')
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.saveTabToShelf('tab-1') })
+      expect(tabStorageMock.upsertSavedTab).not.toHaveBeenCalled()
+    })
+
+    it('moveTabToLibrary pushes the tab to Supabase when userId is provided', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-1')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      tabStorageMock.upsertSavedTab.mockClear()
+      await act(async () => { await result.current.moveTabToLibrary('tab-1', null) })
+
+      expect(tabStorageMock.upsertSavedTab).toHaveBeenCalledOnce()
+      const row = tabStorageMock.upsertSavedTab.mock.calls[0][0]
+      expect(row.saved_location).toBe('library')
+    })
+
+    it('renameTab pushes to Supabase when tab is saved and userId is provided', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-1')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.saveTabToShelf('tab-1') })
+      tabStorageMock.upsertSavedTab.mockClear()
+
+      await act(async () => { await result.current.renameTab('tab-1', 'My Research') })
+      expect(tabStorageMock.upsertSavedTab).toHaveBeenCalledOnce()
+      expect(tabStorageMock.upsertSavedTab.mock.calls[0][0].name).toBe('My Research')
+    })
+
+    it('renameTab does not push to Supabase when tab is unsaved', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-1')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      tabStorageMock.upsertSavedTab.mockClear()
+      await act(async () => { await result.current.renameTab('tab-1', 'Work') })
+      expect(tabStorageMock.upsertSavedTab).not.toHaveBeenCalled()
+    })
+
+    it('removeTab on a saved tab does not call deleteSavedTab', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('tab-fallback')
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.saveTabToShelf('tab-1') })
+      await act(async () => { await result.current.removeTab('tab-1') })
+
+      expect(tabStorageMock.deleteSavedTab).not.toHaveBeenCalled()
+    })
+
+    it('init reconcile creates a local tab from a remote saved tab', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-local')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const remoteTab = {
+        id: 'tab-remote',
+        name: 'Remote Research',
+        saved_location: 'shelf',
+        saved_folder_id: null,
+        card_ids: [],
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-02T00:00:00Z',
+      }
+      tabStorageMock.fetchSavedTabsForUser.mockResolvedValue([remoteTab])
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await waitFor(() => expect(result.current.tabs.some((t) => t.id === 'tab-remote')).toBe(true))
+
+      const remoteLocal = result.current.tabs.find((t) => t.id === 'tab-remote')
+      expect(remoteLocal.name).toBe('Remote Research')
+      expect(remoteLocal.savedLocation).toBe('shelf')
     })
   })
 
@@ -1305,6 +1513,128 @@ describe('useTabs', () => {
       expect(result.current.tabs[0].savedFolderId).toBe('folder-x')
       const stored = await getAllTabs()
       expect(stored[0].savedLocation).toBe('library')
+    })
+  })
+
+  describe('brainFeedItems', () => {
+    it('brainFeedItems is empty when no cards are in the index', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid').mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+      expect(result.current.brainFeedItems).toEqual([])
+    })
+
+    it('stale card appears in brainFeedItems when contentHash differs', async () => {
+      await db.tabs.put({
+        id: 'seed-tab', name: 'Main', kind: 'blank', order: 0,
+        savedLocation: 'none', savedFolderId: null,
+        createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000,
+      })
+      await db.cards.put({
+        id: 'lib-card', type: 'text', title: 'Stale note', body: 'old',
+        location: 'library', contentHash: 'hash-current',
+        createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000,
+      })
+      await db.index_entries.put({
+        cardId: 'lib-card', title: 'Stale note', tags: [], summary: '',
+        links: [], contentHash: 'hash-old', updatedAt: 1_700_000_000_000,
+      })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(result.current.brainFeedItems).toHaveLength(1)
+      expect(result.current.brainFeedItems[0]).toMatchObject({ cardId: 'lib-card', reason: 'stale' })
+    })
+
+    it('non-stale card with matching contentHash is excluded from brainFeedItems', async () => {
+      await db.tabs.put({
+        id: 'seed-tab', name: 'Main', kind: 'blank', order: 0,
+        savedLocation: 'none', savedFolderId: null,
+        createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000,
+      })
+      await db.cards.put({
+        id: 'lib-card', type: 'text', title: 'Current note', body: 'body',
+        location: 'library', contentHash: 'hash-same',
+        createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000,
+      })
+      await db.index_entries.put({
+        cardId: 'lib-card', title: 'Current note', tags: [], summary: '',
+        links: [], contentHash: 'hash-same', updatedAt: 1_700_000_000_000,
+      })
+      await db.links.put({ sourceCardId: 'lib-card', targetCardId: 'other', linkType: 'embed', createdAt: 1 })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(result.current.brainFeedItems).toEqual([])
+    })
+
+    it('dismissBrainItem removes the item from brainFeedItems', async () => {
+      await db.tabs.put({
+        id: 'seed-tab', name: 'Main', kind: 'blank', order: 0,
+        savedLocation: 'none', savedFolderId: null,
+        createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000,
+      })
+      await db.cards.put({
+        id: 'lib-card', type: 'text', title: 'Stale note', body: 'old',
+        location: 'library', contentHash: 'hash-current',
+        createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000,
+      })
+      await db.index_entries.put({
+        cardId: 'lib-card', title: 'Stale note', tags: [], summary: '',
+        links: [], contentHash: 'hash-old', updatedAt: 1_700_000_000_000,
+      })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      expect(result.current.brainFeedItems).toHaveLength(1)
+
+      await act(async () => { result.current.onBrainDismiss('lib-card') })
+
+      expect(result.current.brainFeedItems).toHaveLength(0)
+    })
+  })
+
+  describe('flip state', () => {
+    it('isFlipped returns false for a card that has not been flipped', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid').mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+      expect(result.current.isFlipped('card-uuid')).toBe(false)
+    })
+
+    it('flipCard toggles isFlipped to true', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid').mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+      act(() => { result.current.flipCard('card-uuid') })
+      expect(result.current.isFlipped('card-uuid')).toBe(true)
+    })
+
+    it('flipping the same card twice returns to false', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid').mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+      act(() => { result.current.flipCard('card-uuid') })
+      act(() => { result.current.flipCard('card-uuid') })
+      expect(result.current.isFlipped('card-uuid')).toBe(false)
     })
   })
 })

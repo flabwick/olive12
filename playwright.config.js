@@ -1,4 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
+import { loadEnv } from 'vite'
+
+const env = loadEnv('development', process.cwd(), '')
+const port = Number(env.PORT) || 5173
+const baseURL = `http://localhost:${port}`
 
 export default defineConfig({
   testDir: './e2e',
@@ -8,7 +13,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -19,7 +24,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:5173',
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
   },
 })

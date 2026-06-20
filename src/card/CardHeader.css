@@ -148,6 +148,17 @@
   }
 }
 
+.card-header__control--active {
+  opacity: 1;
+  color: #7a5c3a;
+}
+
+@media (prefers-color-scheme: dark) {
+  .card-header__control--active {
+    color: #c8a87a;
+  }
+}
+
 .card-header__control--close {
   margin-left: 0.25rem;
   border-left: 1px solid #c8b89a;

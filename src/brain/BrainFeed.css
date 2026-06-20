@@ -1,0 +1,11 @@
+.brain-feed {
+  display: flex;
+  flex-direction: column;
+}
+
+.brain-feed__empty {
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b7280);
+  padding: 16px 10px;
+  margin: 0;
+}

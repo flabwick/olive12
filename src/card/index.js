@@ -1,6 +1,8 @@
 export { createCard } from './createCard'
 export { Card } from './Card'
+export { CardBack } from './CardBack'
 export { CardHeader } from './CardHeader'
 export { PortalCard } from './PortalCard'
 export { loadCards, saveCards } from './cardStorage'
 export { useCards } from './useCards'
+export { canFlip } from './flipLogic'

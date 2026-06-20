@@ -2,7 +2,23 @@ import { Card } from '../card/Card'
 import { PortalCard } from '../card/PortalCard'
 import './Tab.css'
 
-export function Tab({ entries = [], folders = [], cardsById = {}, onReorder, onUpdate, onRemove, onFold, onUnfold, onHide, onUnhide, onSaveToShelf, onMoveToLibrary, onLocate }) {
+export function Tab({
+  entries = [],
+  folders = [],
+  cardsById = {},
+  onReorder,
+  onUpdate,
+  onRemove,
+  onFold,
+  onUnfold,
+  onHide,
+  onUnhide,
+  onSaveToShelf,
+  onMoveToLibrary,
+  onLocate,
+  flipCard,
+  isFlipped,
+}) {
   if (entries.length === 0) {
     return (
       <div className="tab tab--empty">
@@ -24,6 +40,12 @@ export function Tab({ entries = [], folders = [], cardsById = {}, onReorder, onU
           onClose: onRemove ? () => onRemove(entry.card.id) : undefined,
         }
 
+        const indexProps = {
+          indexEntry: entry.indexEntry,
+          indexLoading: entry.indexLoading ?? false,
+          location: entry.indexLocation ?? entry.card?.location ?? 'none',
+        }
+
         if (entry.card.type === 'portal') {
           const targetId = entry.card.config?.target_card_id
           const target = targetId ? cardsById[targetId] : null
@@ -33,6 +55,9 @@ export function Tab({ entries = [], folders = [], cardsById = {}, onReorder, onU
                 config={entry.card.config}
                 cardsById={cardsById}
                 {...sharedProps}
+                {...indexProps}
+                flipped={isFlipped ? isFlipped(entry.card.id) : false}
+                onFlip={flipCard ? () => flipCard(entry.card.id) : undefined}
                 onUpdate={target && onUpdate ? (fields) => onUpdate(target.id, fields) : undefined}
                 onLocate={target && onLocate ? () => onLocate(target.id) : undefined}
               />
@@ -45,9 +70,15 @@ export function Tab({ entries = [], folders = [], cardsById = {}, onReorder, onU
             <Card
               title={entry.card.title}
               body={entry.card.body}
-              location={entry.card.location}
+              back={entry.card.back ?? ''}
+              cardId={entry.card.id}
+              createdAt={entry.card.createdAt}
+              updatedAt={entry.card.updatedAt}
               folders={folders}
+              flipped={isFlipped ? isFlipped(entry.card.id) : false}
+              onFlip={flipCard ? () => flipCard(entry.card.id) : undefined}
               {...sharedProps}
+              {...indexProps}
               onUpdate={onUpdate ? (fields) => onUpdate(entry.card.id, fields) : undefined}
               onSaveToShelf={onSaveToShelf ? () => onSaveToShelf(entry.card.id) : undefined}
               onMoveToLibrary={onMoveToLibrary ? (folderId) => onMoveToLibrary(entry.card.id, folderId) : undefined}

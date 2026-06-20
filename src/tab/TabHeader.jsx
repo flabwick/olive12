@@ -57,7 +57,7 @@ export function TabHeader({ name, savedLocation, onRename, onSaveToShelf, onMove
           />
         ) : (
           <h2 className="tab-header__title" onClick={handleNameClick}>
-            {name}
+            {name || <span className="tab-header__placeholder">(untitled)</span>}
           </h2>
         )}
       </div>

@@ -211,6 +211,82 @@ describe('Card', () => {
     })
   })
 
+  describe('flip', () => {
+    it('flip button is present when onFlip is provided, regardless of back content', () => {
+      render(<Card title="Q" body="Some body" back="" onFlip={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Flip card' })).toBeInTheDocument()
+    })
+
+    it('flip button is present even when back has content', () => {
+      render(<Card title="Q" body="Some body" back="The answer" onFlip={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Flip card' })).toBeInTheDocument()
+    })
+
+    it('flip button is absent when onFlip is not provided', () => {
+      render(<Card title="Q" body="Some body" back="The answer" />)
+      expect(screen.queryByRole('button', { name: 'Flip card' })).not.toBeInTheDocument()
+    })
+
+    it('flip button calls onFlip when clicked', async () => {
+      const onFlip = vi.fn()
+      render(<Card title="Q" body="Some body" back="The answer" onFlip={onFlip} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Flip card' }))
+      expect(onFlip).toHaveBeenCalledOnce()
+    })
+
+    it('flipped=true renders CardBack instead of body', () => {
+      render(<Card title="Q" body="Front body" back="Back content" flipped={true} onFlip={() => {}} />)
+      expect(screen.queryByText('Front body')).not.toBeInTheDocument()
+      expect(screen.getByText('Back content')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Flip to front' })).toBeInTheDocument()
+    })
+
+    it('flipped=true hides the resize handle', () => {
+      render(<Card title="Q" body="B" back="Back" flipped={true} onFlip={() => {}} />)
+      expect(screen.queryByRole('separator', { name: 'Resize card' })).not.toBeInTheDocument()
+    })
+
+    it('card--flipped class is applied when flipped is true', () => {
+      render(<Card title="Q" body="B" back="Back" flipped={true} onFlip={() => {}} />)
+      const card = screen.getByRole('heading', { level: 3, name: 'Q' }).closest('.card')
+      expect(card).toHaveClass('card--flipped')
+    })
+
+    it('card--flipped class is absent when flipped is false', () => {
+      render(<Card title="Q" body="B" back="Back" flipped={false} onFlip={() => {}} />)
+      const card = screen.getByRole('heading', { level: 3, name: 'Q' }).closest('.card')
+      expect(card).not.toHaveClass('card--flipped')
+    })
+
+    it('editing the back face calls onUpdate with { back } on blur', async () => {
+      const onUpdate = vi.fn()
+      render(
+        <div>
+          <Card title="Q" body="B" back="Old back" flipped={true} onFlip={() => {}} onUpdate={onUpdate} />
+          <button type="button">Outside</button>
+        </div>,
+      )
+      await userEvent.click(screen.getByText('Old back'))
+      const textarea = screen.getByRole('textbox', { name: 'Card back' })
+      await userEvent.clear(textarea)
+      await userEvent.type(textarea, 'New back')
+      await userEvent.click(screen.getByRole('button', { name: 'Outside' }))
+      expect(onUpdate).toHaveBeenCalledWith({ back: 'New back' })
+    })
+
+    it('Escape cancels back edit without calling onUpdate', async () => {
+      const onUpdate = vi.fn()
+      render(<Card title="Q" body="B" back="Original" flipped={true} onFlip={() => {}} onUpdate={onUpdate} />)
+      await userEvent.click(screen.getByText('Original'))
+      const textarea = screen.getByRole('textbox', { name: 'Card back' })
+      await userEvent.clear(textarea)
+      await userEvent.type(textarea, 'Changed')
+      await userEvent.keyboard('{Escape}')
+      expect(onUpdate).not.toHaveBeenCalled()
+      expect(screen.getByText('Original')).toBeInTheDocument()
+    })
+  })
+
   describe('location', () => {
     it('renders + button when location is "none" and onSaveToShelf is provided', () => {
       render(<Card title="T" body="B" location="none" onSaveToShelf={() => {}} />)

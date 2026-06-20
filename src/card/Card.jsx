@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { CardBack } from './CardBack'
 import { CardHeader } from './CardHeader'
 import './Card.css'
 
@@ -13,10 +14,16 @@ function autoResize(el) {
 export function Card({
   title,
   body,
+  back = '',
+  cardId,
+  createdAt,
+  updatedAt,
+  flipped = false,
   foldState = false,
   hiddenState = false,
   location = 'none',
   folders = [],
+  onFlip,
   onToggleFold,
   onToggleHide,
   onMoveUp,
@@ -25,10 +32,13 @@ export function Card({
   onClose,
   onSaveToShelf,
   onMoveToLibrary,
+  indexEntry,
+  indexLoading = false,
 }) {
   const [editing, setEditing] = useState(false)
   const [draftTitle, setDraftTitle] = useState(title)
   const [draftBody, setDraftBody] = useState(body)
+  const [draftBack, setDraftBack] = useState(back)
   const [bodyHeight, setBodyHeight] = useState(null)
   const bodyRef = useRef(null)
   const titleInputRef = useRef(null)
@@ -40,17 +50,19 @@ export function Card({
     if (!editing) {
       setDraftTitle(title)
       setDraftBody(body)
+      setDraftBack(back)
     }
-  }, [title, body, editing])
+  }, [title, body, back, editing])
 
   useEffect(() => {
     if (!editing) return
     if (focusTargetRef.current === 'title') {
       titleInputRef.current?.focus()
       titleInputRef.current?.select()
-    } else {
+    } else if (focusTargetRef.current === 'body') {
       bodyRef.current?.focus()
     }
+    // 'back' focus is handled by CardBack's internal useEffect
   }, [editing])
 
   useLayoutEffect(() => {
@@ -69,14 +81,21 @@ export function Card({
     focusTargetRef.current = target
     setDraftTitle(title)
     setDraftBody(body)
+    setDraftBack(back)
     setEditing(true)
   }
 
   function commitEdit(e) {
     if (e.currentTarget.contains(e.relatedTarget)) return
     setEditing(false)
-    if (draftTitle !== title || draftBody !== body) {
-      onUpdate?.({ title: draftTitle, body: draftBody })
+    if (flipped) {
+      if (draftBack !== back) {
+        onUpdate?.({ back: draftBack })
+      }
+    } else {
+      if (draftTitle !== title || draftBody !== body) {
+        onUpdate?.({ title: draftTitle, body: draftBody })
+      }
     }
   }
 
@@ -85,6 +104,7 @@ export function Card({
       setEditing(false)
       setDraftTitle(title)
       setDraftBody(body)
+      setDraftBack(back)
     }
   }
 
@@ -116,24 +136,26 @@ export function Card({
 
   return (
     <div
-      className={`card${hiddenState ? ' card--hidden' : ''}`}
+      className={`card${hiddenState ? ' card--hidden' : ''}${flipped ? ' card--flipped' : ''}`}
       onBlur={editing ? commitEdit : undefined}
       onKeyDown={editing ? handleKeyDown : undefined}
     >
       <CardHeader
-        title={editing ? draftTitle : title}
-        editing={editing}
+        title={editing && !flipped ? draftTitle : title}
+        editing={editing && !flipped}
         onTitleChange={setDraftTitle}
         inputRef={titleInputRef}
-        onTitleClick={onUpdate ? () => startEditing('title') : undefined}
+        onTitleClick={onUpdate && !flipped ? () => startEditing('title') : undefined}
         folded={foldState}
         hidden={hiddenState}
+        flipped={flipped}
         location={location}
         folders={folders}
         onSaveToShelf={onSaveToShelf}
         onMoveToLibrary={onMoveToLibrary}
         onToggleFold={onToggleFold}
         onToggleHide={onToggleHide}
+        onFlip={onFlip}
         onMoveUp={onMoveUp}
         onMoveDown={onMoveDown}
         onClose={onClose}
@@ -143,38 +165,63 @@ export function Card({
           <div
             className="card__body-area"
             ref={bodyAreaRef}
-            style={bodyHeight !== null ? { height: bodyHeight, overflowY: 'auto' } : undefined}
+            style={bodyHeight !== null && !flipped ? { height: bodyHeight, overflowY: 'auto' } : undefined}
           >
-            {editing ? (
-              <textarea
-                ref={bodyRef}
-                className="card__body card__body--edit"
-                value={draftBody}
-                onChange={(e) => {
-                  setDraftBody(e.target.value)
-                  autoResize(e.target)
-                }}
-                aria-label="Card body"
-              />
-            ) : (
-              <p
-                className="card__body"
-                onClick={onUpdate ? () => startEditing('body') : undefined}
-                role={onUpdate ? 'button' : undefined}
-                tabIndex={onUpdate ? 0 : undefined}
-                onKeyDown={onUpdate ? (e) => e.key === 'Enter' && startEditing() : undefined}
+            {flipped ? (
+              <div
+                onClick={onUpdate && !editing ? (e) => {
+                  if (!e.target.closest('.card-back__flip')) startEditing('back')
+                } : undefined}
               >
-                {body}
-              </p>
+                <CardBack
+                  back={editing ? draftBack : back}
+                  editing={editing}
+                  onBackChange={setDraftBack}
+                  onFlip={onFlip}
+                  cardId={cardId}
+                  createdAt={createdAt}
+                  updatedAt={updatedAt}
+                  location={location}
+                  indexEntry={indexEntry}
+                  indexLoading={indexLoading}
+                />
+              </div>
+            ) : (
+              <>
+                {editing ? (
+                  <textarea
+                    ref={bodyRef}
+                    className="card__body card__body--edit"
+                    value={draftBody}
+                    onChange={(e) => {
+                      setDraftBody(e.target.value)
+                      autoResize(e.target)
+                    }}
+                    aria-label="Card body"
+                  />
+                ) : (
+                  <p
+                    className="card__body"
+                    onClick={onUpdate ? () => startEditing('body') : undefined}
+                    role={onUpdate ? 'button' : undefined}
+                    tabIndex={onUpdate ? 0 : undefined}
+                    onKeyDown={onUpdate ? (e) => e.key === 'Enter' && startEditing() : undefined}
+                  >
+                    {body}
+                  </p>
+                )}
+              </>
             )}
           </div>
-          <div
-            className="card__resize-handle"
-            role="separator"
-            aria-label="Resize card"
-            aria-orientation="horizontal"
-            onMouseDown={startResize}
-          />
+          {!flipped && (
+            <div
+              className="card__resize-handle"
+              role="separator"
+              aria-label="Resize card"
+              aria-orientation="horizontal"
+              onMouseDown={startResize}
+            />
+          )}
         </>
       )}
     </div>

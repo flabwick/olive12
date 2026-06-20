@@ -7,15 +7,19 @@ export function PortalCard({
   cardsById = {},
   foldState = false,
   hiddenState = false,
+  flipped = false,
   location,
   folders,
   onToggleFold,
   onToggleHide,
+  onFlip,
   onMoveUp,
   onMoveDown,
   onClose,
   onUpdate,
   onLocate,
+  indexEntry,
+  indexLoading = false,
 }) {
   const target = resolvePortalTarget({ config }, cardsById)
 
@@ -24,12 +28,20 @@ export function PortalCard({
       <Card
         title={target ? target.title : 'Portal — no target'}
         body={target ? target.body : 'No card linked.'}
+        back={target?.back ?? ''}
+        cardId={target?.id}
+        createdAt={target?.createdAt}
+        updatedAt={target?.updatedAt}
         foldState={foldState}
         hiddenState={hiddenState}
+        flipped={flipped}
         location={location}
         folders={folders}
+        indexEntry={indexEntry}
+        indexLoading={indexLoading}
         onToggleFold={onToggleFold}
         onToggleHide={onToggleHide}
+        onFlip={onFlip}
         onMoveUp={onMoveUp}
         onMoveDown={onMoveDown}
         onUpdate={target ? onUpdate : undefined}

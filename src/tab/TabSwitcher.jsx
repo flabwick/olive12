@@ -52,12 +52,12 @@ export function TabSwitcher({
                 <button
                   type="button"
                   className="tab-switcher__close"
-                  aria-label={`Close ${tab.name}`}
+                  aria-label={`Close ${tab.name || '(untitled)'}`}
                   onClick={(e) => { e.stopPropagation(); onRemoveTab?.(tab.id) }}
                 >
                   ×
                 </button>
-                <div className="tab-switcher__tile-name">{tab.name}</div>
+                <div className="tab-switcher__tile-name">{tab.name || '(untitled)'}</div>
                 <div className="tab-switcher__tile-count">{cardCount} card{cardCount !== 1 ? 's' : ''}</div>
                 {tab.savedLocation !== 'none' && (
                   <div className="tab-switcher__tile-badge">
@@ -68,7 +68,7 @@ export function TabSwitcher({
                   <button
                     type="button"
                     className="tab-switcher__save"
-                    aria-label={`Save ${tab.name} to Shelf`}
+                    aria-label={`Save ${tab.name || '(untitled)'} to Shelf`}
                     onClick={(e) => { e.stopPropagation(); onSaveTab?.(tab.id) }}
                   >
                     Save

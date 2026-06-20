@@ -55,6 +55,8 @@ export function Dock({
   promptDisabled = false,
   onTabOverview,
   onMenu,
+  onIndexDebug,
+  indexDebugActive = false,
 }) {
   return (
     <div className="dock" role="toolbar" aria-label="Tab actions">
@@ -95,6 +97,15 @@ export function Dock({
         </button>
       </div>
       <div className="dock__group dock__group--right">
+        <button
+          type="button"
+          className={`dock__btn${indexDebugActive ? ' dock__btn--active' : ''}`}
+          aria-label="Index debug"
+          aria-pressed={indexDebugActive}
+          onClick={onIndexDebug}
+        >
+          Idx
+        </button>
         <button
           type="button"
           className="dock__btn"

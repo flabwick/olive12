@@ -28,7 +28,7 @@ describe('createTab', () => {
   it('creates a tab with default values', () => {
     expect(createTab()).toEqual({
       id: 'test-tab-uuid',
-      name: 'New tab',
+      name: '',
       kind: 'blank',
       order: 0,
       savedLocation: 'none',

@@ -1,4 +1,4 @@
-export function createTab({ name = 'New tab', order = 0 } = {}) {
+export function createTab({ name = '', order = 0 } = {}) {
   return {
     id: crypto.randomUUID(),
     name,

@@ -113,6 +113,23 @@ function CloseIcon() {
   )
 }
 
+function FlipIcon() {
+  return (
+    <svg
+      viewBox="0 0 12 10"
+      width="12"
+      height="10"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="M1 2h10M1 5h10M1 8h10" />
+    </svg>
+  )
+}
+
 export function CardHeader({
   title,
   editing = false,
@@ -121,17 +138,19 @@ export function CardHeader({
   onTitleClick,
   folded = false,
   hidden = false,
+  flipped = false,
   location = 'none',
   folders = [],
   onSaveToShelf,
   onMoveToLibrary,
   onToggleFold,
   onToggleHide,
+  onFlip,
   onMoveUp,
   onMoveDown,
   onClose,
 }) {
-  const hasRightControls = onMoveUp || onMoveDown || onToggleHide || onClose
+  const hasRightControls = onFlip || onMoveUp || onMoveDown || onToggleHide || onClose
   const hasLocationButton =
     (location === 'none' && onSaveToShelf) ||
     (location === 'shelf' && onMoveToLibrary) ||
@@ -187,6 +206,17 @@ export function CardHeader({
 
       {hasRightControls && (
         <div className="card-header__controls">
+          {onFlip && (
+            <button
+              type="button"
+              className={`card-header__control${flipped ? ' card-header__control--active' : ''}`}
+              onClick={onFlip}
+              aria-label="Flip card"
+              aria-pressed={flipped}
+            >
+              <FlipIcon />
+            </button>
+          )}
           {onMoveUp && (
             <button
               type="button"

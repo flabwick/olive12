@@ -1,164 +1,158 @@
-# Brain / Wiki Index — implementation
+# Brain — wiki index, Brain feed, and library-only indexing
 
-Knowledge indexing layer: an `index_entries` table in Dexie and Supabase, a pure `createIndexEntry` factory, a `wiki-index` Edge Function that writes a structured index entry from a card, and wiring in `useTabs.moveToLibrary` that triggers indexing on promotion.
+The brain layer turns **library** cards into searchable wiki index entries (title, tags, summary, links) via OpenRouter, stores them locally and in Supabase, and surfaces maintenance items in the FolderPanel Brain tab.
 
-For the Dexie schema this extends, see [storage.md](./storage.md). For `useTabs` and `moveToLibrary`, see [tabs.md](./tabs.md). For Supabase setup, see [supabase-setup.md](./supabase-setup.md).
+**Library-only rule:** wiki-index is never invoked for shelf or tab cards. Flip back shows the Index section only when `location === 'library'`.
+
+For card flip UI see [cards.md](./cards.md). For pipeline tracing see [debug.md](./debug.md).
 
 ## File map
 
 ```
 src/
   brain/
-    createIndexEntry.js          # Pure factory: IndexEntry data shape
-    createIndexEntry.test.js     # [TEST] 6 unit tests
-    indexEntryStorage.js         # Dexie-backed storage for index_entries (pure, no React)
-    indexEntryStorage.test.js    # [TEST] 11 integration tests
-  db/
-    vaultDb.js                   # Version 6: adds `index_entries` table
+    index.js                  # Re-exports
+    createIndexEntry.js       # Pure shape for index entry records
+    createIndexEntry.test.js
+    finishIndexResult.js      # Normalize LLM JSON + body fallback + enrichIndexEntry
+    finishIndexResult.test.js
+    indexCard.js              # indexCard(), computeContentHash, Dexie + Supabase persist
+    indexCard.test.js
+    indexEntryStorage.js      # Dexie index_entries CRUD
+    indexEntryStorage.test.js
+    brainFeedLogic.js         # detectStaleEntries (stale hash + orphan)
+    brainFeedLogic.test.js
+    BrainFeed.jsx             # List in FolderPanel Brain tab
+    BrainFeedItem.jsx
+    BrainFeed.css / BrainFeedItem.css
   tab/
-    useTabs.js                   # Extended: moveToLibrary triggers wiki-index + putIndexEntry
+    useTabs.js                # moveToLibrary → indexCard; flip ensureIndex; brainFeedItems
+  card/
+    CardBack.jsx              # Renders index summary/tags on back (library only)
 supabase/
-  functions/
-    wiki-index/
-      index.ts                   # Deno Edge Function: card → { title, tags, summary, links }
+  functions/wiki-index/
+    index.ts                  # OpenRouter call + parseIndexResult (body fallback)
   migrations/
     20260620000000_create_index_entries.sql
 ```
 
-## Data model
-
-### IndexEntry
-
-`createIndexEntry({ cardId, title, tags, summary, links, contentHash })` returns:
-
-| Field | Type | Notes |
-|---|---|---|
-| `cardId` | string | Primary key — one entry per card |
-| `title` | string | Index title (may differ from the card's own title); default `''` |
-| `tags` | string[] | Lowercase keyword strings; default `[]` |
-| `summary` | string | 1–2 sentence description; default `''` |
-| `links` | string[] | Card ids this entry references; default `[]` |
-| `contentHash` | string | FNV-1a hash of the card at index time (matches `computeContentHash`); default `''` |
-| `updatedAt` | number | `Date.now()` at creation |
-
-There is no separate `id` field — `cardId` is the primary key in both Dexie and Supabase.
-
-## Dexie schema — version 6
+## Index entry shape
 
 ```js
-db.version(6).stores({
-  cards:         'id',
-  tabs:          'id',
-  tab_cards:     '[tabId+cardId], tabId',
-  folders:       'id',
-  links:         '[sourceCardId+targetCardId], sourceCardId, targetCardId',
-  index_entries: 'cardId',
-})
+{
+  cardId: string,      // uuid of source card
+  title: string,
+  tags: string[],
+  summary: string,
+  links: string[],     // card ids extracted by LLM
+  contentHash: string, // hash of card body at index time
+  updatedAt: number,
+}
 ```
 
-No upgrade callback — the new table starts empty; no migration of existing data is needed.
+Stored in Dexie `index_entries` (key `cardId`) and Supabase `index_entries` (upsert on index).
 
-## Index entry storage
+## indexCard flow
 
-`src/brain/indexEntryStorage.js` — plain async functions, no React.
+1. **Guard:** throws if `card.location !== 'library'`
+2. **Invoke** `supabase.functions.invoke('wiki-index', { body: { title, body, cardId } })`
+3. **Parse** response via `finishIndexResult(raw, card)` — see below
+4. **Persist** Dexie `putIndexEntry`, then Supabase upsert (errors logged, non-blocking)
+5. **Return** finished entry
 
-| Function | Behaviour |
+`computeContentHash(card)` hashes normalised body text for stale detection.
+
+## finishIndexResult and body fallback
+
+Small models (e.g. llama-3.2-3b) often return valid JSON with `"summary": ""`. Pipeline:
+
+1. `extractIndexPayload(text)` — strip markdown fences, find JSON object
+2. Map fields to entry shape
+3. If `summary` still empty and card has body → **body fallback:** first ~400 chars of plain body as summary (`summarySource: 'body-fallback'`)
+4. `enrichIndexEntry(entry, card)` — same fallback when loading existing empty summaries on flip
+
+## When indexing runs
+
+| Trigger | Behaviour |
 |---|---|
-| `getAllIndexEntries()` | Returns all records from `index_entries` |
-| `getIndexEntry(cardId)` | Returns the entry for a single card, or `undefined` |
-| `putIndexEntry(entry)` | Upserts by `cardId` |
-| `deleteIndexEntry(cardId)` | Deletes by primary key |
-| `searchIndexEntries(query)` | Case-insensitive substring match over `title`, joined `tags`, and `summary`. Loads all entries into memory and filters in JS. Returns matched entries sorted by `updatedAt` desc. |
+| `moveToLibrary(cardId)` | After location update, calls `indexCard` for that card (and portal target if applicable) |
+| Flip on library card with no entry | `ensureIndexEntry` in `flipCard` — invokes `indexCard` if missing |
+| Flip on shelf/tab card | No index call; CardBack shows notes only (no Index section) |
 
-`searchIndexEntries` is a full in-memory scan — fast enough for the current scale. No Dexie index on text fields is needed at this stage.
+Indexing state: `indexLoadingIds` Set exposed as `isIndexing(cardId)`.
 
-## Supabase table — index_entries
+## Resolving index on tab entries
 
-Migration: `supabase/migrations/20260620000000_create_index_entries.sql`
+Portal and nested cards resolve index against the **target** card id:
 
-| Column | Type | Notes |
-|---|---|---|
-| `card_id` | uuid PK | FK → `cards(id)` ON DELETE CASCADE |
-| `user_id` | uuid NOT NULL | FK → `auth.users(id)`; enforced by RLS |
-| `title` | text | Default `''` |
-| `tags` | text[] | Default `'{}'` |
-| `summary` | text | Default `''` |
-| `links` | text[] | Card ids; default `'{}'` |
-| `content_hash` | text | Default `''` |
-| `updated_at` | timestamptz | Default `now()` |
+- `resolveIndexTargetId(entry)` — portal → `entry.card.targetId`, else `entry.card.id`
+- `resolveIndexTarget(entry, cardsById)` — full card for location checks
 
-RLS is enabled. A single `for all` policy allows users to read and write only their own rows (`auth.uid() = user_id`).
+Tab `entries` include:
 
-The `ON DELETE CASCADE` on `card_id` means deleting a card from Supabase automatically removes its index entry.
+```js
+indexEntry      // from indexEntriesById[targetId], only if target.location === 'library'
+indexLocation   // target card location
+indexLoading    // isIndexing(targetId)
+```
 
-## Edge Function — wiki-index
+## Card back display
 
-**Deploy command** (run by the human outside this session):
+When flipped and `indexLocation === 'library'`, CardBack shows:
+
+- Loading spinner while `indexLoading`
+- Title, summary, tags from `indexEntry`
+- Empty state if no entry yet (may still be indexing)
+- Inline Index debug `<details>` (see [debug.md](./debug.md))
+
+## Brain feed
+
+`detectStaleEntries(libraryCards, indexEntries, allLinks)` flags:
+
+- **stale** — card has `contentHash` and index entry hash differs (card edited since index)
+- **orphan** — card has no incoming links (`linkLogic.isOrphan`)
+
+`useTabs` builds `brainFeedItems` from library cards + index entries + links. Rendered in FolderPanel **Brain** tab via `BrainFeed` / `BrainFeedItem`.
+
+| Action | Status |
+|---|---|
+| Dismiss | Removes item from local `dismissedBrainIds` Set |
+| Accept | **Stub** — `console.log` only; should re-run `indexCard` |
+
+Note: live cards do not yet persist `contentHash` on the card record (only on index entries), so stale detection mainly activates when tests or future sync add card-side hashes.
+
+## Edge function: wiki-index
+
+POST body: `{ title, body, cardId }`. Uses OpenRouter with JSON schema for index fields. Server-side `parseIndexResult` mirrors client fallback (empty summary → body excerpt).
+
+Deploy after changes:
+
 ```bash
 supabase functions deploy wiki-index
 ```
 
-**Prerequisites:**
-- `OPENROUTER_API_KEY` secret set (same key used by `dock-prompt`)
+## useTabs exports (brain-related)
 
-**Request shape:**
-```json
-{
-  "card": { "id": "...", "title": "...", "body": "...", "config": {} },
-  "neighborEntries": [{ "cardId": "...", "title": "...", "tags": [...], ... }]
-}
+```js
+brainFeedItems, onBrainAccept, onBrainDismiss,
+flipCard, isFlipped, getIndexEntry, isIndexing,
+moveToLibrary,  // triggers indexing
 ```
-
-**Response shape on success:**
-```json
-{ "title": "string", "tags": ["string"], "summary": "string", "links": ["card-id"] }
-```
-
-`neighborEntries` is a bounded sample of existing index entries — provides the model with context about what's already in the knowledge base. The caller passes up to 10.
-
-**Model config** (top of `index.ts`, the only place model selection lives):
-```ts
-const MODEL_CONFIG = {
-  model: 'meta-llama/llama-3.2-3b-instruct',
-  temperature: 0.3,
-  maxTokens: 500,
-}
-```
-
-The function instructs the model to return a plain JSON object (no code fences). If the model wraps output in backtick fences, `parseIndexResult` strips them before parsing. On a JSON parse failure, the function falls back to `{ title: '', tags: [], summary: <first 200 chars of raw content>, links: [] }` — the caller always gets a usable shape.
-
-## Wiring — useTabs.moveToLibrary
-
-When `moveToLibrary(cardId, folderId?)` is called:
-
-1. Updates card `location` to `'library'` and persists to Dexie (unchanged from before).
-2. Schedules a Supabase card sync (unchanged from before).
-3. Fetches up to 10 existing index entries from Dexie as the neighbor sample.
-4. Invokes `wiki-index` with the updated card + neighbor entries.
-5. On success: constructs an `IndexEntry` via `createIndexEntry`, writes it to Dexie via `putIndexEntry`.
-6. If `userId` is present: upserts the entry to Supabase `index_entries` directly (not through the debounced sync scheduler).
-
-Steps 3–6 run in a `try/catch` — any wiki-index failure is logged and silently swallowed. The card save in step 1 is never blocked by indexing.
-
-The Supabase write in step 6 uses `supabase.from('index_entries').upsert(...)` directly (no adapter abstraction yet, same pattern as would be added in a future indexEntrySupabaseStorage layer).
 
 ## Tests
 
-| File | What it covers |
+| File | Covers |
 |---|---|
-| `createIndexEntry.test.js` | Default fields (title/tags/summary/links/contentHash all default); custom values; no `id` field (cardId is the PK); `updatedAt` stamped with `Date.now()` |
-| `indexEntryStorage.test.js` | Empty read; put round-trip; `getIndexEntry` found/undefined; upsert (no duplicate); `deleteIndexEntry`; `searchIndexEntries`: title match, tag match, summary match, no-match → [], case-insensitive, results sorted by updatedAt desc |
-
-No hook-level or E2E tests for the wiki-index wiring yet — the `moveToLibrary` path is covered in `useTabs.test.js` at the card-state level only (the AI call path is not exercised in the test suite).
+| `indexCard.test.js` | library guard, invoke, persist |
+| `finishIndexResult.test.js` | JSON parse, body fallback, enrich |
+| `brainFeedLogic.test.js` | stale/orphan detection |
+| `useTabs.test.js` | moveToLibrary invokes wiki-index; flip index on library; shelf flip skips |
+| `CardBack.test.jsx` | Index section library-only |
 
 ## Not built yet
 
-- Re-indexing when a library card is updated (currently only promotion triggers indexing)
-- Stale index detection (content hash drift between `index_entries.contentHash` and the live card)
-- Brain feed UI: contradiction flagging, orphan detection, staleness display
-- `indexEntrySupabaseStorage.js` adapter (Supabase write is done inline in `useTabs` for now)
-- Full-library scan or batch re-indexing
-- Embedding / vector search (current search is plain JS substring match)
-- Incoming links (`links` field is populated by the model from the card body, not from the Dexie `links` table)
-- FolderPanel Brain pane content (currently "coming soon" placeholder)
-- Index entry deletion when a card is deleted from the library
+- `onBrainAccept` → re-index workflow
+- Card `contentHash` on every edit for reliable stale feed
+- Embeddings / semantic search
+- Batch re-index all stale
+- Brain feed Supabase sync
