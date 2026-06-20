@@ -300,28 +300,16 @@ describe('Card', () => {
       expect(onSaveToShelf).toHaveBeenCalledOnce()
     })
 
-    it('renders ✓ button when location is "shelf" and onMoveToLibrary is provided', () => {
+    it('renders no location button when location is "shelf"', () => {
       render(<Card title="T" body="B" location="shelf" onMoveToLibrary={() => {}} />)
-      expect(
-        screen.getByRole('button', { name: 'Saved to Shelf — click to move to Library' }),
-      ).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Saved to Shelf — click to move to Library' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save to Shelf' })).not.toBeInTheDocument()
     })
 
-    it('clicking ✓ opens the folder picker and calls onMoveToLibrary with folderId', async () => {
-      const onMoveToLibrary = vi.fn()
-      render(<Card title="T" body="B" location="shelf" folders={[]} onMoveToLibrary={onMoveToLibrary} />)
-      await userEvent.click(
-        screen.getByRole('button', { name: 'Saved to Shelf — click to move to Library' }),
-      )
-      await userEvent.click(screen.getByRole('button', { name: 'Library root' }))
-      expect(onMoveToLibrary).toHaveBeenCalledWith(null)
-    })
-
-    it('renders disabled ✓ when location is "library"', () => {
+    it('renders no location button when location is "library"', () => {
       render(<Card title="T" body="B" location="library" />)
-      const btn = screen.getByRole('button', { name: 'In Library' })
-      expect(btn).toBeInTheDocument()
-      expect(btn).toBeDisabled()
+      expect(screen.queryByRole('button', { name: 'In Library' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save to Shelf' })).not.toBeInTheDocument()
     })
 
     it('renders no location button when callbacks are not provided', () => {

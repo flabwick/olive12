@@ -12,10 +12,13 @@ import { TransientCard } from './tab/TransientCard'
 import { useTabs } from './tab/useTabs'
 import './App.css'
 
+const E2E_AUTH_BYPASS = import.meta.env.VITE_E2E_AUTH_BYPASS === 'true'
+const E2E_USER_ID = '00000000-0000-4000-8000-000000000001'
+
 function AppShell({ userId }) {
   const {
     tab,
-    tabs,
+    openTabs,
     activeTabId,
     entries,
     shelfEntries,
@@ -61,7 +64,7 @@ function AppShell({ userId }) {
   const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false)
   const [vaultInitialTab, setVaultInitialTab] = useState('shelf')
   const [highlightedCardId, setHighlightedCardId] = useState(null)
-  const [indexDebugOpen, setIndexDebugOpen] = useState(true)
+  const [indexDebugOpen, setIndexDebugOpen] = useState(!E2E_AUTH_BYPASS)
 
   function handleAddCard(fields) {
     addCard(fields)
@@ -200,10 +203,10 @@ function AppShell({ userId }) {
       <IndexDebugPanel open={indexDebugOpen} onClose={() => setIndexDebugOpen(false)} />
       {tabSwitcherOpen && (
         <TabSwitcher
-          tabs={tabs}
+          tabs={openTabs}
           activeTabId={activeTabId}
           tabEntries={Object.fromEntries(
-            tabs.map((t) => [
+            openTabs.map((t) => [
               t.id,
               allTabCards
                 .filter((tc) => tc.tabId === t.id)
@@ -229,6 +232,12 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false)
 
   useEffect(() => {
+    if (E2E_AUTH_BYPASS) {
+      setUserId(E2E_USER_ID)
+      setSessionChecked(true)
+      return undefined
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       setUserId(data.session?.user?.id ?? null)
       setSessionChecked(true)

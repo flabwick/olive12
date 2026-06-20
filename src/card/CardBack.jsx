@@ -1,6 +1,12 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { getLastErrorForCard, logIndexEvent, INDEX_STAGES } from '../debug/indexPipelineDebug'
 import './CardBack.css'
+
+function autoResize(el) {
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
+}
 
 function fmtDate(ts) {
   if (!ts) return '—'
@@ -31,6 +37,10 @@ export function CardBack({
   useEffect(() => {
     if (editing) textareaRef.current?.focus()
   }, [editing])
+
+  useLayoutEffect(() => {
+    if (editing) autoResize(textareaRef.current)
+  }, [editing, back])
 
   useEffect(() => {
     if (!cardId || loggedRef.current === `${location}:${!!indexEntry}:${indexLoading}`) return
@@ -141,7 +151,10 @@ export function CardBack({
             ref={textareaRef}
             className="card-back__notes-input"
             value={back}
-            onChange={(e) => onBackChange?.(e.target.value)}
+            onChange={(e) => {
+              onBackChange?.(e.target.value)
+              autoResize(e.target)
+            }}
             placeholder="Add notes…"
             aria-label="Card back"
           />

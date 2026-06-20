@@ -453,6 +453,9 @@ describe('useTabs', () => {
     await waitFor(() => expect(reloaded.current.isReady).toBe(true))
 
     expect(reloaded.current.shelfEntries[0].id).toBe('card-uuid')
+    expect(reloaded.current.entries).toHaveLength(1)
+    expect(reloaded.current.entries[0].card.type).toBe('portal')
+    expect(reloaded.current.entries[0].card.config.target_card_id).toBe('card-uuid')
     const cards = await getAllCards()
     const original = cards.find((c) => c.id === 'card-uuid')
     expect(original?.location).toBe('shelf')
@@ -462,6 +465,7 @@ describe('useTabs', () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
       .mockReturnValueOnce('card-uuid')
+      .mockReturnValueOnce('portal-uuid')
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
     const { result } = renderHook(() => useTabs())
@@ -469,7 +473,8 @@ describe('useTabs', () => {
     await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
     await act(async () => { await result.current.moveToLibrary('card-uuid') })
 
-    expect(result.current.entries[0].card.location).toBe('library')
+    expect(result.current.entries[0].card.type).toBe('portal')
+    expect(result.current.libraryEntries[0].location).toBe('library')
   })
 
   it('moveToLibrary calls wiki-index and stores the index entry', async () => {
@@ -564,6 +569,7 @@ describe('useTabs', () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')
       .mockReturnValueOnce('card-uuid')
+      .mockReturnValueOnce('portal-uuid')
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
     const { result, unmount } = renderHook(() => useTabs())
@@ -575,7 +581,8 @@ describe('useTabs', () => {
     const { result: reloaded } = renderHook(() => useTabs())
     await waitFor(() => expect(reloaded.current.isReady).toBe(true))
 
-    expect(reloaded.current.entries[0].card.location).toBe('library')
+    expect(reloaded.current.entries[0].card.type).toBe('portal')
+    expect(reloaded.current.libraryEntries[0].location).toBe('library')
   })
 
   describe('shelfEntries and libraryEntries', () => {
@@ -755,6 +762,7 @@ describe('useTabs', () => {
         .mockReturnValueOnce('tab-uuid')
         .mockReturnValueOnce('card-uuid')
         .mockReturnValueOnce('folder-uuid')
+        .mockReturnValueOnce('portal-uuid')
       vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
       const { result } = renderHook(() => useTabs())
@@ -763,12 +771,16 @@ describe('useTabs', () => {
       await act(async () => { await result.current.createFolder({ name: 'Work' }) })
       await act(async () => { await result.current.moveToLibrary('card-uuid', 'folder-uuid') })
 
-      expect(result.current.entries[0].card.folderId).toBe('folder-uuid')
-      expect(result.current.entries[0].card.location).toBe('library')
+      expect(result.current.entries[0].card.type).toBe('portal')
+      expect(result.current.libraryEntries[0].folderId).toBe('folder-uuid')
+      expect(result.current.libraryEntries[0].location).toBe('library')
     })
 
     it('moveToLibrary with null folderId keeps folderId null', async () => {
-      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid').mockReturnValueOnce('card-uuid')
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+        .mockReturnValueOnce('portal-uuid')
       vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
       const { result } = renderHook(() => useTabs())
@@ -776,7 +788,8 @@ describe('useTabs', () => {
       await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
       await act(async () => { await result.current.moveToLibrary('card-uuid', null) })
 
-      expect(result.current.entries[0].card.folderId).toBeNull()
+      expect(result.current.entries[0].card.type).toBe('portal')
+      expect(result.current.libraryEntries[0].folderId).toBeNull()
     })
 
     it('libraryEntries groups correctly by folderId', async () => {
@@ -1116,18 +1129,108 @@ describe('useTabs', () => {
       expect(tabStorageMock.upsertSavedTab).not.toHaveBeenCalled()
     })
 
-    it('removeTab on a saved tab does not call deleteSavedTab', async () => {
+    it('removeTab on a saved tab closes it but keeps shelf data and tab_cards', async () => {
       vi.spyOn(crypto, 'randomUUID')
         .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('card-1')
         .mockReturnValueOnce('tab-fallback')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
 
       const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
       await waitFor(() => expect(result.current.isReady).toBe(true))
 
+      await act(async () => { await result.current.addCard({ title: 'Note', body: 'Body' }) })
       await act(async () => { await result.current.saveTabToShelf('tab-1') })
       await act(async () => { await result.current.removeTab('tab-1') })
 
       expect(tabStorageMock.deleteSavedTab).not.toHaveBeenCalled()
+      expect(result.current.openTabs).toHaveLength(1)
+      expect(result.current.openTabs[0].id).toBe('tab-fallback')
+      expect(result.current.shelfTabs).toHaveLength(1)
+      expect(result.current.shelfTabs[0].id).toBe('tab-1')
+      expect(result.current.shelfTabs[0].isOpen).toBe(false)
+
+      const tabCards = await getAllTabCards()
+      expect(tabCards.some((tc) => tc.tabId === 'tab-1' && tc.cardId === 'card-1')).toBe(true)
+      const storedTabs = await getAllTabs()
+      expect(storedTabs.some((t) => t.id === 'tab-1' && t.savedLocation === 'shelf')).toBe(true)
+    })
+
+    it('reopening a closed saved tab restores its cards on the active tab', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('card-1')
+        .mockReturnValueOnce('tab-fallback')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.addCard({ title: 'Persist', body: '' }) })
+      await act(async () => { await result.current.saveTabToShelf('tab-1') })
+      await act(async () => { await result.current.removeTab('tab-1') })
+      await act(async () => { await result.current.switchTab('tab-1') })
+
+      expect(result.current.openTabs.some((t) => t.id === 'tab-1')).toBe(true)
+      expect(result.current.activeTabId).toBe('tab-1')
+      expect(result.current.entries).toHaveLength(1)
+      expect(result.current.entries[0].card.title).toBe('Persist')
+    })
+
+    it('closed saved tab persists across remount and can be reopened', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('card-1')
+        .mockReturnValueOnce('tab-fallback')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result, unmount } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.addCard({ title: 'After refresh', body: '' }) })
+      await act(async () => { await result.current.saveTabToShelf('tab-1') })
+      await act(async () => { await result.current.removeTab('tab-1') })
+
+      unmount()
+
+      const { result: reloaded } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(reloaded.current.isReady).toBe(true))
+
+      expect(reloaded.current.shelfTabs).toHaveLength(1)
+      expect(reloaded.current.shelfTabs[0].isOpen).toBe(false)
+      expect(reloaded.current.openTabs.some((t) => t.id === 'tab-1')).toBe(false)
+
+      await act(async () => { await reloaded.current.switchTab('tab-1') })
+
+      expect(reloaded.current.entries).toHaveLength(1)
+      expect(reloaded.current.entries[0].card.title).toBe('After refresh')
+    })
+
+    it('removeTab on a library tab closes it without deleting tab_cards', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('card-1')
+        .mockReturnValueOnce('tab-fallback')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      invokeMock.mockResolvedValue({
+        data: { title: 'Lib tab', tags: [], summary: '', links: [] },
+        error: null,
+      })
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.addCard({ title: 'Lib tab', body: '' }) })
+      await act(async () => { await result.current.saveTabToShelf('tab-1') })
+      await act(async () => { await result.current.moveTabToLibrary('tab-1', null) })
+      await act(async () => { await result.current.removeTab('tab-1') })
+
+      expect(result.current.libraryTabs).toHaveLength(1)
+      expect(result.current.libraryTabs[0].isOpen).toBe(false)
+      expect(result.current.openTabs.some((t) => t.id === 'tab-1')).toBe(false)
+      expect(await getAllTabCards()).toEqual(expect.arrayContaining([
+        expect.objectContaining({ tabId: 'tab-1', cardId: 'card-1' }),
+      ]))
     })
 
     it('init reconcile creates a local tab from a remote saved tab', async () => {
@@ -1214,6 +1317,92 @@ describe('useTabs', () => {
       expect(await db.links.toArray()).toHaveLength(0)
     })
 
+    it('removeCard on a portal does not delete the target vault card', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+        .mockReturnValueOnce('portal-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'Vault', body: 'Keep me' }) })
+      await act(async () => { await result.current.saveToShelf('card-uuid') })
+
+      await act(async () => { await result.current.removeCard(result.current.entries[0].card.id) })
+
+      expect(result.current.entries).toHaveLength(0)
+      expect(result.current.shelfEntries).toHaveLength(1)
+      expect(result.current.shelfEntries[0].id).toBe('card-uuid')
+      const cards = await getAllCards()
+      expect(cards.some((c) => c.id === 'card-uuid')).toBe(true)
+    })
+
+    it('removeCard on a vault card in the tab only detaches it from the tab', async () => {
+      await db.tabs.put({
+        id: 'tab-uuid',
+        name: 'Main',
+        kind: 'blank',
+        order: 0,
+        savedLocation: 'none',
+        savedFolderId: null,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      await db.cards.put({
+        id: 'vault-1',
+        type: 'text',
+        title: 'Saved',
+        body: '',
+        location: 'shelf',
+        folderId: null,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      await db.tab_cards.put({
+        tabId: 'tab-uuid',
+        cardId: 'vault-1',
+        position: 0,
+        foldState: false,
+        hiddenState: false,
+      })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await waitFor(() => expect(result.current.entries).toHaveLength(1))
+
+      await act(async () => { await result.current.removeCard('vault-1') })
+
+      expect(result.current.entries).toHaveLength(0)
+      expect(result.current.shelfEntries.some((c) => c.id === 'vault-1')).toBe(true)
+      expect(await getAllCards()).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'vault-1', location: 'shelf' }),
+      ]))
+    })
+
+    it('does not re-add shelf cards to the tab after refresh', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+        .mockReturnValueOnce('portal-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result, unmount } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'Saved', body: '' }) })
+      await act(async () => { await result.current.saveToShelf('card-uuid') })
+
+      unmount()
+
+      const { result: reloaded } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(reloaded.current.isReady).toBe(true))
+      await waitFor(() => expect(syncMocks.runNow).toHaveBeenCalled())
+
+      expect(reloaded.current.entries).toHaveLength(1)
+      expect(reloaded.current.entries[0].card.type).toBe('portal')
+      expect(reloaded.current.shelfEntries).toHaveLength(1)
+    })
+
     it('saveToShelf writes a link for the portal card that replaces the original', async () => {
       vi.spyOn(crypto, 'randomUUID')
         .mockReturnValueOnce('tab-uuid')
@@ -1232,6 +1421,125 @@ describe('useTabs', () => {
       expect(links[0].sourceCardId).toBe('portal-uuid')
       expect(links[0].targetCardId).toBe('card-uuid')
       expect(links[0].linkType).toBe('portal')
+    })
+
+    it('does not re-add library cards to the tab after refresh', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+        .mockReturnValueOnce('portal-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      invokeMock.mockResolvedValue({
+        data: { title: 'Saved', tags: [], summary: '', links: [] },
+        error: null,
+      })
+
+      const { result, unmount } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'Saved', body: '' }) })
+      await act(async () => { await result.current.moveToLibrary('card-uuid') })
+
+      unmount()
+
+      const { result: reloaded } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(reloaded.current.isReady).toBe(true))
+      await waitFor(() => expect(syncMocks.runNow).toHaveBeenCalled())
+
+      expect(reloaded.current.entries).toHaveLength(1)
+      expect(reloaded.current.entries[0].card.type).toBe('portal')
+      expect(reloaded.current.libraryEntries).toHaveLength(1)
+      expect(reloaded.current.libraryEntries[0].id).toBe('card-uuid')
+    })
+
+    it('removeCard on a library portal keeps the vault card and does not delete it remotely', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+        .mockReturnValueOnce('portal-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      invokeMock.mockResolvedValue({
+        data: { title: 'Lib', tags: [], summary: '', links: [] },
+        error: null,
+      })
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'Lib', body: '' }) })
+      await act(async () => { await result.current.moveToLibrary('card-uuid') })
+
+      deleteRemoteMock.mockClear()
+      const portalId = result.current.entries[0].card.id
+      await act(async () => { await result.current.removeCard(portalId) })
+
+      expect(result.current.entries).toHaveLength(0)
+      expect(result.current.libraryEntries).toHaveLength(1)
+      expect(result.current.libraryEntries[0].id).toBe('card-uuid')
+      expect(await getAllCards()).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'card-uuid', location: 'library' }),
+      ]))
+      expect(deleteRemoteMock).toHaveBeenCalledOnce()
+      expect(deleteRemoteMock).toHaveBeenCalledWith(portalId)
+      expect(deleteRemoteMock).not.toHaveBeenCalledWith('card-uuid')
+    })
+
+    it('moveToLibrary from shelf without a tab instance does not create a portal', async () => {
+      await db.tabs.put({
+        id: 'tab-uuid',
+        name: 'Main',
+        kind: 'blank',
+        order: 0,
+        savedLocation: 'none',
+        savedFolderId: null,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      await db.cards.put({
+        id: 'shelf-only',
+        type: 'text',
+        title: 'Shelf only',
+        body: '',
+        location: 'shelf',
+        folderId: null,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      invokeMock.mockResolvedValue({
+        data: { title: 'Shelf only', tags: [], summary: '', links: [] },
+        error: null,
+      })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await waitFor(() => expect(result.current.shelfEntries).toHaveLength(1))
+
+      await act(async () => { await result.current.moveToLibrary('shelf-only', null) })
+
+      expect(result.current.entries).toHaveLength(0)
+      expect(result.current.shelfEntries).toHaveLength(0)
+      expect(result.current.libraryEntries).toHaveLength(1)
+      expect(result.current.libraryEntries[0].id).toBe('shelf-only')
+      const cards = await getAllCards()
+      expect(cards.filter((c) => c.type === 'portal')).toHaveLength(0)
+    })
+
+    it('saveToShelf leaves exactly one text card and one portal in storage', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+        .mockReturnValueOnce('portal-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'Unique', body: '' }) })
+      await act(async () => { await result.current.saveToShelf('card-uuid') })
+
+      const cards = await getAllCards()
+      expect(cards).toHaveLength(2)
+      expect(cards.filter((c) => c.id === 'card-uuid' && c.location === 'shelf')).toHaveLength(1)
+      expect(cards.filter((c) => c.type === 'portal')).toHaveLength(1)
+      expect(result.current.entries).toHaveLength(1)
+      expect(result.current.entries[0].card.type).toBe('portal')
     })
   })
 

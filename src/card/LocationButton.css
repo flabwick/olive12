@@ -9,44 +9,48 @@
   width: 1.625rem;
   height: 1.625rem;
   border-radius: 50%;
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s, transform 0.1s;
+  transition: background 0.12s, color 0.12s, transform 0.12s, box-shadow 0.12s;
   flex-shrink: 0;
 }
 
 .location-btn--add {
-  background: transparent;
-  border: 1.5px solid #c8b89a;
-  color: #8a6848;
+  background: rgba(255, 255, 255, 0.25);
+  border: 1.5px solid rgba(44, 24, 16, 0.35);
+  color: #2c1810;
 }
 
 .location-btn--add:hover {
-  background: #f0e8d8;
-  border-color: #8a6848;
-  color: #2a1a0a;
+  background: rgba(255, 255, 255, 0.45);
+  border-color: #2c1810;
   transform: scale(1.1);
 }
 
+/* Shelf = warm amber */
 .location-btn--shelf {
-  background: #c8a87a;
-  border: 1.5px solid #a88050;
-  color: #fff;
+  background: var(--olive-terracotta, #a84830);
+  border: 1.5px solid #8a3018;
+  color: #fef8ee;
+  box-shadow: 0 1px 3px rgba(168, 72, 48, 0.4);
 }
 
 .location-btn--shelf:hover {
-  background: #a88050;
+  background: #8a3018;
   transform: scale(1.1);
 }
 
+/* Library = sage green */
 .location-btn--library {
-  background: #7a9a6a;
-  border: 1.5px solid #5a7a4a;
-  color: #fff;
+  background: var(--olive-sage, #5a7850);
+  border: 1.5px solid #3a5830;
+  color: #fef8ee;
+  box-shadow: 0 1px 3px rgba(90, 120, 80, 0.4);
   cursor: default;
-  opacity: 0.75;
+  opacity: 0.85;
 }
 
 .location-btn--library:disabled {
@@ -55,27 +59,27 @@
 
 @media (prefers-color-scheme: dark) {
   .location-btn--add {
-    border-color: #4a3a28;
-    color: #b8956a;
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(232, 208, 160, 0.3);
+    color: #e8d0a0;
   }
 
   .location-btn--add:hover {
-    background: #2a1e10;
-    border-color: #b8956a;
-    color: #f0d8b0;
+    background: rgba(232, 208, 160, 0.12);
+    border-color: #e8d0a0;
   }
 
   .location-btn--shelf {
-    background: #8a6040;
-    border-color: #6a4828;
+    background: #8a3018;
+    border-color: #6a2010;
   }
 
   .location-btn--shelf:hover {
-    background: #6a4828;
+    background: #6a2010;
   }
 
   .location-btn--library {
-    background: #4a6a3a;
-    border-color: #3a5a2a;
+    background: #3a5830;
+    border-color: #2a4020;
   }
 }

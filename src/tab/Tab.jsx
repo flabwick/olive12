@@ -43,7 +43,7 @@ export function Tab({
         const indexProps = {
           indexEntry: entry.indexEntry,
           indexLoading: entry.indexLoading ?? false,
-          location: entry.indexLocation ?? entry.card?.location ?? 'none',
+          location: entry.card.type === 'portal' ? 'none' : (entry.card.location ?? 'none'),
         }
 
         if (entry.card.type === 'portal') {
@@ -81,7 +81,6 @@ export function Tab({
               {...indexProps}
               onUpdate={onUpdate ? (fields) => onUpdate(entry.card.id, fields) : undefined}
               onSaveToShelf={onSaveToShelf ? () => onSaveToShelf(entry.card.id) : undefined}
-              onMoveToLibrary={onMoveToLibrary ? (folderId) => onMoveToLibrary(entry.card.id, folderId) : undefined}
             />
           </li>
         )

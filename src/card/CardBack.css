@@ -1,97 +1,120 @@
 .card-back {
   position: relative;
-  padding: 0.75rem;
-  padding-bottom: 2rem;
+  padding: 0.875rem 1rem;
+  padding-bottom: 2.25rem;
   font-size: 0.8125rem;
-  line-height: 1.6;
-  color: #6b5d54;
+  line-height: 1.75;
+  color: #5a4030;
   min-height: 2.5rem;
 }
 
-.card-back__notes {
-  margin-bottom: 0.75rem;
-}
-
+/* ── Wiki index section — amber band header like transient cards ── */
 .card-back__wiki {
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.625rem;
-  border-bottom: 1px solid currentColor;
+  margin-bottom: 0.875rem;
+  border: 1.5px solid var(--olive-border, #b89868);
+  border-radius: 0.3125rem;
+  overflow: hidden;
+  background: var(--olive-parchment, #ede0ca);
 }
 
 .card-back__wiki-heading {
-  margin: 0 0 0.375rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  margin: 0;
+  padding: 0.4375rem 0.625rem;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  opacity: 0.55;
+  color: #2c1810;
+  background: #c09060;
+  border-bottom: 2px solid #9a7040;
 }
 
 .card-back__wiki-title {
-  margin: 0 0 0.25rem;
-  font-weight: 600;
-  color: inherit;
+  margin: 0;
+  padding: 0.625rem 0.75rem 0.25rem;
+  font-family: var(--serif, 'Playfair Display', Georgia, serif);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--olive-text, #2c1810);
 }
 
 .card-back__wiki-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
-  margin: 0 0 0.375rem;
-  padding: 0;
+  gap: 0.3125rem;
+  margin: 0;
+  padding: 0 0.75rem 0.375rem;
   list-style: none;
 }
 
 .card-back__wiki-tag {
   font-size: 0.625rem;
-  padding: 0.0625rem 0.375rem;
-  border-radius: 0.25rem;
-  background: rgba(122, 92, 58, 0.12);
-  opacity: 0.85;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.125rem 0.4375rem;
+  border-radius: 0.2rem;
+  background: rgba(168, 72, 48, 0.1);
+  border: 1px solid rgba(168, 72, 48, 0.28);
+  color: var(--olive-terracotta, #a84830);
 }
 
 .card-back__wiki-summary {
   margin: 0;
+  padding: 0 0.75rem 0.625rem;
   white-space: pre-wrap;
+  color: var(--olive-text-mid, #6b5040);
 }
 
 .card-back__wiki-links {
-  margin: 0.375rem 0 0;
+  margin: 0;
+  padding: 0.4375rem 0.75rem 0.625rem;
   font-size: 0.6875rem;
-  opacity: 0.55;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--olive-teal, #336868);
+  border-top: 1px solid var(--olive-surface, #dfd0b4);
   word-break: break-all;
 }
 
 .card-back__wiki-hint {
-  margin: 0 0 0.75rem;
-  padding: 0.375rem 0.5rem;
-  border-radius: 0.25rem;
-  background: rgba(122, 92, 58, 0.08);
-  font-size: 0.6875rem;
+  margin: 0 0 0.875rem;
+  padding: 0.5rem 0.625rem;
+  border: 1.5px dashed var(--olive-border, #b89868);
+  border-radius: 0.3125rem;
+  background: rgba(200, 168, 122, 0.08);
+  font-family: var(--serif, Georgia, serif);
+  font-size: 0.8125rem;
   font-style: italic;
-  opacity: 0.75;
+  color: var(--olive-text-muted, #8a6848);
+  line-height: 1.6;
 }
 
 .card-back__wiki-loading,
 .card-back__wiki-empty {
   margin: 0;
-  opacity: 0.45;
+  padding: 0.625rem 0.75rem 0.75rem;
   font-style: italic;
+  color: var(--olive-text-muted, #8a6848);
 }
 
+/* ── Debug panel — dashed border, archive stamp feel ── */
 .card-back__debug {
-  margin-bottom: 0.75rem;
-  padding: 0.375rem 0.5rem;
-  border: 1px dashed currentColor;
-  border-radius: 0.25rem;
-  opacity: 0.75;
+  margin-bottom: 0.875rem;
+  padding: 0.4375rem 0.625rem;
+  border: 1.5px dashed var(--olive-border, #b89868);
+  border-radius: 0.3125rem;
+  background: rgba(200, 168, 122, 0.06);
   font-size: 0.625rem;
+  font-family: var(--mono, ui-monospace, monospace);
 }
 
 .card-back__debug summary {
   cursor: pointer;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--olive-text-muted, #8a6848);
 }
 
 .card-back__debug-grid {
@@ -102,16 +125,23 @@
 }
 
 .card-back__debug-grid dt {
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--olive-text-mid, #6b5040);
 }
 
 .card-back__debug-grid dd {
   margin: 0;
   word-break: break-all;
+  color: var(--olive-text, #2c1810);
 }
 
 .card-back__debug-error {
-  color: #b04040;
+  color: var(--olive-terracotta, #a84830);
+}
+
+/* ── Notes area ── */
+.card-back__notes {
+  margin-bottom: 0.875rem;
 }
 
 .card-back__notes-text {
@@ -121,8 +151,8 @@
 }
 
 .card-back__notes-empty {
-  opacity: 0.45;
   font-style: italic;
+  color: var(--olive-text-muted, #8a6848);
 }
 
 .card-back__notes-input {
@@ -133,32 +163,41 @@
   box-sizing: border-box;
   font: inherit;
   font-size: 0.8125rem;
-  line-height: 1.6;
+  line-height: 1.75;
   color: inherit;
   background: transparent;
   border: none;
+  border-bottom: 1px solid var(--olive-surface, #dfd0b4);
   outline: none;
   resize: none;
   overflow: hidden;
   cursor: text;
   min-height: 2.5rem;
+  padding: 0 0 0.375rem;
 }
 
+.card-back__notes-input::placeholder {
+  color: var(--olive-border, #b89868);
+  font-style: italic;
+}
+
+/* ── Metadata footer ── */
 .card-back__meta {
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 0.125rem 0.625rem;
   margin: 0;
-  opacity: 0.55;
+  padding-top: 0.625rem;
+  border-top: 1.5px solid var(--olive-surface, #dfd0b4);
   font-size: 0.6875rem;
   line-height: 1.5;
-  border-top: 1px solid currentColor;
-  padding-top: 0.5rem;
+  color: var(--olive-text-muted, #8a6848);
 }
 
 .card-back__meta dt {
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .card-back__meta dd {
@@ -166,27 +205,39 @@
 }
 
 .card-back__meta-id {
-  font-family: monospace;
+  font-family: var(--mono, ui-monospace, monospace);
   font-size: 0.625rem;
   word-break: break-all;
 }
 
+/* ── Flip button — matches portal locate / header controls ── */
 .card-back__flip {
   position: absolute;
-  bottom: 0.3125rem;
-  right: 0.4375rem;
-  background: none;
-  border: none;
+  bottom: 0.4375rem;
+  right: 0.5625rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 50%;
+  border: 1.5px solid rgba(44, 24, 16, 0.35);
+  background: rgba(255, 255, 255, 0.45);
+  color: var(--olive-text-muted, #8a6848);
   cursor: pointer;
-  font-size: 0.875rem;
-  color: inherit;
-  opacity: 0.55;
-  padding: 0.125rem;
+  opacity: 0.65;
+  padding: 0;
+  font-size: 0.75rem;
   line-height: 1;
+  transition: opacity 0.15s, border-color 0.15s, background 0.15s, transform 0.1s;
 }
 
 .card-back__flip:hover {
   opacity: 1;
+  border-color: var(--olive-border-dark, #2c1810);
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--olive-text, #2c1810);
+  transform: scale(1.08);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -194,7 +245,73 @@
     color: #9e8e80;
   }
 
+  .card-back__wiki {
+    background: #231910;
+    border-color: #6a4e35;
+  }
+
+  .card-back__wiki-heading {
+    background: #5a3a18;
+    border-bottom-color: #4a2e10;
+    color: #e8d0a0;
+  }
+
+  .card-back__wiki-title {
+    color: #e8d0a0;
+  }
+
   .card-back__wiki-tag {
-    background: rgba(200, 168, 122, 0.15);
+    color: var(--olive-terracotta, #c8603a);
+    background: rgba(200, 96, 58, 0.12);
+    border-color: rgba(200, 96, 58, 0.3);
+  }
+
+  .card-back__wiki-summary {
+    color: #b89870;
+  }
+
+  .card-back__wiki-links {
+    color: #5a9898;
+    border-top-color: #3a2c1c;
+  }
+
+  .card-back__wiki-hint {
+    border-color: #4a3828;
+    background: rgba(200, 168, 122, 0.06);
+    color: #8a6848;
+  }
+
+  .card-back__debug {
+    border-color: #4a3828;
+    background: rgba(0, 0, 0, 0.15);
+  }
+
+  .card-back__debug-grid dt {
+    color: #8a6848;
+  }
+
+  .card-back__debug-grid dd {
+    color: #c8a87a;
+  }
+
+  .card-back__notes-input {
+    border-bottom-color: #3a2c1c;
+  }
+
+  .card-back__meta {
+    border-top-color: #3a2c1c;
+    color: #8a6848;
+  }
+
+  .card-back__flip {
+    background: rgba(28, 21, 16, 0.7);
+    border-color: rgba(232, 208, 160, 0.25);
+    color: #8a6848;
+  }
+
+  .card-back__flip:hover {
+    background: rgba(40, 30, 20, 0.9);
+    border-color: rgba(232, 208, 160, 0.6);
+    color: #e8d0a0;
   }
 }

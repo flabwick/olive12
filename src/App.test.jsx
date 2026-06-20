@@ -32,8 +32,10 @@ vi.mock('./sync/cardSync', () => ({
   syncDirtyCardsForUser: vi.fn(),
 }))
 
+const deleteRemoteMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
+
 vi.mock('./sync/cardSupabaseStorage', () => ({
-  makeCardSupabaseStorage: vi.fn(() => ({})),
+  makeCardSupabaseStorage: vi.fn(() => ({ deleteRemoteCard: deleteRemoteMock })),
 }))
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -64,6 +66,7 @@ describe('App', () => {
     syncMocks.scheduleSync.mockClear()
     syncMocks.runNow.mockClear()
     syncMocks.createCardSyncScheduler.mockClear()
+    deleteRemoteMock.mockClear()
     invokeMock.mockClear()
     mockLoggedIn()
   })
@@ -311,6 +314,118 @@ describe('App', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Sign up' }))
       await waitFor(() => screen.getByRole('alert'))
       expect(screen.getByRole('alert')).toHaveTextContent('Check your email')
+    })
+  })
+
+  // ── Vault / portal lifecycle (save, refresh, close) ─────────────────────
+  describe('vault card lifecycle', () => {
+    it('save to shelf converts the tab card to a portal with no tick icon', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('card-1')
+        .mockReturnValueOnce('portal-1')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Add card' }))
+      await userEvent.type(screen.getByLabelText('Title'), 'Vault note')
+      await userEvent.click(screen.getByRole('button', { name: /add →/i }))
+
+      await waitFor(() => screen.getByRole('button', { name: 'Save to Shelf' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
+
+      await waitFor(() => screen.getByRole('heading', { name: 'Vault note' }))
+      expect(document.querySelector('.portal-card')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save to Shelf' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Saved to Shelf — click to move to Library' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'In Library' })).not.toBeInTheDocument()
+    })
+
+    it('after refresh, saved card appears once as a portal with no tick icon', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('card-1')
+        .mockReturnValueOnce('portal-1')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { unmount } = render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Add card' }))
+      await userEvent.type(screen.getByLabelText('Title'), 'Persist me')
+      await userEvent.click(screen.getByRole('button', { name: /add →/i }))
+      await waitFor(() => screen.getByRole('button', { name: 'Save to Shelf' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
+      await waitFor(() => screen.getByRole('heading', { name: 'Persist me' }))
+
+      unmount()
+      render(<App />)
+      await waitFor(() => screen.getByRole('heading', { name: 'Persist me' }))
+
+      expect(screen.getAllByRole('heading', { name: 'Persist me' })).toHaveLength(1)
+      expect(document.querySelector('.portal-card')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save to Shelf' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Saved to Shelf — click to move to Library' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'In Library' })).not.toBeInTheDocument()
+    })
+
+    it('closing a portal removes it from the tab but keeps the card on the shelf', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('card-1')
+        .mockReturnValueOnce('portal-1')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Add card' }))
+      await userEvent.type(screen.getByLabelText('Title'), 'Keep on shelf')
+      await userEvent.click(screen.getByRole('button', { name: /add →/i }))
+      await waitFor(() => screen.getByRole('button', { name: 'Save to Shelf' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
+      await waitFor(() => screen.getByRole('heading', { name: 'Keep on shelf' }))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
+      await waitFor(() => screen.getByText('No cards yet.'))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Folders' }))
+      await waitFor(() => screen.getByRole('dialog', { name: 'Vault and Brain' }))
+      expect(screen.getByText('Keep on shelf')).toBeInTheDocument()
+    })
+  })
+
+  describe('saved tab lifecycle', () => {
+    it('closing a saved tab from the switcher keeps it on the shelf and allows reopening with cards', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('card-1')
+        .mockReturnValueOnce('tab-fallback')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Add card' }))
+      await userEvent.type(screen.getByLabelText('Title'), 'Inside tab')
+      await userEvent.click(screen.getByRole('button', { name: /add →/i }))
+      await waitFor(() => screen.getByRole('heading', { name: 'Inside tab' }))
+
+      await userEvent.click(screen.getByRole('heading', { level: 2 }))
+      await userEvent.clear(screen.getByRole('textbox'))
+      await userEvent.type(screen.getByRole('textbox'), 'Saved workspace')
+      await userEvent.keyboard('{Enter}')
+      await userEvent.click(screen.getByRole('button', { name: 'Save tab to Shelf' }))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Close Saved workspace' }))
+      fireEvent.keyDown(document, { key: 'Escape' })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Folders' }))
+      await waitFor(() => screen.getByRole('dialog', { name: 'Vault and Brain' }))
+      expect(screen.getByText('Saved workspace')).toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Switch to tab' }))
+      await waitFor(() => screen.getByRole('heading', { name: 'Inside tab' }))
+      expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Saved workspace')
     })
   })
 })

@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  closeSavedTab,
   createTab,
   createTabCard,
+  isTabOpen,
   moveTabToLibrary,
   nextPosition,
   removeTab,
   removeTabCard,
+  reopenTab,
   reorderTabCard,
   reorderTabs,
   saveTabToShelf,
@@ -33,6 +36,7 @@ describe('createTab', () => {
       order: 0,
       savedLocation: 'none',
       savedFolderId: null,
+      isOpen: true,
       createdAt: 1_700_000_000_000,
       updatedAt: 1_700_000_000_000,
     })
@@ -46,6 +50,7 @@ describe('createTab', () => {
       order: 2,
       savedLocation: 'none',
       savedFolderId: null,
+      isOpen: true,
       createdAt: 1_700_000_000_000,
       updatedAt: 1_700_000_000_000,
     })
@@ -334,5 +339,30 @@ describe('moveTabToLibrary', () => {
     const tab = { id: 't', savedLocation: 'shelf', savedFolderId: 'old', updatedAt: 1_000 }
     const result = moveTabToLibrary(tab)
     expect(result.savedFolderId).toBeNull()
+  })
+})
+
+describe('isTabOpen', () => {
+  it('treats missing isOpen as open', () => {
+    expect(isTabOpen({ id: 't' })).toBe(true)
+  })
+
+  it('returns false when isOpen is false', () => {
+    expect(isTabOpen({ id: 't', isOpen: false })).toBe(false)
+  })
+})
+
+describe('closeSavedTab and reopenTab', () => {
+  beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(1_700_000_005_000) })
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it('closeSavedTab sets isOpen to false', () => {
+    const tab = { id: 't', isOpen: true, updatedAt: 1_000 }
+    expect(closeSavedTab(tab)).toMatchObject({ isOpen: false, updatedAt: 1_700_000_005_000 })
+  })
+
+  it('reopenTab sets isOpen to true', () => {
+    const tab = { id: 't', isOpen: false, updatedAt: 1_000 }
+    expect(reopenTab(tab)).toMatchObject({ isOpen: true, updatedAt: 1_700_000_005_000 })
   })
 })

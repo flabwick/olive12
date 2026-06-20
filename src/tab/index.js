@@ -1,4 +1,4 @@
-export { createTab, createTabCard, moveTabToLibrary, nextPosition, removeTab, reorderTabCard, reorderTabs, saveTabToShelf, setTabCardFold, setTabCardHidden, setTabName, updateTabFields } from './createTab'
+export { createTab, createTabCard, closeSavedTab, isTabOpen, moveTabToLibrary, nextPosition, removeTab, reopenTab, reorderTabCard, reorderTabs, saveTabToShelf, setTabCardFold, setTabCardHidden, setTabName, updateTabFields } from './createTab'
 export { deleteAllTabCards, deleteTab, getAllTabCards, getAllTabs, putTab, putTabCard } from './tabStorage'
 export { Dock } from './Dock'
 export { Tab } from './Tab'

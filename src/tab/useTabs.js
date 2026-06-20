@@ -15,12 +15,15 @@ import { getAllIndexEntries, getIndexEntry as getStoredIndexEntry, putIndexEntry
 import { INDEX_STAGES, logIndexEvent } from '../debug/indexPipelineDebug'
 import { detectStaleEntries } from '../brain/brainFeedLogic'
 import {
+  closeSavedTab,
   createTab,
   createTabCard,
+  isTabOpen,
   moveTabToLibrary as moveTabToLibraryPure,
   nextPosition,
   removeTab as removeTabPure,
   removeTabCard,
+  reopenTab,
   reorderTabCard,
   saveTabToShelf as saveTabToShelfPure,
   setTabCardFold,
@@ -36,8 +39,58 @@ import {
   putTab,
   putTabCard,
 } from './tabStorage'
+import { isOrphanTabCandidate } from './tabVaultLogic'
 
 const ACTIVE_TAB_KEY = 'olive12:activeTabId'
+
+function getOpenTabs(tabList) {
+  return tabList.filter(isTabOpen)
+}
+
+function pickActiveTabId(tabList, preferredId) {
+  const open = getOpenTabs(tabList)
+  if (preferredId && open.some((t) => t.id === preferredId)) return preferredId
+  return open[0]?.id ?? null
+}
+
+function planPortalReplacement(cardId, tabCards) {
+  const matchingTabCards = tabCards.filter((tc) => tc.cardId === cardId)
+  const portalCards = matchingTabCards.map(() =>
+    createCard({ type: 'portal', config: { target_card_id: cardId } }),
+  )
+  const portalTabCards = matchingTabCards.map((tc, i) =>
+    createTabCard({ tabId: tc.tabId, cardId: portalCards[i].id, position: tc.position }),
+  )
+  return { matchingTabCards, portalCards, portalTabCards }
+}
+
+async function applyPortalReplacement({
+  cardId,
+  updatedCard,
+  matchingTabCards,
+  portalCards,
+  portalTabCards,
+  cardsById,
+  setCardsById,
+  setTabCards,
+}) {
+  const newCardsById = { ...cardsById, [cardId]: updatedCard }
+  for (const pc of portalCards) newCardsById[pc.id] = pc
+
+  setCardsById(newCardsById)
+  setTabCards((prev) => [
+    ...prev.filter((tc) => tc.cardId !== cardId),
+    ...portalTabCards,
+  ])
+
+  await putCard(updatedCard)
+  await Promise.all([
+    ...portalCards.map((pc) => putCard(pc)),
+    ...portalTabCards.map((tc) => putTabCard(tc)),
+    ...matchingTabCards.map((tc) => deleteTabCard(tc.tabId, cardId)),
+  ])
+  await Promise.all(portalCards.map((pc) => rebuildLinksForCard(pc)))
+}
 
 function resolveIndexTargetId(card) {
   if (!card) return null
@@ -111,11 +164,12 @@ export function useTabs({ userId } = {}) {
 
       const freshById = Object.fromEntries(freshCards.map((c) => [c.id, c]))
       const sortedTabs = [...allTabs].sort((a, b) => a.order - b.order)
-      const activeTab = sortedTabs[0]
+      const activeTab = getOpenTabs(sortedTabs)[0] ?? sortedTabs[0]
 
       if (activeTab) {
-        const knownIds = new Set(allTabCards.map((tc) => tc.cardId))
-        const orphans = freshCards.filter((c) => !knownIds.has(c.id))
+        const orphans = freshCards.filter((c) =>
+          isOrphanTabCandidate(c, allTabCards, freshById),
+        )
 
         if (orphans.length > 0) {
           const maxPos = allTabCards.reduce((m, tc) => Math.max(m, tc.position), -1)
@@ -165,6 +219,7 @@ export function useTabs({ userId } = {}) {
               order: allTabs.length + newTabs.length,
               savedLocation: remote.saved_location,
               savedFolderId: remote.saved_folder_id ?? null,
+              isOpen: false,
               createdAt: new Date(remote.created_at).getTime(),
               updatedAt: new Date(remote.updated_at).getTime(),
             }
@@ -234,11 +289,19 @@ export function useTabs({ userId } = {}) {
         setCardsById({})
       } else {
         const savedId = localStorage.getItem(ACTIVE_TAB_KEY)
-        const restoredId = savedId && sortedTabs.find((t) => t.id === savedId)
-          ? savedId
-          : sortedTabs[0].id
-        setTabs(sortedTabs)
-        setActiveTabId(restoredId)
+        let openTabs = getOpenTabs(sortedTabs)
+
+        if (openTabs.length === 0) {
+          const defaultTab = createTab({ order: sortedTabs.length })
+          await putTab(defaultTab)
+          if (!active) return
+          setTabs([...sortedTabs, defaultTab])
+          setActiveTabId(defaultTab.id)
+        } else {
+          setTabs(sortedTabs)
+          setActiveTabId(pickActiveTabId(sortedTabs, savedId))
+        }
+
         setTabCards(tcs)
         setCardsById(Object.fromEntries(cards.map((c) => [c.id, c])))
       }
@@ -257,34 +320,68 @@ export function useTabs({ userId } = {}) {
     if (activeTabId) localStorage.setItem(ACTIVE_TAB_KEY, activeTabId)
   }, [activeTabId])
 
-  const switchTab = useCallback((tabId) => {
+  const switchTab = useCallback(async (tabId) => {
+    const tab = tabs.find((t) => t.id === tabId)
+    if (tab && !isTabOpen(tab)) {
+      const updated = reopenTab(tab)
+      await putTab(updated)
+      setTabs((prev) => prev.map((t) => (t.id === tabId ? updated : t)))
+    }
     setActiveTabId(tabId)
-  }, [])
+  }, [tabs])
 
   const addTab = useCallback(async () => {
     const newTab = createTab({ order: tabs.length })
     await putTab(newTab)
     setTabs((prev) => [...prev, newTab])
     setActiveTabId(newTab.id)
-  }, [tabs])
+  }, [tabs.length])
 
   const removeTab = useCallback(async (tabId) => {
+    const tab = tabs.find((t) => t.id === tabId)
+    if (!tab) return
+
+    if (tab.savedLocation === 'shelf' || tab.savedLocation === 'library') {
+      const openBefore = getOpenTabs(tabs)
+      const closedIndex = openBefore.findIndex((t) => t.id === tabId)
+      const updated = closeSavedTab(tab)
+      await putTab(updated)
+      const nextTabs = tabs.map((t) => (t.id === tabId ? updated : t))
+      setTabs(nextTabs)
+
+      if (activeTabId === tabId) {
+        const remainingOpen = openBefore.filter((t) => t.id !== tabId)
+        if (remainingOpen.length === 0) {
+          const defaultTab = createTab({ order: nextTabs.length })
+          await putTab(defaultTab)
+          setTabs([...nextTabs, defaultTab])
+          setActiveTabId(defaultTab.id)
+        } else {
+          const adjacent = remainingOpen[closedIndex] ?? remainingOpen[closedIndex - 1] ?? remainingOpen[0]
+          setActiveTabId(adjacent.id)
+        }
+      }
+      return
+    }
+
     await deleteAllTabCards(tabId)
     await deleteTabStorage(tabId)
 
     const nextTabs = removeTabPure(tabs, tabId)
+    const remainingOpen = getOpenTabs(nextTabs)
 
-    if (nextTabs.length === 0) {
-      const defaultTab = createTab({ order: 0 })
+    if (remainingOpen.length === 0) {
+      const defaultTab = createTab({ order: nextTabs.length })
       await putTab(defaultTab)
-      setTabs([defaultTab])
+      setTabs([...nextTabs, defaultTab])
       setActiveTabId(defaultTab.id)
     } else {
       let nextActiveId = activeTabId
       if (activeTabId === tabId) {
-        const removedIndex = tabs.findIndex((t) => t.id === tabId)
-        const adjacent = nextTabs[removedIndex] ?? nextTabs[removedIndex - 1] ?? nextTabs[0]
-        nextActiveId = adjacent.id
+        const openBefore = getOpenTabs(tabs)
+        const removedIndex = openBefore.findIndex((t) => t.id === tabId)
+        const openAfter = openBefore.filter((t) => t.id !== tabId)
+        nextActiveId = (openAfter[removedIndex] ?? openAfter[removedIndex - 1] ?? openAfter[0]).id
       }
       setTabs(nextTabs)
       setActiveTabId(nextActiveId)
@@ -345,7 +442,8 @@ export function useTabs({ userId } = {}) {
     }
   }, [tabs, tabCards, userId])
 
-  const activeTab = tabs.find((t) => t.id === activeTabId) ?? null
+  const openTabs = useMemo(() => getOpenTabs(tabs), [tabs])
+  const activeTab = openTabs.find((t) => t.id === activeTabId) ?? openTabs[0] ?? null
 
   const addCard = useCallback(
     async ({ title = '', body = '' } = {}) => {
@@ -402,8 +500,40 @@ export function useTabs({ userId } = {}) {
 
   const removeCard = useCallback(
     async (cardId) => {
+      const card = cardsById[cardId]
+      if (!card) return
+
       const tc = tabCards.find((t) => t.cardId === cardId)
       const nextTabCards = removeTabCard(tabCards, cardId)
+
+      // Portal: remove tab reference and delete the portal shell only.
+      if (card.type === 'portal') {
+        const { [cardId]: _, ...rest } = cardsById
+        setTabCards(nextTabCards)
+        setCardsById(rest)
+        await Promise.all([
+          deleteCard(cardId),
+          deleteLinksForSource(cardId),
+          ...(tc ? [deleteTabCard(tc.tabId, cardId)] : []),
+          ...nextTabCards.map((t) => putTabCard(t)),
+          ...(storageRef.current?.deleteRemoteCard
+            ? [storageRef.current.deleteRemoteCard(cardId)]
+            : []),
+        ])
+        return
+      }
+
+      // Vault card on tab: detach from tab only — shelf/library copy stays.
+      if (card.location === 'shelf' || card.location === 'library') {
+        setTabCards(nextTabCards)
+        await Promise.all([
+          ...(tc ? [deleteTabCard(tc.tabId, cardId)] : []),
+          ...nextTabCards.map((t) => putTabCard(t)),
+        ])
+        return
+      }
+
+      // Unsaved draft: remove from tab and delete entirely.
       const { [cardId]: _, ...rest } = cardsById
       setTabCards(nextTabCards)
       setCardsById(rest)
@@ -412,7 +542,9 @@ export function useTabs({ userId } = {}) {
         deleteLinksForSource(cardId),
         ...(tc ? [deleteTabCard(tc.tabId, cardId)] : []),
         ...nextTabCards.map((t) => putTabCard(t)),
-        ...(storageRef.current ? [storageRef.current.deleteRemoteCard(cardId)] : []),
+        ...(storageRef.current?.deleteRemoteCard
+          ? [storageRef.current.deleteRemoteCard(cardId)]
+          : []),
       ])
     },
     [tabCards, cardsById],
@@ -470,33 +602,20 @@ export function useTabs({ userId } = {}) {
   const saveToShelf = useCallback(
     async (cardId) => {
       const card = cardsById[cardId]
-      if (!card) return
+      if (!card || card.type === 'portal') return
       const updated = updateCardFields(card, { location: 'shelf' })
+      const { matchingTabCards, portalCards, portalTabCards } = planPortalReplacement(cardId, tabCards)
 
-      const matchingTabCards = tabCards.filter((tc) => tc.cardId === cardId)
-      const portalCards = matchingTabCards.map(() =>
-        createCard({ type: 'portal', config: { target_card_id: cardId } }),
-      )
-      const portalTabCards = matchingTabCards.map((tc, i) =>
-        createTabCard({ tabId: tc.tabId, cardId: portalCards[i].id, position: tc.position }),
-      )
-
-      const newCardsById = { ...cardsById, [cardId]: updated }
-      for (const pc of portalCards) newCardsById[pc.id] = pc
-
-      setCardsById(newCardsById)
-      setTabCards((prev) => [
-        ...prev.filter((tc) => tc.cardId !== cardId),
-        ...portalTabCards,
-      ])
-
-      await putCard(updated)
-      await Promise.all([
-        ...portalCards.map((pc) => putCard(pc)),
-        ...portalTabCards.map((tc) => putTabCard(tc)),
-        ...matchingTabCards.map((tc) => deleteTabCard(tc.tabId, cardId)),
-      ])
-      await Promise.all(portalCards.map((pc) => rebuildLinksForCard(pc)))
+      await applyPortalReplacement({
+        cardId,
+        updatedCard: updated,
+        matchingTabCards,
+        portalCards,
+        portalTabCards,
+        cardsById,
+        setCardsById,
+        setTabCards,
+      })
       schedulerRef.current?.scheduleSync()
     },
     [cardsById, tabCards],
@@ -515,8 +634,23 @@ export function useTabs({ userId } = {}) {
       })
 
       const updated = updateCardFields(card, { location: 'library', folderId })
-      setCardsById((prev) => ({ ...prev, [cardId]: updated }))
-      await putCard(updated)
+      const { matchingTabCards, portalCards, portalTabCards } = planPortalReplacement(cardId, tabCards)
+
+      if (matchingTabCards.length > 0) {
+        await applyPortalReplacement({
+          cardId,
+          updatedCard: updated,
+          matchingTabCards,
+          portalCards,
+          portalTabCards,
+          cardsById,
+          setCardsById,
+          setTabCards,
+        })
+      } else {
+        setCardsById((prev) => ({ ...prev, [cardId]: updated }))
+        await putCard(updated)
+      }
       schedulerRef.current?.scheduleSync()
 
       setIndexingCardIds((prev) => new Set([...prev, cardId]))
@@ -576,7 +710,7 @@ export function useTabs({ userId } = {}) {
         })
       }
     },
-    [cardsById, userId],
+    [cardsById, tabCards, userId],
   )
 
   const createFolder = useCallback(async ({ name = 'New folder', parentId = null } = {}) => {
@@ -803,6 +937,9 @@ export function useTabs({ userId } = {}) {
         const body = data?.body ?? ''
         console.log('[useTabs] title to addCard:', JSON.stringify(title))
         console.log('[useTabs] body to addCard:', JSON.stringify(body))
+        if (data?.truncated) {
+          console.warn('[useTabs] dock-prompt response was truncated after continuations')
+        }
         const card = await addCard({ title, body })
         console.log('[useTabs] addCard result:', JSON.stringify(card))
         setPromptLoading(false)
@@ -820,6 +957,7 @@ export function useTabs({ userId } = {}) {
   return {
     tab: activeTab,
     tabs,
+    openTabs,
     activeTabId,
     isReady,
     entries,

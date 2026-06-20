@@ -1,8 +1,9 @@
 // Model config — change the model here and redeploy; no other location controls this.
 const MODEL_CONFIG = {
-  model: 'meta-llama/llama-3.2-3b-instruct',
+  model: 'meta-llama/llama-3.1-8b-instruct',
   temperature: 0.7,
-  maxTokens: 2000,
+  maxTokens: 4096,
+  maxContinuations: 6,
 }
 
 const CORS_HEADERS = {
@@ -29,7 +30,7 @@ function buildMessages(
     {
       role: 'system',
       content:
-        'You are an AI assistant embedded in a note-taking app. Write a short title on the first line (max 80 characters). Leave one blank line. Then write your full response as plain text. No JSON, no markdown, no labels — just the title, a blank line, then the content.',
+        'You are an AI assistant embedded in a note-taking app. Write a short title on the first line (max 80 characters). Leave one blank line. Then write your complete response as plain text — write the full answer, do not stop mid-sentence, and include all relevant detail. No JSON, no markdown, no labels — just the title, a blank line, then the content.',
     },
     {
       role: 'user',
@@ -38,15 +39,96 @@ function buildMessages(
   ]
 }
 
+// Mirrors src/prompt/parseDockPromptContent.js — keep both in sync if parsing changes.
+const MAX_TITLE_LENGTH = 80
+
 function parseContent(content: string): { title: string; body: string } {
-  const trimmed = content.trim()
-  const firstNewline = trimmed.indexOf('\n')
-  if (firstNewline < 0) {
-    return { title: trimmed || 'Response', body: trimmed }
+  const trimmed = (content ?? '').trim()
+  if (!trimmed) {
+    return { title: 'Response', body: '' }
   }
-  const title = trimmed.slice(0, firstNewline).trim() || 'Response'
-  const body = trimmed.slice(firstNewline + 1).trim()
-  return { title, body: body || trimmed }
+
+  const lines = trimmed.split('\n')
+  const firstLine = lines[0].trim()
+
+  let bodyStart = 1
+  while (bodyStart < lines.length && lines[bodyStart].trim() === '') {
+    bodyStart++
+  }
+
+  const body = lines.slice(bodyStart).join('\n').trim()
+
+  if (!body) {
+    if (firstLine.length <= MAX_TITLE_LENGTH) {
+      return { title: firstLine || 'Response', body: '' }
+    }
+    return { title: 'Response', body: trimmed }
+  }
+
+  if (firstLine.length > MAX_TITLE_LENGTH) {
+    return { title: 'Response', body: trimmed }
+  }
+
+  return {
+    title: firstLine || 'Response',
+    body,
+  }
+}
+
+async function completeChat(
+  apiKey: string,
+  messages: Array<{ role: string; content: string }>,
+): Promise<{ content: string; finishReason: string; continuationCount: number }> {
+  let fullContent = ''
+  let finishReason = 'stop'
+  let currentMessages = [...messages]
+  let continuationCount = 0
+
+  for (let attempt = 0; attempt <= MODEL_CONFIG.maxContinuations; attempt++) {
+    const openRouterRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: MODEL_CONFIG.model,
+        temperature: MODEL_CONFIG.temperature,
+        max_tokens: MODEL_CONFIG.maxTokens,
+        messages: currentMessages,
+      }),
+    })
+
+    console.log('[dock-prompt] OpenRouter status:', openRouterRes.status, 'attempt:', attempt)
+
+    if (!openRouterRes.ok) {
+      const detail = await openRouterRes.text()
+      console.log('[dock-prompt] OpenRouter error detail:', detail)
+      throw new Error(`OpenRouter responded with ${openRouterRes.status}: ${detail}`)
+    }
+
+    const completion = await openRouterRes.json()
+    const chunk: string = completion.choices?.[0]?.message?.content ?? ''
+    finishReason = completion.choices?.[0]?.finish_reason ?? 'stop'
+    fullContent += chunk
+
+    console.log('[dock-prompt] finish_reason:', finishReason, 'chunkLen:', chunk.length)
+
+    if (finishReason !== 'length') break
+
+    continuationCount += 1
+    currentMessages = [
+      ...currentMessages,
+      { role: 'assistant', content: chunk },
+      {
+        role: 'user',
+        content:
+          'Continue exactly where you left off. Do not repeat any text already written. Keep the same plain-text format.',
+      },
+    ]
+  }
+
+  return { content: fullContent, finishReason, continuationCount }
 }
 
 Deno.serve(async (req: Request) => {
@@ -79,48 +161,21 @@ Deno.serve(async (req: Request) => {
     const messages = buildMessages(prompt, contextCards ?? [])
     console.log('[dock-prompt] sending to OpenRouter, model:', MODEL_CONFIG.model)
 
-    const openRouterRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL_CONFIG.model,
-        temperature: MODEL_CONFIG.temperature,
-        max_tokens: MODEL_CONFIG.maxTokens,
-        messages,
-      }),
-    })
-
-    console.log('[dock-prompt] OpenRouter status:', openRouterRes.status)
-
-    if (!openRouterRes.ok) {
-      const detail = await openRouterRes.text()
-      console.log('[dock-prompt] OpenRouter error detail:', detail)
-      return new Response(
-        JSON.stringify({ error: `OpenRouter responded with ${openRouterRes.status}`, detail }),
-        {
-          status: 502,
-          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-        },
-      )
-    }
-
-    const completion = await openRouterRes.json()
-    const finishReason = completion.choices?.[0]?.finish_reason
-    const content: string = completion.choices?.[0]?.message?.content ?? ''
-    console.log('[dock-prompt] finish_reason:', finishReason)
+    const { content, finishReason, continuationCount } = await completeChat(apiKey, messages)
+    console.log('[dock-prompt] total content length:', content.length)
     console.log('[dock-prompt] raw content:', JSON.stringify(content))
 
     const { title, body: cardBody } = parseContent(content)
     console.log('[dock-prompt] parsed title:', JSON.stringify(title))
-    console.log('[dock-prompt] parsed body:', JSON.stringify(cardBody))
+    console.log('[dock-prompt] parsed body length:', cardBody.length)
+
+    const truncated = finishReason === 'length'
 
     const responsePayload = {
       title,
       body: cardBody,
-      _debug: { finishReason, rawContent: content },
+      truncated,
+      _debug: { finishReason, continuationCount, rawContent: content },
     }
 
     return new Response(

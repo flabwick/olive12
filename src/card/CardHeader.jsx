@@ -151,10 +151,7 @@ export function CardHeader({
   onClose,
 }) {
   const hasRightControls = onFlip || onMoveUp || onMoveDown || onToggleHide || onClose
-  const hasLocationButton =
-    (location === 'none' && onSaveToShelf) ||
-    (location === 'shelf' && onMoveToLibrary) ||
-    location === 'library'
+  const hasLocationButton = location === 'none' && onSaveToShelf
 
   return (
     <div className="card-header">

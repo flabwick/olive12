@@ -2,24 +2,24 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 0.75rem 0.875rem;
+  padding: 0.875rem;
   margin: 0 1.5rem 0;
   max-width: 680px;
-  background: var(--olive-parchment, #f5ede0);
+  background: var(--olive-surface, #dfd0b4);
   border: 2px solid var(--olive-border-dark, #2c1810);
   border-bottom: none;
   border-radius: 0.625rem 0.625rem 0 0;
   box-shadow:
-    0 0 0 1px var(--olive-amber, #c8a87a),
-    0 -4px 20px rgba(44, 24, 16, 0.1);
+    4px 4px 0 #b09070,
+    0 -4px 20px rgba(44, 24, 16, 0.12);
 }
 
 @media (prefers-color-scheme: dark) {
   .dock-prompt {
-    background: #1e1810;
+    background: #1b1510;
     border-color: #8a6235;
     box-shadow:
-      0 0 0 1px #6a4830,
+      4px 4px 0 #3a2c1c,
       0 -4px 20px rgba(0, 0, 0, 0.3);
   }
 }
@@ -27,21 +27,22 @@
 .dock-prompt__input {
   width: 100%;
   resize: none;
-  border: 1.5px solid var(--olive-border, #c8b89a);
-  border-radius: 0.25rem;
-  background: transparent;
+  border: 2px solid var(--olive-border, #b89868);
+  border-radius: 0.375rem;
+  background: var(--olive-cream, #fef8ee);
   color: var(--olive-text, #2c1810);
   font-family: inherit;
   font-size: 0.9rem;
-  line-height: 1.5;
-  padding: 0.375rem 0.5rem;
+  line-height: 1.6;
+  padding: 0.5rem 0.625rem;
   outline: none;
   box-sizing: border-box;
-  transition: border-color 0.1s;
+  transition: border-color 0.12s, box-shadow 0.12s;
 }
 
 .dock-prompt__input:focus {
   border-color: var(--olive-border-dark, #2c1810);
+  box-shadow: 0 0 0 2px rgba(44, 24, 16, 0.1);
 }
 
 .dock-prompt__input:disabled {
@@ -50,24 +51,28 @@
 
 @media (prefers-color-scheme: dark) {
   .dock-prompt__input {
+    background: #1c1510;
     border-color: #6a4e35;
     color: #d4b898;
   }
 
   .dock-prompt__input:focus {
-    border-color: #9a6a45;
+    border-color: #c8a87a;
+    box-shadow: 0 0 0 2px rgba(200, 168, 122, 0.1);
   }
 }
 
 .dock-prompt__error {
   margin: 0;
-  font-size: 0.8rem;
-  color: #b03020;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--olive-terracotta, #a84830);
 }
 
 @media (prefers-color-scheme: dark) {
   .dock-prompt__error {
-    color: #e07060;
+    color: var(--olive-terracotta, #c8603a);
   }
 }
 
@@ -79,22 +84,41 @@
 
 .dock-prompt__cancel,
 .dock-prompt__submit {
-  height: 1.75rem;
-  padding: 0 0.625rem;
-  border: 1.5px solid var(--olive-border, #c8b89a);
+  height: 1.875rem;
+  padding: 0 0.75rem;
+  border: 1.5px solid var(--olive-border, #b89868);
   border-radius: 0.25rem;
-  background: transparent;
+  background: var(--olive-parchment, #ede0ca);
   color: var(--olive-text-mid, #6b5040);
-  font-size: 0.8rem;
+  font-family: inherit;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   cursor: pointer;
   transition: background 0.1s, color 0.1s, border-color 0.1s;
 }
 
 .dock-prompt__cancel:hover:not(:disabled),
 .dock-prompt__submit:hover:not(:disabled) {
-  background: var(--olive-surface, #ede3d4);
+  background: var(--olive-surface, #dfd0b4);
   border-color: var(--olive-border-dark, #2c1810);
   color: var(--olive-text, #2c1810);
+}
+
+.dock-prompt__submit {
+  background: var(--olive-terracotta, #a84830);
+  border-color: #8a3018;
+  color: #fef8ee;
+  box-shadow: 2px 2px 0 #6a2010;
+}
+
+.dock-prompt__submit:hover:not(:disabled) {
+  background: #8a3018;
+  border-color: #6a2010;
+  color: #fef8ee;
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 #6a2010;
 }
 
 .dock-prompt__cancel:disabled,
@@ -104,16 +128,27 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .dock-prompt__cancel,
-  .dock-prompt__submit {
+  .dock-prompt__cancel {
+    background: #231910;
     border-color: #6a4e35;
     color: #a07858;
   }
 
-  .dock-prompt__cancel:hover:not(:disabled),
+  .dock-prompt__cancel:hover:not(:disabled) {
+    background: #3a2a18;
+    border-color: #c8a87a;
+    color: #e8d5b8;
+  }
+
+  .dock-prompt__submit {
+    background: #8a3018;
+    border-color: #6a2010;
+    box-shadow: 2px 2px 0 #3a1008;
+  }
+
   .dock-prompt__submit:hover:not(:disabled) {
-    background: #2a1e14;
-    border-color: #9a6a45;
-    color: #d4b898;
+    background: #6a2010;
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 #3a1008;
   }
 }

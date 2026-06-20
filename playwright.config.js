@@ -2,8 +2,9 @@ import { defineConfig, devices } from '@playwright/test'
 import { loadEnv } from 'vite'
 
 const env = loadEnv('development', process.cwd(), '')
-const port = Number(env.PORT) || 5173
-const baseURL = `http://localhost:${port}`
+const devPort = Number(env.PORT) || 5173
+const e2ePort = Number(env.E2E_PORT) || devPort + 1
+const baseURL = `http://localhost:${e2ePort}`
 
 export default defineConfig({
   testDir: './e2e',
@@ -23,8 +24,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: 'npm run dev:e2e',
     url: baseURL,
     reuseExistingServer: !process.env.CI,
+    env: {
+      ...env,
+      PORT: String(e2ePort),
+      VITE_E2E_AUTH_BYPASS: 'true',
+    },
   },
 })

@@ -71,10 +71,18 @@ export function Card({
     if (pendingBodyHeightRef.current !== null) {
       el.style.height = pendingBodyHeightRef.current + 'px'
       pendingBodyHeightRef.current = null
-    } else {
-      autoResize(el)
     }
+    autoResize(el)
   }, [editing, draftBody])
+
+  // If content outgrows a manual resize, expand back to fit — cards are not height-capped.
+  useLayoutEffect(() => {
+    const area = bodyAreaRef.current
+    if (!area || bodyHeight === null || flipped || editing) return
+    if (area.scrollHeight > area.clientHeight + 1) {
+      setBodyHeight(null)
+    }
+  }, [body, back, bodyHeight, flipped, editing])
 
   function startEditing(target = 'body') {
     pendingBodyHeightRef.current = bodyAreaRef.current?.offsetHeight ?? null

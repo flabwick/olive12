@@ -6,6 +6,7 @@ export function createTab({ name = '', order = 0 } = {}) {
     order,
     savedLocation: 'none',
     savedFolderId: null,
+    isOpen: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   }
@@ -41,6 +42,19 @@ export function saveTabToShelf(tab) {
 
 export function moveTabToLibrary(tab, folderId = null) {
   return updateTabFields(tab, { savedLocation: 'library', savedFolderId: folderId })
+}
+
+/** Tabs without `isOpen` (legacy records) are treated as open. */
+export function isTabOpen(tab) {
+  return tab?.isOpen !== false
+}
+
+export function closeSavedTab(tab) {
+  return updateTabFields(tab, { isOpen: false })
+}
+
+export function reopenTab(tab) {
+  return updateTabFields(tab, { isOpen: true })
 }
 
 export function createTabCard({ tabId, cardId, position }) {

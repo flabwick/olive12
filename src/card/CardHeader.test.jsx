@@ -145,18 +145,15 @@ describe('CardHeader', () => {
       expect(screen.queryByRole('button', { name: 'Save to Shelf' })).not.toBeInTheDocument()
     })
 
-    it('renders shelf ✓ button when location is shelf and onMoveToLibrary is provided', () => {
+    it('renders no location button when location is shelf', () => {
       render(<CardHeader title="A" location="shelf" onMoveToLibrary={() => {}} />)
-      expect(
-        screen.getByRole('button', { name: 'Saved to Shelf — click to move to Library' }),
-      ).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Saved to Shelf — click to move to Library' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'In Library' })).not.toBeInTheDocument()
     })
 
-    it('renders disabled In Library button when location is library', () => {
+    it('renders no location button when location is library', () => {
       render(<CardHeader title="A" location="library" />)
-      const btn = screen.getByRole('button', { name: 'In Library' })
-      expect(btn).toBeInTheDocument()
-      expect(btn).toBeDisabled()
+      expect(screen.queryByRole('button', { name: 'In Library' })).not.toBeInTheDocument()
     })
 
     it('calls onSaveToShelf when Save to Shelf is clicked', async () => {

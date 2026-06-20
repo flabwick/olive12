@@ -1,21 +1,35 @@
 /* ── Design tokens ── */
 :root {
-  --olive-canvas:      #faf7f2;
-  --olive-parchment:   #f5ede0;
-  --olive-surface:     #ede3d4;
-  --olive-border:      #c8b89a;
+  /* Base material palette */
+  --olive-canvas:      #f5f0e6;
+  --olive-parchment:   #ede0ca;
+  --olive-surface:     #dfd0b4;
+  --olive-border:      #b89868;
   --olive-border-dark: #2c1810;
   --olive-text:        #2c1810;
   --olive-text-mid:    #6b5040;
   --olive-text-muted:  #8a6848;
   --olive-amber:       #c8a87a;
-  --olive-shadow:      3px 3px 0 #c8b89a;
+  --olive-cream:       #fef8ee;
 
-  --sans:    system-ui, 'Segoe UI', Roboto, sans-serif;
-  --serif:   Georgia, 'Palatino Linotype', serif;
+  /* Heritage accent tones */
+  --olive-terracotta:  #a84830;
+  --olive-aubergine:   #5a3255;
+  --olive-teal:        #336868;
+  --olive-sage:        #5a7850;
+  --olive-accent:      #a84830;
+
+  /* Layered-paper shadow system */
+  --olive-shadow:      4px 4px 0 #b09070;
+  --olive-shadow-sm:   2px 2px 0 #b09070;
+  --olive-shadow-lift: 6px 6px 0 #9a7858;
+
+  /* Type stack */
+  --sans:    'DM Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --serif:   'Playfair Display', Georgia, 'Palatino Linotype', serif;
   --mono:    'SF Mono', 'Fira Code', ui-monospace, monospace;
 
-  font: 14px/1.5 var(--sans);
+  font: 14px/1.6 var(--sans);
   letter-spacing: 0.01em;
   color-scheme: light dark;
   color: var(--olive-text);
@@ -28,16 +42,21 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --olive-canvas:      #16100a;
-    --olive-parchment:   #1e1710;
-    --olive-surface:     #261c12;
+    --olive-canvas:      #13100b;
+    --olive-parchment:   #1b1510;
+    --olive-surface:     #231910;
     --olive-border:      #4a3828;
     --olive-border-dark: #c8a87a;
     --olive-text:        #e8d5b8;
     --olive-text-mid:    #b89870;
     --olive-text-muted:  #8a6848;
     --olive-amber:       #c8a87a;
-    --olive-shadow:      3px 3px 0 #3a2c1c;
+    --olive-cream:       #1e1810;
+    --olive-terracotta:  #c8603a;
+    --olive-accent:      #c8603a;
+    --olive-shadow:      4px 4px 0 #3a2c1c;
+    --olive-shadow-sm:   2px 2px 0 #3a2c1c;
+    --olive-shadow-lift: 6px 6px 0 #2a1c0c;
   }
 }
 

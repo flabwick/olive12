@@ -16,7 +16,7 @@ export function buildPrompt(prompt, contextCards) {
     {
       role: 'system',
       content:
-        'You are an AI assistant embedded in a note-taking app. Write a short title on the first line (max 80 characters). Leave one blank line. Then write your full response as plain text. No JSON, no markdown, no labels — just the title, a blank line, then the content.',
+        'You are an AI assistant embedded in a note-taking app. Write a short title on the first line (max 80 characters). Leave one blank line. Then write your complete response as plain text — write the full answer, do not stop mid-sentence, and include all relevant detail. No JSON, no markdown, no labels — just the title, a blank line, then the content.',
     },
     {
       role: 'user',
