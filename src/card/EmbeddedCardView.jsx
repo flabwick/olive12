@@ -80,7 +80,7 @@ export function EmbeddedCardView({ node, deleteNode }) {
                   role="separator"
                   aria-label="Resize embedded card"
                   aria-orientation="horizontal"
-                  onMouseDown={startResize}
+                  onPointerDown={startResize}
                 />
               )}
             </>
