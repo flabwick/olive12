@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { NodeViewWrapper } from '@tiptap/react'
 import { CardHeader } from './CardHeader'
 import { markdownToHtml } from './richTextLogic'
@@ -15,6 +15,7 @@ export function EmbeddedCardView({ node, deleteNode }) {
   const [flipped, setFlipped] = useState(false)
   const [bodyHeight, setBodyHeight] = useState(null)
   const bodyAreaRef = useRef(null)
+  const resizeHandleRef = useRef(null)
 
   // If content outgrows a manual resize, expand back to fit.
   useLayoutEffect(() => {
@@ -25,31 +26,44 @@ export function EmbeddedCardView({ node, deleteNode }) {
     }
   }, [card?.body, card?.back, bodyHeight, flipped])
 
-  function startResize(e) {
-    e.preventDefault()
-    const area = bodyAreaRef.current
-    if (!area) return
-    const startY = e.clientY
-    const startHeight = area.offsetHeight
+  // Native listener on the element itself fires before ProseMirror's bubble-phase
+  // handler on the editor parent, so stopPropagation() actually reaches ProseMirror
+  // before it can start an atom-node selection drag.
+  useEffect(() => {
+    const el = resizeHandleRef.current
+    if (!el) return
 
-    function onMouseMove(mv) {
-      const delta = mv.clientY - startY
-      const newHeight = startHeight + delta
-      if (newHeight >= area.scrollHeight) {
-        setBodyHeight(null)
-      } else {
-        setBodyHeight(Math.max(MIN_BODY_HEIGHT, newHeight))
+    function handleMouseDown(e) {
+      e.preventDefault()
+      e.stopPropagation()
+
+      const area = bodyAreaRef.current
+      if (!area) return
+      const startY = e.clientY
+      const startHeight = area.offsetHeight
+
+      function onMouseMove(mv) {
+        const delta = mv.clientY - startY
+        const newHeight = startHeight + delta
+        if (newHeight >= area.scrollHeight) {
+          setBodyHeight(null)
+        } else {
+          setBodyHeight(Math.max(MIN_BODY_HEIGHT, newHeight))
+        }
       }
+
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove)
+        document.removeEventListener('mouseup', onMouseUp)
+      }
+
+      document.addEventListener('mousemove', onMouseMove)
+      document.addEventListener('mouseup', onMouseUp)
     }
 
-    function onMouseUp() {
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
-    }
-
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
-  }
+    el.addEventListener('mousedown', handleMouseDown)
+    return () => el.removeEventListener('mousedown', handleMouseDown)
+  }, []) // bodyAreaRef and setBodyHeight are stable refs/setters
 
   return (
     <NodeViewWrapper as="span" className="embedded-card-view" contentEditable={false}>
@@ -76,11 +90,11 @@ export function EmbeddedCardView({ node, deleteNode }) {
               />
               {!flipped && (
                 <div
+                  ref={resizeHandleRef}
                   className="embedded-card-view__resize-handle"
                   role="separator"
                   aria-label="Resize embedded card"
                   aria-orientation="horizontal"
-                  onMouseDown={startResize}
                 />
               )}
             </>
