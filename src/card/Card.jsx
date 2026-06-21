@@ -29,6 +29,7 @@ export function Card({
   onMoveToLibrary,
   indexEntry,
   indexLoading = false,
+  editorSurface = 'tab',
 }) {
   const [editing, setEditing] = useState(false)
   const [draftTitle, setDraftTitle] = useState(title)
@@ -185,6 +186,8 @@ export function Card({
                   onChange={setDraftBody}
                   editable={editing && !!onUpdate}
                   ariaLabel="Card body"
+                  cardId={cardId}
+                  editorSurface={editorSurface}
                 />
               </div>
             )}

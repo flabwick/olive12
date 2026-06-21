@@ -49,6 +49,63 @@
   gap: 0.375rem;
 }
 
+/* BASE state layout */
+.dock--base {
+  gap: 0.5rem;
+  justify-content: flex-start;
+}
+
+.dock__pills {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  overflow-x: auto;
+  min-width: 0;
+  flex: 1;
+}
+
+.dock__pill {
+  height: 2rem;
+  padding: 0 0.625rem;
+  border: 2px solid var(--olive-border, #b89868);
+  border-radius: 0.375rem;
+  background: var(--olive-parchment, #ede0ca);
+  color: var(--olive-text-mid, #6b5040);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: var(--olive-shadow-sm, 2px 2px 0 #b09070);
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.dock__pill:hover {
+  background: var(--olive-amber, #c8a87a);
+  border-color: var(--olive-border-dark, #2c1810);
+  color: var(--olive-text, #2c1810);
+}
+
+.dock__pill--active {
+  background: var(--olive-terracotta, #a84830);
+  border-color: #8a3018;
+  color: #fef8ee;
+  box-shadow: 2px 2px 0 #6a2010;
+}
+
+.dock__divider {
+  width: 1px;
+  height: 1.5rem;
+  background: var(--olive-border, #b89868);
+  flex-shrink: 0;
+}
+
+.dock__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-shrink: 0;
+}
+
 .dock__btn {
   width: 2rem;
   height: 2rem;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AuthForm } from './auth/AuthForm'
-import { RichTextEditorProvider } from './card/RichTextEditorContext'
+import { useRichTextEditorContext, RichTextEditorProvider } from './card/RichTextEditorContext'
 import { FolderPanel } from './layout/FolderPanel'
 import { supabase } from './lib/supabaseClient'
 import { Dock } from './tab/Dock'
@@ -8,11 +8,13 @@ import { DockPrompt } from './tab/DockPrompt'
 import { Tab } from './tab/Tab'
 import { TabHeader } from './tab/TabHeader'
 import { TabSwitcher } from './tab/TabSwitcher'
-import { TransientCard } from './tab/TransientCard'
+import { useDock } from './tab/useDock'
 import { useTabs } from './tab/useTabs'
 import './App.css'
 
 function AppShell({ userId }) {
+  const { activeCardId: activeEditorCardId } = useRichTextEditorContext()
+
   const {
     tab,
     tabs,
@@ -29,7 +31,7 @@ function AppShell({ userId }) {
     renameTab,
     saveTabToShelf,
     moveTabToLibrary,
-    addCard,
+    addTabCard,
     addPortalCard,
     updateCard,
     removeCard,
@@ -52,17 +54,23 @@ function AppShell({ userId }) {
     isFlippedCard,
   } = useTabs({ userId })
 
+  const {
+    dockCardEntries,
+    activeDockCardId,
+    dockState,
+    openDockCard,
+    closeDockCard,
+    addToDock,
+    createAndPinCard,
+    moveDockCardToTab,
+  } = useDock({ cardsById, activeEditorCardId })
+
   const [folderPanelOpen, setFolderPanelOpen] = useState(false)
-  const [transientOpen, setTransientOpen] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
   const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false)
+  const [lightningActive, setLightningActive] = useState(false)
   const [vaultInitialTab, setVaultInitialTab] = useState('shelf')
   const [highlightedCardId, setHighlightedCardId] = useState(null)
-
-  function handleAddCard(fields) {
-    addCard(fields)
-    setTransientOpen(false)
-  }
 
   function handleOpenAsPortal(cardId) {
     addPortalCard(cardId)
@@ -86,25 +94,13 @@ function AppShell({ userId }) {
     moveTabToLibrary(tabId, null)
   }
 
-  function handleSubmitPortal(cardId) {
-    addPortalCard(cardId)
-    setTransientOpen(false)
-  }
-
-  function handleFolder() {
-    setPromptOpen(false)
+  function handleFolderOpen() {
+    closeDockCard()
     setFolderPanelOpen((v) => !v)
   }
 
-  function handlePromptToggle() {
-    setFolderPanelOpen(false)
-    setPromptOpen((v) => !v)
-  }
-
   async function handlePromptSubmit(text) {
-    console.log('[app] handlePromptSubmit fired, text:', JSON.stringify(text))
     const ok = await runDockPrompt(text)
-    console.log('[app] runDockPrompt returned:', ok)
     if (ok) setPromptOpen(false)
   }
 
@@ -115,7 +111,6 @@ function AppShell({ userId }) {
   }
 
   return (
-    <RichTextEditorProvider>
     <div className="app-shell">
       <div className="app-shell__content">
         {tab && (
@@ -144,15 +139,6 @@ function AppShell({ userId }) {
           flipCard={flipCard}
           isFlipped={isFlippedCard}
         />
-        {transientOpen && (
-          <TransientCard
-            onSubmit={handleAddCard}
-            onDismiss={() => setTransientOpen(false)}
-            onSubmitPortal={handleSubmitPortal}
-            shelfEntries={shelfEntries}
-            libraryEntries={libraryEntries}
-          />
-        )}
       </div>
       <div className="app-shell__dock-area">
         {folderPanelOpen && (
@@ -183,12 +169,17 @@ function AppShell({ userId }) {
           />
         )}
         <Dock
-          onAdd={() => setTransientOpen(true)}
-          addDisabled={transientOpen}
-          onFolder={handleFolder}
-          onPrompt={handlePromptToggle}
-          promptDisabled={promptLoading}
-          onTabOverview={handleTabOverview}
+          dockState={dockState}
+          dockCardEntries={dockCardEntries}
+          activeDockCardId={activeDockCardId}
+          onAddDockCard={createAndPinCard}
+          onOpenDockCard={openDockCard}
+          onFolderOpen={handleFolderOpen}
+          onSettings={handleTabOverview}
+          onMoveDockCardToTab={() => moveDockCardToTab(activeDockCardId, addTabCard)}
+          onMoveToDock={() => activeEditorCardId && addToDock(activeEditorCardId)}
+          lightningActive={lightningActive}
+          onLightningToggle={() => setLightningActive((v) => !v)}
         />
       </div>
       {tabSwitcherOpen && (
@@ -212,7 +203,6 @@ function AppShell({ userId }) {
         />
       )}
     </div>
-    </RichTextEditorProvider>
   )
 }
 
@@ -263,7 +253,11 @@ function App() {
     )
   }
 
-  return <AppShell userId={userId} />
+  return (
+    <RichTextEditorProvider>
+      <AppShell userId={userId} />
+    </RichTextEditorProvider>
+  )
 }
 
 export default App

@@ -29,8 +29,10 @@ export function RichTextEditor({
   editable = true,
   ariaLabel,
   placeholder = 'Write something…',
+  cardId,
+  editorSurface = 'tab',
 }) {
-  const { setActiveEditor } = useRichTextEditorContext()
+  const { registerEditor, clearEditor } = useRichTextEditorContext()
 
   const editor = useEditor({
     extensions: [StarterKit],
@@ -64,9 +66,9 @@ export function RichTextEditor({
     if (editable) {
       setTimeout(() => editor.commands.focus('end'), 0)
     } else {
-      setActiveEditor(null)
+      clearEditor(cardId)
     }
-  }, [editor, editable, setActiveEditor])
+  }, [editor, editable, clearEditor, cardId])
 
   if (!editor) return null
 
@@ -75,8 +77,8 @@ export function RichTextEditor({
       <EditorContent
         editor={editor}
         className="rich-text-editor__content"
-        onFocus={() => { if (editable) setActiveEditor(editor) }}
-        onBlur={() => setActiveEditor(null)}
+        onFocus={() => { if (editable) registerEditor(cardId, editorSurface, editor) }}
+        onBlur={() => clearEditor(cardId)}
       />
     </div>
   )

@@ -39,6 +39,8 @@ vi.mock('./sync/cardSupabaseStorage', () => ({
 }))
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+const T = 1_700_000_000_000
+
 function mockLoggedIn(id = 'test-user') {
   authMocks.getSession.mockResolvedValue({
     data: { session: { user: { id } } },
@@ -53,6 +55,18 @@ function mockLoggedOut() {
   authMocks.getSession.mockResolvedValue({ data: { session: null } })
 }
 
+async function seedTab(id = 'seeded-tab', name = 'Main') {
+  await db.tabs.put({ id, name, kind: 'blank', order: 0, savedLocation: 'none', savedFolderId: null, createdAt: T, updatedAt: T })
+}
+
+async function seedCard(id = 'seeded-card', title = 'Vault note') {
+  await db.cards.put({ id, type: 'text', title, body: '', back: '', config: null, location: 'none', folderId: null, createdAt: T, updatedAt: T, dirty: true })
+}
+
+async function seedTabCard(tabId = 'seeded-tab', cardId = 'seeded-card') {
+  await db.tab_cards.put({ tabId, cardId, position: 0, foldState: false, hiddenState: false })
+}
+
 // ── Test setup ───────────────────────────────────────────────────────────────
 describe('App', () => {
   beforeEach(async () => {
@@ -61,6 +75,7 @@ describe('App', () => {
     await db.tab_cards.clear()
     await db.folders.clear()
     await db.links.clear()
+    await db.dock_cards.clear()
     authMocks.signInWithPassword.mockReset()
     authMocks.signUp.mockReset()
     syncMocks.scheduleSync.mockClear()
@@ -77,64 +92,30 @@ describe('App', () => {
     await db.tab_cards.clear()
     await db.folders.clear()
     await db.links.clear()
+    await db.dock_cards.clear()
     vi.unstubAllGlobals()
   })
 
-  // ── Existing app shell tests (unchanged behaviour) ───────────────────────
-  it('renders the dock with an Add card button', async () => {
+  // ── App shell / dock rendering ───────────────────────────────────────────
+  it('renders the dock with a Library button and Pin new card button', async () => {
     render(<App />)
-    await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
-    expect(screen.getByRole('button', { name: 'Add card' })).toBeInTheDocument()
+    await waitFor(() => screen.getByRole('button', { name: 'Library' }))
+    expect(screen.getByRole('button', { name: 'Library' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pin new card' })).toBeInTheDocument()
   })
 
-  it('opens the transient card when Add card is clicked', async () => {
+  // ── Folder panel tests ───────────────────────────────────────────────────
+  it('clicking Library opens the folder panel', async () => {
     render(<App />)
-    await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Add card' }))
-    expect(screen.getByLabelText('Title')).toBeInTheDocument()
-    expect(screen.getByLabelText('Body')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /add →/i })).toBeInTheDocument()
-  })
-
-  it('disables the dock + button while transient card is open', async () => {
-    render(<App />)
-    await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Add card' }))
-    expect(screen.getByRole('button', { name: 'Add card' })).toBeDisabled()
-  })
-
-  it('submitting the transient card creates a card and closes the form', async () => {
-    render(<App />)
-    await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Add card' }))
-    await userEvent.type(screen.getByLabelText('Title'), 'My note')
-    await userEvent.type(screen.getByLabelText('Body'), 'Some body')
-    await userEvent.click(screen.getByRole('button', { name: /add →/i }))
-    expect(screen.queryByLabelText('Title')).not.toBeInTheDocument()
-    await waitFor(() => screen.getByRole('heading', { name: 'My note' }))
-    expect(screen.getByRole('heading', { name: 'My note' })).toBeInTheDocument()
-  })
-
-  it('cancelling the transient card closes it without adding a card', async () => {
-    render(<App />)
-    await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Add card' }))
-    await userEvent.click(screen.getByRole('button', { name: /cancel/i }))
-    expect(screen.queryByLabelText('Title')).not.toBeInTheDocument()
-    expect(screen.getByText('No cards yet.')).toBeInTheDocument()
-  })
-
-  it('clicking Folders opens the folder panel', async () => {
-    render(<App />)
-    await waitFor(() => screen.getByRole('button', { name: 'Folders' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Folders' }))
+    await waitFor(() => screen.getByRole('button', { name: 'Library' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Library' }))
     expect(screen.getByRole('dialog', { name: 'Vault and Brain' })).toBeInTheDocument()
   })
 
   it('folder panel shows Shelf, Library and Brain tabs', async () => {
     render(<App />)
-    await waitFor(() => screen.getByRole('button', { name: 'Folders' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Folders' }))
+    await waitFor(() => screen.getByRole('button', { name: 'Library' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Library' }))
     expect(screen.getByRole('tab', { name: 'Shelf' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Library' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Brain' })).toBeInTheDocument()
@@ -142,90 +123,40 @@ describe('App', () => {
 
   it('closing the folder panel via X removes it from the screen', async () => {
     render(<App />)
-    await waitFor(() => screen.getByRole('button', { name: 'Folders' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Folders' }))
+    await waitFor(() => screen.getByRole('button', { name: 'Library' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Library' }))
     await userEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog', { name: 'Vault and Brain' })).not.toBeInTheDocument()
   })
 
-  // ── Prompt mode tests ────────────────────────────────────────────────────
-  it('renders the Prompt button in the dock', async () => {
-    render(<App />)
-    await waitFor(() => screen.getByRole('button', { name: 'Prompt' }))
-    expect(screen.getByRole('button', { name: 'Prompt' })).toBeInTheDocument()
-  })
-
-  it('clicking Prompt opens the DockPrompt form', async () => {
-    render(<App />)
-    await waitFor(() => screen.getByRole('button', { name: 'Prompt' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Prompt' }))
-    expect(screen.getByRole('textbox', { name: 'Prompt input' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Send →' })).toBeInTheDocument()
-  })
-
-  it('clicking Cancel in DockPrompt closes it', async () => {
-    render(<App />)
-    await waitFor(() => screen.getByRole('button', { name: 'Prompt' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Prompt' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(screen.queryByRole('textbox', { name: 'Prompt input' })).not.toBeInTheDocument()
-  })
-
-  it('submitting DockPrompt streams a card via fetch and creates a card on success', async () => {
-    vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
-    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
-    vi.stubGlobal('requestAnimationFrame', (fn) => { fn(0); return 0 })
-    vi.stubGlobal('cancelAnimationFrame', () => {})
-    const encoder = new TextEncoder()
-    const sseBody = new ReadableStream({
-      start(controller) {
-        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"AI result"}}]}\n'))
-        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"\\n\\nAI body"}}]}\n'))
-        controller.enqueue(encoder.encode('data: [DONE]\n'))
-        controller.close()
-      },
-    })
-    const sseResponse = new Response(sseBody, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse))
-
-    render(<App />)
-    await waitFor(() => screen.getByRole('button', { name: 'Prompt' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Prompt' }))
-    await userEvent.type(screen.getByRole('textbox', { name: 'Prompt input' }), 'Make a card')
-    await userEvent.click(screen.getByRole('button', { name: 'Send →' }))
-
-    await waitFor(() => screen.getByRole('heading', { name: 'AI result' }))
-    expect(screen.getByRole('heading', { name: 'AI result' })).toBeInTheDocument()
-    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Prompt input' })).not.toBeInTheDocument())
-  })
-
   // ── Tab switcher tests ───────────────────────────────────────────────────
+  // Settings button temporarily opens the tab switcher until Slice 8 wires it to TabHeader.
   describe('tab switcher', () => {
-    it('tab overview button opens the tab switcher', async () => {
+    it('Settings button opens the tab switcher', async () => {
       render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Tab overview' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+      await waitFor(() => screen.getByRole('button', { name: 'Settings' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
       expect(screen.getByRole('dialog', { name: 'Tab switcher' })).toBeInTheDocument()
     })
 
     it('closing the tab switcher removes it from the screen', async () => {
       render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Tab overview' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+      await waitFor(() => screen.getByRole('button', { name: 'Settings' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
       fireEvent.keyDown(document, { key: 'Escape' })
       expect(screen.queryByRole('dialog', { name: 'Tab switcher' })).not.toBeInTheDocument()
     })
 
     it('creating a new tab from the switcher adds a tab', async () => {
       render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Tab overview' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+      await waitFor(() => screen.getByRole('button', { name: 'Settings' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
 
       const initialTiles = document.querySelectorAll('.tab-switcher__tile:not(.tab-switcher__tile--add)')
       const initialCount = initialTiles.length
 
       await userEvent.click(screen.getByRole('button', { name: 'New tab' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
 
       await waitFor(() => {
         const tiles = document.querySelectorAll('.tab-switcher__tile:not(.tab-switcher__tile--add)')
@@ -239,10 +170,10 @@ describe('App', () => {
         .mockReturnValueOnce('tab-2')
 
       render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Tab overview' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+      await waitFor(() => screen.getByRole('button', { name: 'Settings' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
       await userEvent.click(screen.getByRole('button', { name: 'New tab' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
 
       const tiles = document.querySelectorAll('.tab-switcher__tile:not(.tab-switcher__tile--add)')
       await userEvent.click(tiles[0])
@@ -265,12 +196,12 @@ describe('App', () => {
       mockLoggedOut()
       render(<App />)
       await waitFor(() => screen.getByRole('button', { name: 'Sign in' }))
-      expect(screen.queryByRole('button', { name: 'Add card' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Library' })).not.toBeInTheDocument()
     })
 
     it('shows the app shell when logged in', async () => {
       render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
+      await waitFor(() => screen.getByRole('button', { name: 'Library' }))
       expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument()
     })
 
@@ -332,18 +263,14 @@ describe('App', () => {
   // ── Vault / portal lifecycle (save, refresh, close) ─────────────────────
   describe('vault card lifecycle', () => {
     it('save to shelf converts the tab card to a portal with no tick icon', async () => {
-      vi.spyOn(crypto, 'randomUUID')
-        .mockReturnValueOnce('tab-1')
-        .mockReturnValueOnce('card-1')
-        .mockReturnValueOnce('portal-1')
-      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('portal-1')
+      vi.spyOn(Date, 'now').mockReturnValue(T)
+
+      await seedTab()
+      await seedCard('seeded-card', 'Vault note')
+      await seedTabCard()
 
       render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Add card' }))
-      await userEvent.type(screen.getByLabelText('Title'), 'Vault note')
-      await userEvent.click(screen.getByRole('button', { name: /add →/i }))
-
       await waitFor(() => screen.getByRole('button', { name: 'Save to Shelf' }))
       await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
 
@@ -355,17 +282,14 @@ describe('App', () => {
     })
 
     it('after refresh, saved card appears once as a portal with no tick icon', async () => {
-      vi.spyOn(crypto, 'randomUUID')
-        .mockReturnValueOnce('tab-1')
-        .mockReturnValueOnce('card-1')
-        .mockReturnValueOnce('portal-1')
-      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('portal-1')
+      vi.spyOn(Date, 'now').mockReturnValue(T)
+
+      await seedTab()
+      await seedCard('seeded-card', 'Persist me')
+      await seedTabCard()
 
       const { unmount } = render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Add card' }))
-      await userEvent.type(screen.getByLabelText('Title'), 'Persist me')
-      await userEvent.click(screen.getByRole('button', { name: /add →/i }))
       await waitFor(() => screen.getByRole('button', { name: 'Save to Shelf' }))
       await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
       await waitFor(() => screen.getByRole('heading', { name: 'Persist me' }))
@@ -382,17 +306,14 @@ describe('App', () => {
     })
 
     it('closing a portal removes it from the tab but keeps the card on the shelf', async () => {
-      vi.spyOn(crypto, 'randomUUID')
-        .mockReturnValueOnce('tab-1')
-        .mockReturnValueOnce('card-1')
-        .mockReturnValueOnce('portal-1')
-      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('portal-1')
+      vi.spyOn(Date, 'now').mockReturnValue(T)
+
+      await seedTab()
+      await seedCard('seeded-card', 'Keep on shelf')
+      await seedTabCard()
 
       render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Add card' }))
-      await userEvent.type(screen.getByLabelText('Title'), 'Keep on shelf')
-      await userEvent.click(screen.getByRole('button', { name: /add →/i }))
       await waitFor(() => screen.getByRole('button', { name: 'Save to Shelf' }))
       await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
       await waitFor(() => screen.getByRole('heading', { name: 'Keep on shelf' }))
@@ -400,7 +321,7 @@ describe('App', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
       await waitFor(() => screen.getByText('No cards yet.'))
 
-      await userEvent.click(screen.getByRole('button', { name: 'Folders' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Library' }))
       await waitFor(() => screen.getByRole('dialog', { name: 'Vault and Brain' }))
       expect(screen.getByText('Keep on shelf')).toBeInTheDocument()
     })
@@ -408,17 +329,14 @@ describe('App', () => {
 
   describe('saved tab lifecycle', () => {
     it('closing a saved tab from the switcher keeps it on the shelf and allows reopening with cards', async () => {
-      vi.spyOn(crypto, 'randomUUID')
-        .mockReturnValueOnce('tab-1')
-        .mockReturnValueOnce('card-1')
-        .mockReturnValueOnce('tab-fallback')
-      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-fallback')
+      vi.spyOn(Date, 'now').mockReturnValue(T)
+
+      await seedTab('seeded-tab', 'Main')
+      await seedCard('seeded-card', 'Inside tab')
+      await seedTabCard()
 
       render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Add card' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Add card' }))
-      await userEvent.type(screen.getByLabelText('Title'), 'Inside tab')
-      await userEvent.click(screen.getByRole('button', { name: /add →/i }))
       await waitFor(() => screen.getByRole('heading', { name: 'Inside tab' }))
 
       await userEvent.click(screen.getByRole('heading', { level: 2 }))
@@ -428,11 +346,11 @@ describe('App', () => {
       await userEvent.keyboard('{Enter}')
       await userEvent.click(screen.getByRole('button', { name: 'Save tab to Shelf' }))
 
-      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
       await userEvent.click(screen.getByRole('button', { name: 'Close Saved workspace' }))
       fireEvent.keyDown(document, { key: 'Escape' })
 
-      await userEvent.click(screen.getByRole('button', { name: 'Folders' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Library' }))
       await waitFor(() => screen.getByRole('dialog', { name: 'Vault and Brain' }))
       expect(screen.getByText('Saved workspace')).toBeInTheDocument()
 
