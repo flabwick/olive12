@@ -15,6 +15,8 @@
   font-size: 0.8125rem;
   line-height: 1.6;
   color: var(--olive-text, #2c1810);
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .embedded-card-view__body p {

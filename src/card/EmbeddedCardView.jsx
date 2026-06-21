@@ -83,7 +83,7 @@ export function EmbeddedCardView({ node, deleteNode }) {
               <div
                 className="embedded-card-view__body"
                 ref={bodyAreaRef}
-                style={bodyHeight !== null ? { height: bodyHeight, overflowY: 'auto' } : undefined}
+                style={bodyHeight !== null ? { height: bodyHeight, maxHeight: 'none', overflowY: 'auto' } : undefined}
                 dangerouslySetInnerHTML={{
                   __html: markdownToHtml(flipped ? card.back || '' : card.body || ''),
                 }}
