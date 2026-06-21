@@ -32,16 +32,41 @@ describe('DockCardPanel', () => {
     expect(screen.getByRole('complementary', { name: 'Dock card' })).toBeInTheDocument()
   })
 
-  it('calls onClose when the close button is clicked', async () => {
+  it('calls onClose when the card header close button is clicked', async () => {
     const onClose = vi.fn()
     wrap(<DockCardPanel card={SAMPLE_CARD} cardId="c1" onClose={onClose} onUpdate={() => {}} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Close dock panel' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
     expect(onClose).toHaveBeenCalledOnce()
   })
 
-  it('renders with editorSurface dock (Card component present and editable)', () => {
+  it('renders a fold toggle button in the card header', () => {
     wrap(<DockCardPanel card={SAMPLE_CARD} cardId="c1" onClose={() => {}} onUpdate={() => {}} />)
-    // The card body wrapper exists, indicating Card was rendered (editing surface tested in Card.test.jsx)
+    expect(screen.getByRole('button', { name: 'Collapse card' })).toBeInTheDocument()
+  })
+
+  it('fold toggle collapses and expands the card body', async () => {
+    wrap(<DockCardPanel card={SAMPLE_CARD} cardId="c1" onClose={() => {}} onUpdate={() => {}} />)
+    const toggle = screen.getByRole('button', { name: 'Collapse card' })
+    await userEvent.click(toggle)
+    expect(screen.getByRole('button', { name: 'Expand card' })).toBeInTheDocument()
+    expect(document.querySelector('.card__body-rte-wrapper')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Expand card' }))
+    expect(document.querySelector('.card__body-rte-wrapper')).toBeInTheDocument()
+  })
+
+  it('renders a flip button in the card header', () => {
+    wrap(<DockCardPanel card={SAMPLE_CARD} cardId="c1" onClose={() => {}} onUpdate={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
+  })
+
+  it('flip button toggles the card to its back face', async () => {
+    wrap(<DockCardPanel card={SAMPLE_CARD} cardId="c1" onClose={() => {}} onUpdate={() => {}} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Show card back' }))
+    expect(screen.getByRole('button', { name: 'Show card front' })).toBeInTheDocument()
+  })
+
+  it('renders with editorSurface dock (Card body wrapper present)', () => {
+    wrap(<DockCardPanel card={SAMPLE_CARD} cardId="c1" onClose={() => {}} onUpdate={() => {}} />)
     expect(document.querySelector('.card__body-rte-wrapper')).toBeInTheDocument()
   })
 })

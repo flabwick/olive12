@@ -1,73 +1,7 @@
 .dock-card-panel {
   margin: 0 var(--col-pad) 0;
   max-width: var(--col-max);
-  border: 2px solid var(--olive-border-dark, #2c1810);
-  border-bottom: none;
-  border-radius: 0.625rem 0.625rem 0 0;
-  background: var(--olive-parchment, #ede0ca);
-  box-shadow:
-    0 0 0 1px var(--olive-amber, #c8a87a),
-    var(--olive-shadow, 4px 4px 0 #b09070);
-  overflow: hidden;
-}
-
-.dock-card-panel__bar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0.25rem 0.5rem;
-  border-bottom: 1px solid var(--olive-border, #b89868);
-  background: var(--olive-surface, #dfd0b4);
-}
-
-.dock-card-panel__close {
-  width: 1.5rem;
-  height: 1.5rem;
-  border: 1px solid var(--olive-border, #b89868);
-  border-radius: 0.25rem;
-  background: transparent;
-  color: var(--olive-text-mid, #6b5040);
-  font-size: 1rem;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.dock-card-panel__close:hover {
-  background: var(--olive-amber, #c8a87a);
-  border-color: var(--olive-border-dark, #2c1810);
-  color: var(--olive-text, #2c1810);
-}
-
-.dock-card-panel__body {
-  padding: 0.5rem;
-  max-height: 320px;
+  padding-bottom: 0.5rem;
+  max-height: 340px;
   overflow-y: auto;
-}
-
-@media (prefers-color-scheme: dark) {
-  .dock-card-panel {
-    background: #1b1510;
-    border-color: #8a6235;
-    box-shadow:
-      0 0 0 1px #6a4830,
-      4px 4px 0 #3a2c1c;
-  }
-
-  .dock-card-panel__bar {
-    background: #231910;
-    border-color: #6a4e35;
-  }
-
-  .dock-card-panel__close {
-    border-color: #6a4e35;
-    color: #a07858;
-  }
-
-  .dock-card-panel__close:hover {
-    background: #4a2e14;
-    border-color: #c8a87a;
-    color: #e8d5b8;
-  }
 }
