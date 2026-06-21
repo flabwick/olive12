@@ -47,3 +47,10 @@ export const WithAriaLabel = {
     ariaLabel: 'Card body',
   },
 }
+
+export const WithEmbeddedCard = {
+  args: {
+    value: 'See also [[card-abc-123]] for context and [[card-xyz-456]] for details.',
+    editable: false,
+  },
+}

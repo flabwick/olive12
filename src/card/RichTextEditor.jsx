@@ -5,6 +5,7 @@ import { markdownToHtml, htmlToMarkdown } from './richTextLogic'
 import { useRichTextEditorContext } from './RichTextEditorContext'
 import { EmbedSourcePanel } from './EmbedSourcePanel'
 import { useEmbedEntries } from './EmbedEntriesContext'
+import { EmbeddedCardNode } from './EmbeddedCardNode'
 import './RichTextEditor.css'
 
 export const TOOLBAR_ITEMS = [
@@ -39,7 +40,7 @@ export function RichTextEditor({
   const [embedOpen, setEmbedOpen] = useState(false)
 
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [StarterKit, EmbeddedCardNode],
     content: markdownToHtml(value),
     editable,
     editorProps: {
@@ -76,7 +77,7 @@ export function RichTextEditor({
 
   function handleEmbedSelect(selectedCardId) {
     if (editor) {
-      editor.chain().focus().insertContent(`[[${selectedCardId}]]`).run()
+      editor.chain().focus().insertContent({ type: 'embeddedCard', attrs: { cardId: selectedCardId } }).run()
     }
     setEmbedOpen(false)
   }

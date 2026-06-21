@@ -96,3 +96,19 @@
   border-color: var(--olive-border-dark, #2c1810);
   color: var(--olive-text, #2c1810);
 }
+
+/* ── Embedded card node (inline Tiptap atom) ─────────────────────── */
+.embedded-card-node {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.35rem;
+  background: var(--olive-amber-light, #f5e9d0);
+  border: 1px solid var(--olive-border, #b89868);
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+  font-family: monospace;
+  color: var(--olive-text-mid, #6b5040);
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+}

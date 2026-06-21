@@ -32,4 +32,11 @@ describe('RichTextEditor', () => {
     const onChange = vi.fn()
     expect(() => wrap(<RichTextEditor value="initial" onChange={onChange} editable={true} />)).not.toThrow()
   })
+
+  it('renders an embedded-card-node element for [[cardId]] in the markdown value', () => {
+    wrap(<RichTextEditor value="[[card-1]]" editable={false} />)
+    const node = document.querySelector('.embedded-card-node')
+    expect(node).toBeInTheDocument()
+    expect(node.textContent).toContain('card-1')
+  })
 })

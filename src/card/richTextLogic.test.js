@@ -53,6 +53,24 @@ describe('htmlToMarkdown', () => {
   })
 })
 
+describe('embed token [[cardId]]', () => {
+  it('markdownToHtml converts [[cardId]] to a span with data-card-id', () => {
+    expect(markdownToHtml('[[card-1]]')).toContain('data-card-id="card-1"')
+  })
+
+  it('htmlToMarkdown converts span[data-card-id] with inner text back to [[cardId]]', () => {
+    expect(htmlToMarkdown('<p><span data-card-id="card-1">[[card-1]]</span></p>')).toBe('[[card-1]]')
+  })
+
+  it('htmlToMarkdown handles span with class from EmbeddedCardNode renderHTML', () => {
+    expect(htmlToMarkdown('<p><span data-card-id="card-1" class="embedded-card-node">[[card-1]]</span></p>')).toBe('[[card-1]]')
+  })
+
+  it('roundtrips multiple [[cardId]] tokens through markdownToHtml then htmlToMarkdown', () => {
+    expect(htmlToMarkdown(markdownToHtml('see [[card-1]] and [[card-2]]'))).toBe('see [[card-1]] and [[card-2]]')
+  })
+})
+
 describe('isEmptyMarkdown', () => {
   it('returns true for empty string', () => {
     expect(isEmptyMarkdown('')).toBe(true)
