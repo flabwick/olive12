@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AuthForm } from './auth/AuthForm'
 import { useRichTextEditorContext, RichTextEditorProvider } from './card/RichTextEditorContext'
+import { EmbedEntriesProvider } from './card/EmbedEntriesContext'
 import { IndexDebugPanel } from './debug/IndexDebugPanel'
 import { FolderPanel } from './layout/FolderPanel'
 import { supabase } from './lib/supabaseClient'
@@ -120,6 +121,7 @@ function AppShell({ userId }) {
   }
 
   return (
+    <EmbedEntriesProvider entries={[...shelfEntries, ...libraryEntries]}>
     <div className="app-shell">
       <div className="app-shell__content">
         {tab && (
@@ -221,6 +223,7 @@ function AppShell({ userId }) {
         />
       )}
     </div>
+    </EmbedEntriesProvider>
   )
 }
 

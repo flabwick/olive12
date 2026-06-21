@@ -1,0 +1,116 @@
+.embed-source-panel {
+  border: 1px solid var(--olive-border, #b89868);
+  border-radius: 0.375rem;
+  background: var(--olive-parchment, #ede0ca);
+  box-shadow: 2px 2px 0 #b09070;
+  margin-top: 0.25rem;
+  overflow: hidden;
+}
+
+.embed-source-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid var(--olive-border, #b89868);
+  background: var(--olive-surface, #dfd0b4);
+}
+
+.embed-source-panel__search {
+  flex: 1;
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--olive-border, #b89868);
+  border-radius: 0.25rem;
+  background: var(--olive-parchment, #ede0ca);
+  color: var(--olive-text, #2c1810);
+  font-size: 0.8125rem;
+}
+
+.embed-source-panel__cancel {
+  font-size: 0.75rem;
+  padding: 0 0.5rem;
+  height: 1.75rem;
+  border: 1px solid var(--olive-border, #b89868);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--olive-text-mid, #6b5040);
+  cursor: pointer;
+}
+
+.embed-source-panel__cancel:hover {
+  background: var(--olive-amber, #c8a87a);
+  color: var(--olive-text, #2c1810);
+}
+
+.embed-source-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.embed-source-panel__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.3125rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--olive-text, #2c1810);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.embed-source-panel__item:hover {
+  background: var(--olive-amber, #c8a87a);
+}
+
+.embed-source-panel__empty {
+  padding: 0.5rem 0.75rem;
+  color: var(--olive-text-mid, #6b5040);
+  font-size: 0.8125rem;
+  font-style: italic;
+}
+
+@media (prefers-color-scheme: dark) {
+  .embed-source-panel {
+    background: #1b1510;
+    border-color: #6a4e35;
+    box-shadow: 2px 2px 0 #3a2c1c;
+  }
+
+  .embed-source-panel__header {
+    background: #231910;
+    border-color: #6a4e35;
+  }
+
+  .embed-source-panel__search {
+    background: #1b1510;
+    border-color: #6a4e35;
+    color: #e8d5b8;
+  }
+
+  .embed-source-panel__cancel {
+    border-color: #6a4e35;
+    color: #a07858;
+  }
+
+  .embed-source-panel__cancel:hover {
+    background: #4a2e14;
+    color: #e8d5b8;
+  }
+
+  .embed-source-panel__item {
+    color: #e8d5b8;
+  }
+
+  .embed-source-panel__item:hover {
+    background: #4a2e14;
+  }
+
+  .embed-source-panel__empty {
+    color: #a07858;
+  }
+}

@@ -71,3 +71,28 @@
   margin: 0.3em 0;
 }
 .rich-text-editor__content .ProseMirror li { margin: 0.15em 0; }
+
+/* ── Embed bar ───────────────────────────────────────────────── */
+.rich-text-editor__embed-bar {
+  padding: 0.125rem 0.375rem 0.25rem;
+  position: relative;
+}
+
+.rich-text-editor__embed-btn {
+  font-size: 0.6875rem;
+  font-family: monospace;
+  padding: 0.1rem 0.375rem;
+  border: 1px solid var(--olive-border, #b89868);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--olive-text-mid, #6b5040);
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.rich-text-editor__embed-btn:hover {
+  opacity: 1;
+  background: var(--olive-amber, #c8a87a);
+  border-color: var(--olive-border-dark, #2c1810);
+  color: var(--olive-text, #2c1810);
+}
