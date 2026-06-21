@@ -29,26 +29,29 @@ export function EmbeddedCardView({ node, deleteNode }) {
     e.preventDefault()
     const area = bodyAreaRef.current
     if (!area) return
+
+    // setPointerCapture routes all subsequent pointermove/pointerup events
+    // directly to this element at the OS level — bypasses ProseMirror's event
+    // routing entirely, so no document listener race and no selection drag.
+    const handle = e.currentTarget
+    handle.setPointerCapture(e.pointerId)
+
     const startY = e.clientY
     const startHeight = area.offsetHeight
 
-    function onMouseMove(mv) {
-      const delta = mv.clientY - startY
-      const newHeight = startHeight + delta
-      if (newHeight >= area.scrollHeight) {
-        setBodyHeight(null)
-      } else {
-        setBodyHeight(Math.max(MIN_BODY_HEIGHT, newHeight))
-      }
+    function onPointerMove(mv) {
+      const newHeight = startHeight + (mv.clientY - startY)
+      setBodyHeight(Math.max(MIN_BODY_HEIGHT, newHeight))
     }
 
-    function onMouseUp() {
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
+    function onPointerUp() {
+      handle.releasePointerCapture(e.pointerId)
+      handle.removeEventListener('pointermove', onPointerMove)
+      handle.removeEventListener('pointerup', onPointerUp)
     }
 
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
+    handle.addEventListener('pointermove', onPointerMove)
+    handle.addEventListener('pointerup', onPointerUp)
   }
 
   return (
