@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { EmbedEntriesProvider } from './EmbedEntriesContext'
 import { RichTextEditorProvider } from './RichTextEditorContext'
 import { RichTextEditor } from './RichTextEditor'
 
@@ -33,10 +34,27 @@ describe('RichTextEditor', () => {
     expect(() => wrap(<RichTextEditor value="initial" onChange={onChange} editable={true} />)).not.toThrow()
   })
 
-  it('renders an embedded-card-node element for [[cardId]] in the markdown value', () => {
-    wrap(<RichTextEditor value="[[card-1]]" editable={false} />)
-    const node = document.querySelector('.embedded-card-node')
-    expect(node).toBeInTheDocument()
-    expect(node.textContent).toContain('card-1')
+  it('renders the embedded card view with title and body for a known [[cardId]]', async () => {
+    const entries = [{ id: 'card-1', title: 'My Note', body: 'Hello world' }]
+    render(
+      <RichTextEditorProvider>
+        <EmbedEntriesProvider entries={entries}>
+          <RichTextEditor value="[[card-1]]" editable={false} />
+        </EmbedEntriesProvider>
+      </RichTextEditorProvider>
+    )
+    await waitFor(() => expect(document.querySelector('.embedded-card-view')).toBeInTheDocument())
+    expect(screen.getByText('My Note')).toBeInTheDocument()
+  })
+
+  it('renders the missing fallback for an unknown [[cardId]]', async () => {
+    render(
+      <RichTextEditorProvider>
+        <EmbedEntriesProvider entries={[]}>
+          <RichTextEditor value="[[unknown-card]]" editable={false} />
+        </EmbedEntriesProvider>
+      </RichTextEditorProvider>
+    )
+    await waitFor(() => expect(document.querySelector('.embedded-card-view__missing')).toBeInTheDocument())
   })
 })
