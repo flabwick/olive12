@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AuthForm } from './auth/AuthForm'
 import { useRichTextEditorContext, RichTextEditorProvider } from './card/RichTextEditorContext'
 import { EmbedEntriesProvider } from './card/EmbedEntriesContext'
@@ -70,6 +70,7 @@ function AppShell({ userId }) {
     moveDockCardToTab,
   } = useDock({ cardsById, activeEditorCardId, activeSurface })
 
+  const embedEditorRef = useRef(null)
   const [folderPanelOpen, setFolderPanelOpen] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
   const [embedOpen, setEmbedOpen] = useState(false)
@@ -111,10 +112,17 @@ function AppShell({ userId }) {
     if (ok) setPromptOpen(false)
   }
 
+  function handleEmbedOpen() {
+    embedEditorRef.current = activeEditor
+    setEmbedOpen((v) => !v)
+  }
+
   function handleEmbedSelect(cardId) {
-    if (activeEditor) {
-      activeEditor.chain().focus().insertContent({ type: 'embeddedCard', attrs: { cardId } }).run()
+    const editor = embedEditorRef.current
+    if (editor) {
+      editor.chain().focus().insertContent({ type: 'embeddedCard', attrs: { cardId } }).run()
     }
+    embedEditorRef.current = null
     setEmbedOpen(false)
   }
 
@@ -215,7 +223,7 @@ function AppShell({ userId }) {
           onSettings={handleSettings}
           onMoveDockCardToTab={() => moveDockCardToTab(activeDockCardId, addTabCard)}
           onMoveToDock={() => activeEditorCardId && addToDock(activeEditorCardId)}
-          onEmbedOpen={() => setEmbedOpen((v) => !v)}
+          onEmbedOpen={handleEmbedOpen}
           lightningActive={lightningActive}
           onLightningToggle={() => setLightningActive((v) => !v)}
         />
