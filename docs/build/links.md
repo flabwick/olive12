@@ -90,10 +90,21 @@ Compound primary key `[sourceCardId+targetCardId]` prevents duplicate edges and 
 
 ---
 
+## Embed rendering
+
+`[[cardId]]` tokens in a card's markdown body are:
+1. Extracted by `extractLinks` → stored as `linkType: 'embed'` edges in the `links` table
+2. Rendered in the Tiptap editor as `EmbeddedCardNode` inline atoms (`src/card/EmbeddedCardNode.js`) — styled `.embedded-card-node` badges
+3. Round-tripped via `richTextLogic.js`: a marked extension converts `[[cardId]]` → `<span data-card-id="...">[[cardId]]</span>` on load; a Turndown rule converts it back on save
+
+The card body always stores plain markdown (not HTML). The `[[cardId]]` token is the canonical on-disk format.
+
+---
+
 ## Not built yet
 
 - Supabase sync for `links` (Brain/Wiki slice started but the links table is not yet synced — only `index_entries` is)
 - Any UI rendering links (no graph view, no backlinks panel)
 - Incoming links cleanup when a target card is deleted (only the source card's outgoing links are cleaned up on `removeCard`; target-side link rows from other cards are not removed)
 - Container card `container_children` or process card `input_card_ids` parsing
-- `@cardId` mention parsing (pattern not in use; `[[id]]` is the active embed syntax)
+- EmbeddedCardNode showing card title (currently shows `[[cardId]]` token; title lookup requires cardsById access in the NodeView)

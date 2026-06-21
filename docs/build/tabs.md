@@ -1,6 +1,6 @@
 # Tabs — implementation
 
-Tab and tab_card data shapes, Dexie-backed storage, the `useTabs` React hook, and the full UI layer (TabHeader, Tab, TabSwitcher, Dock, DockPrompt, TransientCard, FolderPanel).
+Tab and tab_card data shapes, Dexie-backed storage, the `useTabs` and `useDock` React hooks, and the full UI layer (TabHeader, Tab, TabSwitcher, Dock, DockCardPanel, FolderPanel).
 
 ## File map
 
@@ -18,6 +18,10 @@ src/
     assembleContext.test.js   # [TEST]
     buildPrompt.js            # Pure: builds OpenRouter messages array
     buildPrompt.test.js       # [TEST]
+    DockPrompt.jsx            # Dumb: prompt textarea + send + cancel + error
+    DockPrompt.css
+    DockPrompt.test.jsx       # [TEST]
+    DockPrompt.stories.jsx    # [STORY]
   sync/
     cardSyncLogic.js          # Pure: hash, classify, resolve conflict
     cardSyncLogic.test.js     # [TEST]
@@ -49,9 +53,15 @@ src/
     tabStorage.test.js        # [TEST]
     tabSupabaseStorage.js     # Supabase adapter for saved tabs (user_tabs)
     tabSupabaseStorage.test.js # [TEST]
+    dockCardStorage.js        # Dexie-backed dock_cards CRUD (pure, no React)
+    dockCardStorage.test.js   # [TEST]
+    dockStateMachine.js       # Pure: computeDockState({ activeDockCardId, activeEditorCardId, activeSurface })
+    dockStateMachine.test.js  # [TEST]
     useTabs.js                # React hook: Dexie init, card/tab/folder/index/brain/flip state
     useTabs.test.js           # [TEST]
-    TabHeader.jsx             # Dumb: inline-editable tab name + 3-state save button
+    useDock.js                # React hook: dock card ids, active card, dock state
+    useDock.test.js           # [TEST]
+    TabHeader.jsx             # Dumb: inline-editable tab name + save button + tab overview button
     TabHeader.css
     TabHeader.test.jsx        # [TEST]
     TabHeader.stories.jsx     # [STORY]
@@ -63,18 +73,14 @@ src/
     Tab.css
     Tab.test.jsx              # [TEST]
     Tab.stories.jsx           # [STORY]
-    Dock.jsx                  # Bottom toolbar: scroll-top, add, folders, prompt, Idx, tab-overview, menu
+    Dock.jsx                  # 3-state toolbar (BASE / DOCK_EDITOR / TAB_EDITOR)
     Dock.css
     Dock.test.jsx             # [TEST]
     Dock.stories.jsx          # [STORY]
-    DockPrompt.jsx            # Dumb: prompt textarea + send + cancel + error
-    DockPrompt.css
-    DockPrompt.test.jsx       # [TEST]
-    DockPrompt.stories.jsx    # [STORY]
-    TransientCard.jsx         # Inline card-creation form (text mode + portal search mode)
-    TransientCard.css
-    TransientCard.test.jsx    # [TEST]
-    TransientCard.stories.jsx # [STORY]
+    DockCardPanel.jsx         # Dumb: Card editor panel for the active dock card
+    DockCardPanel.css
+    DockCardPanel.test.jsx    # [TEST]
+    DockCardPanel.stories.jsx # [STORY]
     index.js                  # Barrel exports
   brain/
     createIndexEntry.js       # Pure: IndexEntry data shape factory
@@ -92,15 +98,18 @@ src/
   debug/
     indexPipelineDebug.js     # Event log for index pipeline
     indexPipelineDebug.test.js
-    IndexDebugPanel.jsx       # Floating debug panel (toggled from Dock)
+    IndexDebugPanel.jsx       # Floating debug panel (toggled from Settings)
     IndexDebugPanel.css
   card/
     flipLogic.js              # Pure flip set helpers
     CardBack.jsx              # Back face (composed by Card / PortalCard)
+    RichTextEditorContext.jsx # Context: active editor, cardId, surface
+    RichTextEditor.jsx        # Tiptap editor + embed bar
+    EmbeddedCardNode.js       # Tiptap node for [[cardId]] tokens
+    EmbedEntriesContext.jsx   # Context: vault entries for embed picker
+    EmbedSourcePanel.jsx      # Dumb: searchable card picker
   App.jsx                     # App (session gate) + AppShell (composes all UI)
   App.css
-  CardShell.jsx               # Thin wrapper used in CardShell-only contexts
-  CardShell.test.jsx
 supabase/
   functions/
     dock-prompt/
@@ -145,6 +154,15 @@ e2e/
 | `foldState` | boolean | `true` = body collapsed; default `false` |
 | `hiddenState` | boolean | `true` = rendered at reduced opacity; default `false` |
 
+### DockCard
+
+Records in the `dock_cards` Dexie table (version 7) track which cards are pinned to the dock.
+
+| Field | Type | Notes |
+|---|---|---|
+| `cardId` | string (PK) | References a card in `cards` |
+| `order` | number | Position in the dock pill row |
+
 ## Pure helpers (createTab.js)
 
 ### Tab-level helpers
@@ -167,6 +185,53 @@ e2e/
 | `setTabCardFold(tabCards, cardId, foldState)` | Returns new array with matching card's `foldState` updated |
 | `setTabCardHidden(tabCards, cardId, hiddenState)` | Returns new array with matching card's `hiddenState` updated |
 | `removeTabCard(tabCards, cardId)` | Returns new array with card removed; positions renumbered |
+
+## Dock state machine (dockStateMachine.js)
+
+Pure function. No React, no storage.
+
+```js
+computeDockState({ activeDockCardId, activeEditorCardId, activeSurface })
+  → DOCK_STATE.BASE | DOCK_STATE.DOCK_EDITOR | DOCK_STATE.TAB_EDITOR
+```
+
+Priority order:
+
+1. `activeEditorCardId` is set **and** `activeSurface === 'dock'` → **DOCK_EDITOR** (editing a dock card)
+2. `activeEditorCardId` is set (any other surface) → **TAB_EDITOR** (editing a tab card)
+3. `activeDockCardId` is set → **DOCK_EDITOR** (dock card open but not being edited)
+4. Otherwise → **BASE**
+
+`activeSurface` distinguishes the case where the same card could be in both the dock and a tab; it is set by `RichTextEditorContext` via the `editorSurface` prop on `Card`.
+
+## React hook — useDock
+
+`useDock({ cardsById, activeEditorCardId, activeSurface })` — manages dock card state and open/close lifecycle.
+
+### State
+
+| State | Type | Description |
+|---|---|---|
+| `dockCardIds` | `string[]` | Ordered list of pinned card ids from Dexie |
+| `activeDockCardId` | `string \| null` | Card currently shown in DockCardPanel |
+
+### Returns
+
+| Property | Type | Description |
+|---|---|---|
+| `dockCardEntries` | `{ cardId, card }[]` | `dockCardIds` zipped with `cardsById`; entries with no matching card are excluded |
+| `activeDockCardId` | `string \| null` | Currently open dock card |
+| `dockState` | `DOCK_STATE` | Computed from `computeDockState` |
+| `openDockCard(cardId)` | function | Sets the active dock card |
+| `closeDockCard()` | function | Clears the active dock card |
+| `addToDock(cardId)` | async function | Pins an existing card to the dock |
+| `removeFromDock(cardId)` | async function | Unpins a card and closes panel if it was active |
+| `createAndPinCard(onCreated?)` | async function | Creates an empty card, pins it, opens it, calls `onCreated(card)` |
+| `moveDockCardToTab(cardId, addTabCard)` | async function | Adds card to the active tab (if not already there), unpins from dock |
+
+### `createAndPinCard` and `addToCardsById`
+
+`createAndPinCard` accepts an optional `onCreated(card)` callback so the caller can immediately register the new card in `cardsById` without a round-trip through storage. `AppShell` passes `addToCardsById` (from `useTabs`) as the callback.
 
 ## React hook — useTabs
 
@@ -191,7 +256,7 @@ e2e/
 ### Three `useEffect` hooks
 
 1. **Scheduler setup** — runs when `userId` changes. Creates a `makeCardSupabaseStorage` adapter (stored in `storageRef`) and a `createCardSyncScheduler` (stored in `schedulerRef`). Sets both to `null` when `userId` is absent.
-2. **Initial reconcile** — runs once when `isReady` and `userId` are both truthy. Calls `runNow()` (pull remote → sync dirty), then detects **orphan cards** (cards in Dexie with no `tab_cards` entry — pulled from Supabase on another device) and auto-creates `tab_card` entries on the first tab.
+2. **Initial reconcile** — runs once when `isReady` and `userId` are both truthy. Calls `runNow()` (pull remote → sync dirty), then detects **orphan cards** (cards in Dexie with no `tab_cards` entry — pulled from Supabase on another device) and auto-creates `tab_card` entries on the first tab. Dock-pinned cards (`getDockCardIds`) are excluded from orphan promotion.
 3. **Dexie init** — on mount, loads all tabs/tab_cards/cards/folders/index_entries in parallel; sets `isReady: true`. If no tabs exist, creates a default `'Main'` tab. Otherwise restores `activeTabId` from `localStorage` (falls back to the first tab if the saved id no longer exists).
 4. **Tab Supabase sync** — when `userId` is set, saved tabs (`savedLocation !== 'none'`) sync to `user_tabs` via `tabSupabaseStorage` (debounced upsert on tab mutations).
 
@@ -201,7 +266,7 @@ e2e/
 
 ### StrictMode safety
 
-All tab mutation functions (`addTab`, `removeTab`, `renameTab`, `saveTabToShelf`, `moveTabToLibrary`) compute their new values and await Dexie writes **before** calling any state setter. No side effects occur inside `setTabs` or `setActiveTabId` updater functions. This is required for React 18 StrictMode, which invokes updater functions twice in development.
+All tab mutation functions compute their new values and await Dexie writes **before** calling any state setter. No side effects occur inside `setTabs` or `setActiveTabId` updater functions.
 
 ### Returns
 
@@ -221,6 +286,7 @@ All tab mutation functions (`addTab`, `removeTab`, `renameTab`, `saveTabToShelf`
 | `renameTab` | function | `(tabId, name)` — updates tab name, persists |
 | `saveTabToShelf` | function | `(tabId)` — sets `savedLocation: 'shelf'`, persists |
 | `moveTabToLibrary` | function | `(tabId, folderId?)` — sets `savedLocation: 'library'`, persists |
+| `addToCardsById` | function | `(card)` — immediately registers a new card into `cardsById` without a Dexie read; used after dock card creation |
 
 **Card state:**
 
@@ -232,7 +298,7 @@ All tab mutation functions (`addTab`, `removeTab`, `renameTab`, `saveTabToShelf`
 | `shelfTabs` | `Tab[]` | All tabs with `savedLocation === 'shelf'` |
 | `libraryTabs` | `Tab[]` | All tabs with `savedLocation === 'library'` |
 | `folders` | `Folder[]` | All folders |
-| `addCard` | function | `({ title, body }) → card` — creates card + tab_card on active tab, persists, schedules sync |
+| `addTabCard` | function | `(cardId)` — adds an existing card to the active tab at the next position |
 | `addPortalCard` | function | `(targetCardId) → card\|null` — creates portal card in active tab (see dedup guard below) |
 | `updateCard` | function | `(cardId, fields)` — updates card, persists, schedules sync |
 | `removeCard` | function | `(cardId)` — removes from state, Dexie, and Supabase (immediate delete, no debounce) |
@@ -264,48 +330,51 @@ When `saveToShelf(cardId)` is called:
 4. Removes the original tab_card entries from Dexie; persists the new portal cards and their tab_card entries.
 5. Schedules sync.
 
-Net result: the saved card moves to the vault shelf; every tab that had the card now shows a portal card in its place. The portal card reads and edits the shelf card's content live.
+Net result: the saved card moves to the vault shelf; every tab that had the card now shows a portal card in its place.
 
 ### `addPortalCard` dedup guard
 
 Before creating a portal card, `addPortalCard` checks every card currently in the active tab:
 
 - If any entry's card has `id === targetCardId` (the target card itself is already in the tab), returns `null` — no-op.
-- If any entry's card is a portal with `config.target_card_id === targetCardId` (a portal to this target already exists), returns `null` — no-op.
-
-This prevents duplicate representations of the same content in a single tab, regardless of how the card was opened (vault "Open in tab" button, TransientCard portal search, or programmatic call).
+- If any entry's card is a portal with `config.target_card_id === targetCardId`, returns `null` — no-op.
 
 ## App layout
 
 `App` owns session state. It renders:
 - `null` while `sessionChecked` is false (avoids a flash)
 - `<AuthForm>` when not authenticated
-- `<AppShell userId={userId}>` when authenticated
+- `<RichTextEditorProvider><AppShell userId={userId}></RichTextEditorProvider>` when authenticated
+
+`RichTextEditorProvider` wraps `AppShell` (not the other way around) so `AppShell` can call `useRichTextEditorContext()` to get `activeCardId` and `activeSurface` for the dock state machine.
 
 `AppShell` receives `userId` and owns:
 - `useTabs({ userId })` — all card, tab, folder, and prompt state
+- `useDock({ cardsById, activeEditorCardId, activeSurface })` — dock card list, panel open state, dock state machine
 - `folderPanelOpen` — whether `FolderPanel` is visible
-- `transientOpen` — whether `TransientCard` form is open
-- `promptOpen` — whether `DockPrompt` form is visible
+- `promptOpen` — whether `DockPrompt` form is visible (not yet openable from UI — see [prompt.md](./prompt.md))
 - `tabSwitcherOpen` — whether `TabSwitcher` overlay is visible
-- `indexDebugOpen` — AppShell state; toggled via Dock **Idx** (`onIndexDebug` / `indexDebugActive`)
-- `vaultInitialTab` — which vault pane (`'shelf'`, `'library'`, or `'brain'`) to open when locating
+- `indexDebugOpen` — toggled via Settings button in Dock
+- `lightningActive` — visual toggle state for the AI prompt button in the formatting toolbar (not yet wired to `promptOpen`)
+- `vaultInitialTab` — which vault pane to open when locating a card
 - `highlightedCardId` — card id to highlight in the vault after a locate action
 
-Opening `DockPrompt` closes `FolderPanel` and vice versa. `TabSwitcher` is independent and overlays the entire shell. Structure:
+Opening the folder panel closes any open dock card. Settings toggle closes the folder panel. Structure:
 
 ```
-app-shell
-  TabHeader                  ← sticky top bar: tab name (editable) + save button
-  app-shell__content         ← scrollable area
-    Tab
-    TransientCard?
-  app-shell__dock-area       ← position: relative
-    FolderPanel?             ← position: absolute, bottom: calc(100% - 2px)
-    DockPrompt?              ← same slot, mutual exclusive with FolderPanel
-    IndexDebugPanel?         ← fixed overlay when indexDebugOpen
-    Dock
-TabSwitcher?                 ← fixed full-screen overlay, outside app-shell flow
+RichTextEditorProvider
+  app-shell
+    EmbedEntriesProvider
+      TabHeader               ← sticky top: tab name (editable) + save button + Tab overview button
+      app-shell__content      ← scrollable area
+        Tab
+      app-shell__dock-area    ← position: relative
+        FolderPanel?          ← position: absolute, bottom: calc(100% - 2px)
+        DockPrompt?           ← same slot, mutually exclusive (not yet reachable from UI)
+        DockCardPanel?        ← above dock when activeDockCardId is set
+        IndexDebugPanel?      ← role="dialog", shown when indexDebugOpen
+        Dock
+    TabSwitcher?              ← fixed full-screen overlay
 ```
 
 **Key handlers in AppShell:**
@@ -313,23 +382,27 @@ TabSwitcher?                 ← fixed full-screen overlay, outside app-shell fl
 | Handler | Trigger | Effect |
 |---|---|---|
 | `handleOpenAsPortal(cardId)` | Vault "Open in tab" button for a card | `addPortalCard(cardId)`, close panel |
-| `handleSubmitPortal(cardId)` | TransientCard portal selection | `addPortalCard(cardId)`, close transient |
 | `handleOpenSavedTab(tabId)` | Vault "Switch to tab" button | `switchTab(tabId)`, close panel |
 | `handleMoveTabToLibrary(tabId)` | Vault "Move to Library" on a tab | `moveTabToLibrary(tabId, null)` |
-| `handleLocate(targetCardId)` | PortalCard "Show in vault" (✓) button | Looks up card location → sets `vaultInitialTab`, sets `highlightedCardId`, opens panel |
+| `handleLocate(targetCardId)` | PortalCard "Show in vault" button | Looks up card location → sets `vaultInitialTab`, sets `highlightedCardId`, opens panel |
+| `handleFolderOpen()` | Dock "Library" button | Closes any open dock card, toggles `folderPanelOpen` |
+| `handleSettings()` | Dock / TabHeader "Settings" button | Closes folder panel, toggles `indexDebugOpen` |
+| `handleTabOverview()` | TabHeader "Tab overview" button | Opens `TabSwitcher` |
+| `handlePromptSubmit(text)` | DockPrompt Submit | Calls `runDockPrompt`, closes panel on success |
 
 ## Display components
 
 ### TabHeader
 
-`TabHeader({ name, savedLocation, onRename, onSaveToShelf, onMoveToLibrary })` — sticky bar above the content area.
+`TabHeader({ name, savedLocation, onRename, onSaveToShelf, onMoveToLibrary, onTabOverview })` — sticky bar above the content area.
 
-- **Name editing:** clicking the `h2` switches to an `<input>` in-place. Enter or blur commits via `onRename`. Escape cancels and restores the original value.
+- **Name editing:** clicking the `h2` switches to an `<input>` in-place. Enter or blur commits via `onRename`. Escape cancels.
 - **Save button** (3 states):
-  - `savedLocation === 'none'` and `onSaveToShelf` provided → `+` button, calls `onSaveToShelf`
-  - `savedLocation === 'shelf'` → `✓` button (shelf state), calls `onMoveToLibrary` if provided
-  - `savedLocation === 'library'` → `✓` button, disabled
-- When neither callback is provided, no save button is rendered.
+  - `savedLocation === 'none'` and `onSaveToShelf` provided → `+` button (aria: "Save tab to Shelf")
+  - `savedLocation === 'shelf'` → `✓` button (aria: "Tab saved to Shelf — click to move to Library"), calls `onMoveToLibrary`
+  - `savedLocation === 'library'` → `✓` button, disabled (aria: "Tab in Library")
+  - When neither callback is provided and no `onTabOverview`, no buttons render.
+- **Tab overview button:** rendered only when `onTabOverview` is provided. `aria-label="Tab overview"`. Clicking opens the `TabSwitcher` dialog.
 
 ### TabSwitcher
 
@@ -337,48 +410,51 @@ TabSwitcher?                 ← fixed full-screen overlay, outside app-shell fl
 
 - `role="dialog" aria-label="Tab switcher"`.
 - Backdrop `div` behind the tile grid calls `onClose` on click.
-- Escape key anywhere closes the switcher (via `document.addEventListener('keydown', ...)`).
-- **Tiles:** one per tab. Shows name, card count, and a badge for `savedLocation` (`Shelf` / `Library`). Has a `×` close button (`aria-label="Close <name>"`) and a Save button when `savedLocation === 'none'`.
+- Escape key closes the switcher.
+- **Tiles:** one per tab. Shows name, card count, and `savedLocation` badge. Close button (`aria-label="Close <name>"`). Save button when `savedLocation === 'none'`.
 - Clicking a tile calls `onSwitch(tabId)`.
-- **Add tile:** `+` tile at end, calls `onAdd`.
-- `tabEntries` is `Record<tabId, Card[]>` — used to display card counts per tile.
-- CSS animation: overlay fades in (`tab-switcher-in 150ms`); tiles stagger in (`tile-in 200ms`) using a `--tile-index` CSS custom property set inline.
+- **Add tile:** `+` tile at end, `aria-label="New tab"`, calls `onAdd`.
 
 ### Tab
 
-`Tab({ entries, folders, cardsById, onReorder, onUpdate, onRemove, onFold, onUnfold, onHide, onUnhide, onSaveToShelf, onMoveToLibrary, onLocate, flipCard, isFlipped })` — presentational. Renders cards in position order. Each entry includes `indexEntry` (resolved to the portal target's entry for portal cards). `flipCard(cardId)` and `isFlipped(cardId)` come from `useTabs` via `AppShell`.
+`Tab({ entries, folders, cardsById, onReorder, onUpdate, onRemove, onFold, onUnfold, onHide, onUnhide, onSaveToShelf, onMoveToLibrary, onLocate, flipCard, isFlipped })` — presentational. Renders cards in position order.
 
-**Flip:** `onFlip(cardId)` and `isFlipped(cardId)` passed to `Card` / `PortalCard`. When flipped, front body hidden and `CardBack` shown.
-
-**Portal card branching:** for each entry with `card.type === 'portal'`, renders `PortalCard` instead of `Card`:
-- Resolves target from `cardsById` using `card.config.target_card_id`.
-- Binds `onUpdate` to the **target card's id** (not the portal card's id), so edits propagate to the source card and sync normally.
-- Binds `onLocate` to `() => onLocate(target.id)` when both target and `onLocate` are available.
+**Portal card branching:** for each entry with `card.type === 'portal'`, renders `PortalCard` instead of `Card`. Binds `onUpdate` to the **target card's id**.
 
 ### Dock
 
-`Dock({ onAdd, addDisabled, onScrollTop, onFolder, onPrompt, promptDisabled, onTabOverview, onMenu, onIndexDebug, indexDebugActive })` — fixed bottom toolbar, `role="toolbar"`.
-- Left group: scroll-top caret, add card (`+`), folders, prompt (lightning bolt icon), **Idx** (index pipeline debug toggle; `indexDebugActive` + `onIndexDebug` from AppShell).
-- Right group: tab overview (`aria-label="Tab overview"`), menu.
-- `addDisabled` disables the `+` button while `TransientCard` is open.
-- `promptDisabled` disables the prompt button while a prompt call is in flight.
-- `onTabOverview` toggles the `TabSwitcher` overlay.
+`Dock({ dockState, dockCardEntries, activeDockCardId, onAddDockCard, onOpenDockCard, onFolderOpen, onSettings, onMoveDockCardToTab, onMoveToDock, lightningActive, onLightningToggle })` — bottom toolbar. Renders differently based on `dockState`:
+
+**BASE state** (`role="toolbar" aria-label="Tab actions"`):
+- Left: dock card pills (one per pinned card, highlighted when active) + "Pin new card" (`+`) button
+- Divider
+- Right: "Library" button (folder icon), "Settings" button (menu icon)
+
+**DOCK_EDITOR state** (`role="toolbar" aria-label="Formatting options"`):
+- Full `FormattingToolbar` (all TOOLBAR_ITEMS from `RichTextEditor`) + separator + "AI prompt" (lightning icon) + "Move card to tab" (arrow icon) + "Settings"
+- Operates on `activeEditor` from `RichTextEditorContext`
+
+**TAB_EDITOR state** (same structure as DOCK_EDITOR):
+- `FormattingToolbar` + "AI prompt" + "Pin to dock" (pin icon) + "Settings"
+
+The "AI prompt" lightning button is visible in both editor states and toggles `lightningActive` for visual feedback. It is not yet wired to open the `DockPrompt` panel.
+
+### DockCardPanel
+
+`DockCardPanel({ card, cardId, onClose, onUpdate })` — panel rendered above the Dock when a dock card is active.
+
+- `role="complementary" aria-label="Dock card"`.
+- Renders a `Card` component with `editorSurface="dock"`.
+- Close button (aria: "Close dock panel") calls `onClose`.
+- `onUpdate(fields)` delegates to `updateCard(cardId, fields)` in AppShell.
 
 ### DockPrompt
 
-`DockPrompt({ onSubmit, onDismiss, loading, error })` — textarea + Send/Cancel buttons + inline error. Send button disabled when textarea is empty or `loading` is true. Submit calls `onSubmit(trimmedText)`. Error displayed with `role="alert"`.
-
-### TransientCard
-
-`TransientCard({ onSubmit, onDismiss, onSubmitPortal, shelfEntries, libraryEntries })` — inline card creation form with two modes.
-
-**Text mode (default):** type row (Text active; Process/Container disabled), title input, body textarea, Add → / Cancel buttons.
-
-**Portal mode:** activated by clicking the `Portal` type button. Shows a search input; typing filters all `shelfEntries` and `libraryEntries` by title. Clicking a result calls `onSubmitPortal(card.id)`. No match: "No cards found." message.
+`DockPrompt({ onSubmit, onDismiss, loading, streaming, error })` — textarea + Send/Cancel buttons + inline error. Submit calls `onSubmit(trimmedText)`. Error displayed with `role="alert"`. Currently rendered by `AppShell` when `promptOpen` is true, but `promptOpen` is not yet set from the UI. See [prompt.md](./prompt.md).
 
 ### FolderPanel
 
-Slide-up panel. Three tabs: **Shelf** (VaultTabRow tab entries + ShelfRow card entries), **Library** (VaultTabRow library tabs + FolderTree), **Brain** (`BrainFeed` with stale/orphan items). Props include `brainFeedItems`, `onBrainAccept`, `onBrainDismiss`. X button calls `onClose`. See [vault.md](./vault.md) and [brain.md](./brain.md).
+Slide-up panel. Three tabs: **Shelf** (VaultTabRow tab entries + ShelfRow card entries), **Library** (VaultTabRow library tabs + FolderTree), **Brain** (`BrainFeed` with stale/orphan items). X button calls `onClose`. See [vault.md](./vault.md) and [brain.md](./brain.md).
 
 ## Tests
 
@@ -386,17 +462,20 @@ Slide-up panel. Three tabs: **Shelf** (VaultTabRow tab entries + ShelfRow card e
 |---|---|
 | `createTab.test.js` | `createTab` defaults/custom/unique ids; `savedLocation`/`savedFolderId` defaults; `createTabCard` defaults; `nextPosition`; `reorderTabCard`; `setTabCardFold`; `setTabCardHidden`; `removeTabCard`; `updateTabFields`; `setTabName`; `removeTab` (removes and renumbers); `reorderTabs`; `saveTabToShelf`; `moveTabToLibrary` |
 | `tabStorage.test.js` | Empty reads; `putTab` round-trip + upsert; `deleteTab`; `putTabCard` round-trip, foldState/hiddenState, position upsert; `deleteTabCard`; `deleteAllTabCards` |
-| `useTabs.test.js` | Default tab on first mount; state loaded on mount; `addCard`; `addPortalCard` (creates portal, appends at end, dedup — same target twice is no-op, target card already in tab is no-op); `updateCard`; `removeCard`; `reorder`; `fold`/`unfold`; `hide`/`unhide`; `saveToShelf` (moves card to shelf, replaces tab instance with portal at same position, persists); `moveToLibrary` (state + Dexie + wiki-index invoke); `shelfEntries`/`libraryEntries` derivation + sort; `shelfTabs`/`libraryTabs` derivation; `createFolder`; `moveToLibrary` with folderId; remount persistence; multi-tab: `addTab`, `removeTab`, `renameTab`, `saveTabToShelf`, `moveTabToLibrary`, `switchTab`; localStorage: `activeTabId` persisted on switch, restored on remount; sync wiring: scheduler created, `runNow` called, `scheduleSync` on mutations, orphan card detection, `removeCard` with userId calls `deleteRemoteCard`; `runDockPrompt`: invoke args, card created, returns true/false, excludes hidden cards; `brainFeedItems` stale/orphan; `flipCard` toggles/un-flips; `isFlippedCard` boolean |
-| `TabHeader.test.jsx` | Renders name and save button; click → edit mode; Enter commits; blur commits; Escape cancels; shelf state button; library state button (disabled); no button when no handlers |
+| `dockCardStorage.test.js` | Empty read; `addDockCard` round-trip; order appended; `removeDockCard`; `getDockCardIds` returns sorted ids |
+| `dockStateMachine.test.js` | BASE when nothing active; TAB_EDITOR when editor active (tab surface); DOCK_EDITOR when activeDockCardId set; DOCK_EDITOR when editing dock surface; TAB_EDITOR when editing with surface='tab' even if ids match |
+| `useDock.test.js` | Loads dock card ids on mount; openDockCard sets active; closeDockCard clears; addToDock appends; removeFromDock clears active; createAndPinCard creates card + pins + opens + calls onCreated; moveDockCardToTab adds to tab if not already there, removes from dock |
+| `useTabs.test.js` | Default tab on first mount; state loaded on mount; `addTabCard`; `addPortalCard` (creates portal, appends at end, dedup — same target twice is no-op, target card already in tab is no-op); `updateCard`; `removeCard`; `reorder`; `fold`/`unfold`; `hide`/`unhide`; `saveToShelf` (moves card to shelf, replaces tab instance with portal at same position, persists); `moveToLibrary` (state + Dexie + wiki-index invoke); `shelfEntries`/`libraryEntries` derivation + sort; `shelfTabs`/`libraryTabs` derivation; `createFolder`; `moveToLibrary` with folderId; remount persistence; multi-tab: `addTab`, `removeTab`, `renameTab`, `saveTabToShelf`, `moveTabToLibrary`, `switchTab`; localStorage: `activeTabId` persisted on switch, restored on remount; sync wiring: scheduler created, `runNow` called, `scheduleSync` on mutations, orphan card detection (dock-pinned excluded), `removeCard` with userId calls `deleteRemoteCard`; `runDockPrompt`: invoke args, card created, returns true/false, excludes hidden cards; `brainFeedItems` stale/orphan; `flipCard` toggles/un-flips; `isFlippedCard` boolean; `addToCardsById` immediately adds card to cardsById state |
+| `TabHeader.test.jsx` | Renders name; click → edit mode; Enter commits; blur commits; Escape cancels; shelf state button; library state button (disabled); no buttons when no callbacks; Tab overview button renders/calls onTabOverview |
 | `TabSwitcher.test.jsx` | Renders all tiles; active tile highlighted; card counts; shelf/library badges; switch on tile click; add tile; close on × click; close on backdrop click; Escape closes; remove tile calls `onRemoveTab`; save button calls `onSaveTab` |
 | `Tab.test.jsx` | Empty state; renders title+body; fold hides body; hidden card class; position order; all callbacks; portal card renders target title/body; portal placeholder when null target; portal onUpdate routes to target id; null target not editable; onLocate called with target id |
-| `Dock.test.jsx` | All 6 buttons render; all callbacks including `onTabOverview`; `addDisabled`; `promptDisabled` |
-| `DockPrompt.test.jsx` | Renders textarea + buttons; Send disabled when empty; enables after typing; `onSubmit` with trimmed text; `onDismiss`; whitespace-only no-op; loading state; error alert; no alert when error empty |
-| `TransientCard.test.jsx` | Form fields; submit; cancel; disabled type stubs; Portal button enabled; portal search mode filters entries; clicking result calls `onSubmitPortal`; no-match message |
+| `Dock.test.jsx` | BASE: renders pill list, Pin new card, Library, Settings buttons; all BASE callbacks. DOCK_EDITOR: formatting toolbar buttons, Move card to tab button, Settings. TAB_EDITOR: formatting toolbar, Pin to dock, Settings. lightningActive styling |
+| `DockCardPanel.test.jsx` | Returns null when no card; renders card heading; landmark role; close button calls onClose; Card body wrapper present |
+| `DockPrompt.test.jsx` | Renders textarea + buttons; Send disabled when empty; enables after typing; `onSubmit` with trimmed text; `onDismiss`; whitespace-only no-op; loading state; streaming spinner; error alert; no alert when error empty |
 | `FolderPanel.test.jsx` | See vault.md |
 | `AuthForm.test.jsx` | Inputs; buttons disabled when empty; enable on type; callbacks; error; loading |
-| `App.test.jsx` | Add card flow; dock disabled while transient open; Folders panel; Prompt button; DockPrompt open/close/submit; auth gate (logged in/out, signIn/signUp, error, confirmation); tab switcher opens/closes; new tab added via switcher |
-| `e2e/tabs.spec.js` | Full flow: open switcher → create tab → rename → save to shelf → close original tab → verify remaining tab and shelf badge |
+| `App.test.jsx` | Dock renders Library + Pin new card; clicking Library opens folder panel; Settings opens IndexDebugPanel; Pin new card shows DockCardPanel; auth gate (logged in/out, signIn/signUp, error, confirmation); vault card lifecycle (save to shelf, refresh, close portal); tab switcher via TabHeader (opens dialog, shows New tab tile, Escape closes) |
+| `e2e/tabs.spec.js` | Full flow: open switcher via TabHeader → create tab → rename → save to shelf → close original tab → verify; vault panel via Library button; Brain tab |
 
 ## Not built yet
 
@@ -407,6 +486,8 @@ Slide-up panel. Three tabs: **Shelf** (VaultTabRow tab entries + ShelfRow card e
 - Search, tagging, filters
 - Tab or tab_card Dexie-only sync (saved tabs sync via `user_tabs` when authenticated)
 - Conflict UI (remote always wins on timestamp difference)
+- Dock Prompt panel wiring to lightning button (component and edge function are ready; button exists in formatting toolbar but does not yet open the panel)
 - Dock Prompt streaming, job queue, credits
 - `onBrainAccept` re-index workflow (see [brain.md](./brain.md))
 - Index debug off by default in production builds
+- EmbeddedCardNode title display (currently shows `[[cardId]]` token; needs NodeView for live title lookup)

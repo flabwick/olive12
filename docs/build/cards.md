@@ -41,6 +41,21 @@ src/
     FolderPickerOverlay.css
     FolderPickerOverlay.test.jsx # [TEST]
     FolderPickerOverlay.stories.jsx # [STORY]
+    richTextLogic.js            # Pure: markdownToHtml, htmlToMarkdown, isEmptyMarkdown (embed-aware)
+    richTextLogic.test.js       # [TEST]
+    RichTextEditorContext.jsx   # React context: tracks active editor, cardId, editorSurface
+    RichTextEditorContext.test.jsx # [TEST]
+    RichTextEditor.jsx          # Tiptap editor wrapper: formatting toolbar, embed bar, EmbeddedCardNode
+    RichTextEditor.css
+    RichTextEditor.test.jsx     # [TEST]
+    RichTextEditor.stories.jsx  # [STORY]
+    EmbeddedCardNode.js         # Tiptap inline node for [[cardId]] embed tokens
+    EmbedEntriesContext.jsx     # React context: vault card entries available to embed picker
+    EmbedEntriesContext.test.jsx # [TEST]
+    EmbedSourcePanel.jsx        # Dumb: searchable card picker for [[cardId]] embed insertion
+    EmbedSourcePanel.css
+    EmbedSourcePanel.test.jsx   # [TEST]
+    EmbedSourcePanel.stories.jsx # [STORY]
     index.js                    # Barrel exports
 ```
 
@@ -147,23 +162,82 @@ Overlay shown when a shelf card is being moved to the Library. Opens when the `�
 
 ## Card component
 
-Stateful: manages `editing`, `draftTitle`, `draftBody`, and `bodyHeight`. Composes `CardHeader`.
+Stateful: manages `editing`, `draftTitle`. Composes `CardHeader` and `RichTextEditor`.
 
-Key props: `title`, `body`, `foldState`, `hiddenState`, `location`, `folders`, `onToggleFold`, `onToggleHide`, `onMoveUp`, `onMoveDown`, `onUpdate`, `onClose`, `onSaveToShelf`, `onMoveToLibrary`.
+Key props: `cardId`, `title`, `body`, `back`, `foldState`, `hiddenState`, `location`, `folders`, `onToggleFold`, `onToggleHide`, `onMoveUp`, `onMoveDown`, `onUpdate`, `onClose`, `onSaveToShelf`, `onMoveToLibrary`, `editorSurface`.
 
-**Inline editing:** Enabled when `onUpdate` is provided.
-- Click title `h3` → enters edit mode with title input focused, all text selected.
-- Click body `<p>` → enters edit mode with textarea focused.
-- Both title and body are simultaneously editable in edit mode.
-- Commit on blur away from the `.card` div; calls `onUpdate` only if content changed.
-- Escape cancels and restores original values.
-- Visual continuity: card does not shift size when entering/leaving edit mode.
+**`editorSurface`** — `'tab'` (default) or `'dock'`. Forwarded to `RichTextEditor`, which forwards it to `RichTextEditorContext.registerEditor(cardId, editorSurface, editor)`. The dock state machine uses this to distinguish a dock-surface edit from a tab-surface edit, enabling the correct Dock state (DOCK_EDITOR vs TAB_EDITOR).
 
-**Body resize:** A drag handle (`role="separator" aria-label="Resize card"`) sits below the body. Dragging up shrinks to a minimum of 40px; dragging down past the content height snaps back to auto. Resize height is ephemeral — not persisted.
+**Title editing:** Click title `h3` → enters edit mode with title input focused. Commit on blur or Enter. Escape cancels.
 
-**Body auto-resize in edit mode:** The textarea grows with content using `scrollHeight`.
+**Body editing:** The body is a `RichTextEditor` (Tiptap). Editing is active whenever `onUpdate` is provided and `editable` is true. Body changes are committed continuously via `onChange` (no explicit blur step). The `[[+]]` embed button appears in the editor's embed bar; clicking it opens `EmbedSourcePanel` inline; selecting a card inserts an `EmbeddedCardNode`.
 
 **Flip:** When `flipped` is true, the front face (header + body) is hidden and `CardBack` is shown instead. Flip is toggled from `CardHeader` via `onFlip`; state lives in `useTabs` (`flippedCardIds` Set). See [brain.md](./brain.md) for wiki index on the back (library only).
+
+## Rich text system
+
+### richTextLogic.js
+
+Pure serialization — no React, no storage.
+
+| Function | Behaviour |
+|---|---|
+| `markdownToHtml(md)` | Parses markdown to HTML. A marked inline extension converts `[[cardId]]` tokens to `<span data-card-id="cardId">[[cardId]]</span>` before parsing. Returns `''` for blank input. |
+| `htmlToMarkdown(html)` | Converts HTML to markdown via Turndown. A custom rule converts `<span data-card-id="...">` back to `[[cardId]]`. GFM strikethrough rule is also registered. |
+| `isEmptyMarkdown(md)` | Returns `true` for blank/null/undefined content. |
+
+The `[[cardId]]` round-trip requires non-empty span content because Turndown skips blank inline nodes before checking custom rules. The marked extension therefore renders the token text inside the span.
+
+### RichTextEditorContext
+
+`RichTextEditorProvider` / `useRichTextEditorContext()` — tracks the active Tiptap editor instance, the card it belongs to, and which surface it is on.
+
+| Value | Type | Description |
+|---|---|---|
+| `activeEditor` | `Editor \| null` | The Tiptap editor that currently has focus |
+| `activeCardId` | `string \| null` | The `cardId` of the focused editor |
+| `activeSurface` | `'tab' \| 'dock' \| null` | Which surface the editor is on |
+| `registerEditor(cardId, surface, editor)` | function | Called on focus — sets all three values |
+| `clearEditor(cardId)` | function | Called on blur — clears only if the card id still matches (guards against focus/blur race) |
+
+`RichTextEditorProvider` wraps `App` (outside `AppShell`) so that `AppShell` can read `activeCardId` and `activeSurface` to drive the dock state machine.
+
+### RichTextEditor component
+
+`RichTextEditor({ value, onChange, editable, ariaLabel, placeholder, cardId, editorSurface })` — Tiptap editor wrapper.
+
+- Uses `StarterKit` + `EmbeddedCardNode` extensions.
+- On focus: calls `registerEditor(cardId, editorSurface, editor)`.
+- On blur: calls `clearEditor(cardId)`.
+- `onChange(markdown)` fires on every Tiptap update via `htmlToMarkdown(editor.getHTML())`.
+- Syncs external `value` changes when the editor is not focused (streaming support).
+- **Formatting toolbar** (TOOLBAR_ITEMS): Bold, Italic, Strike, Code, H1/H2/H3, Bullet list, Ordered list, Blockquote, Undo, Redo — rendered by `Dock` when the editor is active.
+- **Embed bar:** `[[+]]` button (aria: "Embed card") opens `EmbedSourcePanel` inline. Selecting a card inserts an `EmbeddedCardNode` at the cursor.
+
+### EmbeddedCardNode
+
+Tiptap `Node.create` extension (`src/card/EmbeddedCardNode.js`).
+
+- `group: 'inline'`, `inline: true`, `atom: true` — renders as an indivisible inline badge.
+- `addAttributes`: `cardId` — parsed from `data-card-id` attribute; rendered back to `data-card-id`.
+- `parseHTML`: matches `span[data-card-id]`.
+- `renderHTML`: outputs `<span data-card-id="..." class="embedded-card-node">[[cardId]]</span>`.
+
+### EmbedEntriesContext
+
+`EmbedEntriesProvider({ entries, children })` / `useEmbedEntries()` — provides the flat list of vault card entries (shelf + library) to any component in the tree without prop drilling.
+
+`AppShell` wraps its content with `<EmbedEntriesProvider entries={[...shelfEntries, ...libraryEntries]}>`. `RichTextEditor` calls `useEmbedEntries()` to pass entries to `EmbedSourcePanel`.
+
+### EmbedSourcePanel
+
+`EmbedSourcePanel({ entries, onSelect, onClose })` — dumb searchable picker.
+
+- `role="dialog" aria-label="Insert embed"`.
+- Search input filters `entries` by card title (case-insensitive substring).
+- Clicking a card button calls `onSelect(card.id)`.
+- Cancel button calls `onClose`.
+- Empty state: "No cards found."
 
 ## CardBack component
 
@@ -219,11 +293,16 @@ The `.portal-card` wrapper has `position: relative`; the `.portal-card__locate` 
 | `PortalCard.test.jsx` | Renders target title/body when resolved; placeholder when target null; placeholder when cardsById missing target; fold hides body; hiddenState applies card--hidden; onClose/onMoveUp/onMoveDown callbacks; onUpdate called with edited fields (committed on blur); null target not editable; Show in vault button present/absent (requires both target and onLocate); calls onLocate on click |
 | `flipLogic.test.js` | `canFlip` for text/portal/empty back; `toggleFlip` adds/removes/non-mutating; `isFlipped` true/false/empty |
 | `CardBack.test.jsx` | Notes render; index section library-only; loading state; debug details |
+| `richTextLogic.test.js` | `markdownToHtml`: bold/italic/heading/list/empty; embed token `[[cardId]]` → span with data-card-id. `htmlToMarkdown`: strong/em/h1/del; span[data-card-id] → `[[cardId]]`; embed roundtrip. `isEmptyMarkdown` variants. |
+| `RichTextEditorContext.test.jsx` | registerEditor sets active state; clearEditor clears only when cardId matches; blur race condition guard |
+| `RichTextEditor.test.jsx` | Renders without crashing; markdown value renders; bold markdown; aria-label; onChange prop; embedded-card-node renders for [[cardId]] value |
+| `EmbedEntriesContext.test.jsx` | useEmbedEntries returns [] by default; returns provided entries |
+| `EmbedSourcePanel.test.jsx` | Search input; renders entry buttons; filter by title; no-match state; onSelect called with cardId; onClose called; dialog label; empty state |
 
 ## Not built yet
 
 - Process and container card types
-- Rich text (Tiptap), embeds
+- EmbeddedCardNode showing card title (currently shows `[[cardId]]`; needs NodeView + cardsById access)
 - Per-card colour or tags on front face (index tags are on back only)
 - Card deletion sync to Supabase
 - `user_id` on local card records

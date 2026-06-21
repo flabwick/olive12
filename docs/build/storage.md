@@ -83,6 +83,17 @@ db.version(6).stores({
   links:         '[sourceCardId+targetCardId], sourceCardId, targetCardId',
   index_entries: 'cardId',
 })
+
+// v7: adds dock_cards table for pinned dock card membership + order.
+db.version(7).stores({
+  cards:         'id',
+  tabs:          'id',
+  tab_cards:     '[tabId+cardId], tabId',
+  folders:       'id',
+  links:         '[sourceCardId+targetCardId], sourceCardId, targetCardId',
+  index_entries: 'cardId',
+  dock_cards:    'cardId',
+})
 ```
 
 | Table | Primary key | Secondary index | Notes |
@@ -93,6 +104,7 @@ db.version(6).stores({
 | `folders` | `id` | — | Stores folder records including `parentId`; not indexed |
 | `links` | `[sourceCardId+targetCardId]` compound | `sourceCardId`, `targetCardId` | Directed edge from source to target; rebuilt on every card write |
 | `index_entries` | `cardId` | — | One Brain/Wiki index entry per card; keyed by `cardId` |
+| `dock_cards` | `cardId` | — | Membership of the pinned dock card list; records have `cardId` and `order` |
 
 The database name is `olive12`. Increment the version number and add a migration block for any schema change. Always use `tx.table('tableName')` — not `tx.tableName` — in Dexie v4 upgrade callbacks.
 
@@ -134,6 +146,19 @@ The database name is `olive12`. Increment the version number and add a migration
 | `putFolder(folder)` | Upserts a folder record |
 | `deleteFolder(folderId)` | Deletes the record by primary key |
 
+## Dock card storage
+
+`src/tab/dockCardStorage.js` — plain async functions, no React.
+
+| Function | Behaviour |
+|---|---|
+| `getDockCardIds()` | Returns all `cardId` values from `dock_cards` sorted by `order` asc |
+| `addDockCard(cardId)` | Inserts a new dock_card record at `order = count` (append) |
+| `removeDockCard(cardId)` | Deletes the record by primary key |
+| `reorderDockCard(cardId, toOrder)` | Moves card to the given order; renumbers all others |
+
+Dock card records are not synced to Supabase. Card content lives in the `cards` table and follows the normal sync path.
+
 ## Index entry storage
 
 `src/brain/indexEntryStorage.js` — plain async functions, no React. See [brain.md](./brain.md) for the full data shape.
@@ -174,6 +199,7 @@ Between test files: Vitest runs each file in its own worker, so each file gets a
 | `tabStorage.test.js` | Empty reads; `putTab` round-trip + upsert; `deleteTab`; `putTabCard` round-trip; `foldState`/`hiddenState`; position upsert; `deleteTabCard` by compound key; `deleteAllTabCards` removes all records for a given tabId |
 | `folderStorage.test.js` | Empty read; `putFolder` round-trip; upsert; `deleteFolder`; `parentId` round-trip |
 | `indexEntryStorage.test.js` | Empty read; put round-trip; `getIndexEntry` found/undefined; upsert (no duplicate); `deleteIndexEntry`; `searchIndexEntries` — title match, tag match, summary match, no-match → [], case-insensitive, sorted by updatedAt desc |
+| `dockCardStorage.test.js` | Empty read; `addDockCard` round-trip; order appended correctly; `removeDockCard`; `getDockCardIds` returns sorted ids |
 
 ## Not built yet
 

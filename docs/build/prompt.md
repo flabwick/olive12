@@ -11,12 +11,12 @@ src/
     assembleContext.test.js   # [TEST] 6 tests
     buildPrompt.js            # Pure: builds OpenRouter messages array
     buildPrompt.test.js       # [TEST] 7 tests
-  tab/
     DockPrompt.jsx            # Dumb: prompt textarea + send + cancel + error
     DockPrompt.css
     DockPrompt.test.jsx       # [TEST] 9 tests
     DockPrompt.stories.jsx    # [STORY]
-    Dock.jsx                  # Bottom toolbar — includes prompt button
+  tab/
+    Dock.jsx                  # 3-state toolbar — lightning button (AI prompt toggle, not yet wired to DockPrompt)
     useTabs.js                # runDockPrompt, promptLoading, promptError live here
 supabase/
   functions/
@@ -176,14 +176,11 @@ async function handlePromptSubmit(text) {
   const ok = await runDockPrompt(text)
   if (ok) setPromptOpen(false)
 }
-
-function handlePromptToggle() {
-  setFolderPanelOpen(false)
-  setPromptOpen((v) => !v)
-}
 ```
 
-`Dock` receives `onPrompt={handlePromptToggle}` and `promptDisabled={promptLoading}` (disables the lightning bolt button while a request is in flight).
+`AppShell` owns `promptOpen` state and renders `<DockPrompt>` above the dock when true. The `DockPrompt` UI and `runDockPrompt` hook logic are fully functional.
+
+**Current status:** The Dock's lightning bolt button (rendered in DOCK_EDITOR and TAB_EDITOR states as "AI prompt") toggles a `lightningActive` display state, but is not yet wired to `setPromptOpen`. The `promptOpen` panel is not yet openable from the UI — this wiring is part of the AI prompt UX slice (not yet built). The `DockPrompt` component, edge function, and `runDockPrompt` remain ready for when that wiring lands.
 
 ## Tests
 
@@ -197,6 +194,7 @@ function handlePromptToggle() {
 
 ## Not built yet
 
+- Lightning button → DockPrompt panel wiring (button exists; panel and logic are ready but not yet connected)
 - Approve/deny UI before the card is created
 - Streaming responses (currently waits for full completion)
 - Job queue, credits, cost estimation

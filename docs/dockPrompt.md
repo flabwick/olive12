@@ -22,22 +22,20 @@ src/
     assembleContext.test.js     # [TEST] 6 unit tests
     buildPrompt.js              # Pure: builds OpenRouter messages array
     buildPrompt.test.js         # [TEST] 7 unit tests
-  tab/
     DockPrompt.jsx              # Dumb component: textarea + send + error
     DockPrompt.css
     DockPrompt.test.jsx         # [TEST] 9 tests
     DockPrompt.stories.jsx      # [STORY] Default, Loading, WithError
-    Dock.jsx                    # Extended: onPrompt / promptDisabled props + button
-    Dock.stories.jsx            # Extended: onPrompt in default args + PromptDisabled story
-    Dock.test.jsx               # Extended: 3 new tests for prompt button
-    useTabs.js                  # Extended: runDockPrompt, promptLoading, promptError
-    useTabs.test.js             # Extended: 5 new runDockPrompt tests
-  App.jsx                       # AppShell: promptOpen state, DockPrompt render, wiring
-  App.test.jsx                  # Extended: 4 new prompt UI tests
+  tab/
+    Dock.jsx                    # 3-state toolbar; lightning button (AI prompt) exists but not yet wired to DockPrompt
+    useTabs.js                  # runDockPrompt, promptLoading, promptError
+    useTabs.test.js             # 5 runDockPrompt tests
+  App.jsx                       # AppShell: promptOpen state, DockPrompt render, handlePromptSubmit
+  App.test.jsx                  # Prompt wiring tests
 supabase/
   functions/
     dock-prompt/
-      index.ts                  # Deno Edge Function: OpenRouter call, JSON response
+      index.ts                  # Deno Edge Function: OpenRouter call → { title, body }
 ```
 
 ## Context assembly
@@ -110,14 +108,9 @@ Three new return values from `useTabs({ userId })`:
 
 ## App wiring
 
-`AppShell` owns `promptOpen` state. Opening prompt closes the folder panel (and vice versa) to avoid stacking.
+`AppShell` owns `promptOpen` state. When `promptOpen` is true, `<DockPrompt>` is rendered above the dock. `handlePromptSubmit` calls `runDockPrompt` and closes the panel on success.
 
-```
-handlePromptToggle() → setFolderPanelOpen(false); setPromptOpen(v => !v)
-handleFolder()       → setPromptOpen(false); setFolderPanelOpen(v => !v)
-```
-
-`promptDisabled` on `Dock` is wired to `promptLoading` — disables the Prompt button while a call is in flight.
+The Dock's lightning bolt button (visible in DOCK_EDITOR and TAB_EDITOR states) toggles `lightningActive` for visual feedback, but is **not yet wired to `setPromptOpen`**. The DockPrompt panel is currently unreachable from the UI — that wiring is part of the AI prompt UX slice (not yet built).
 
 ## Tests
 
@@ -141,6 +134,7 @@ handleFolder()       → setPromptOpen(false); setFolderPanelOpen(v => !v)
 
 Explicitly out of scope — do not add without a new slice:
 
+- Lightning button → DockPrompt panel wiring (button exists in formatting toolbar, panel and logic ready)
 - Approve/deny/diff UI before the card is created
 - Editing existing cards via LLM
 - Streaming responses (current implementation waits for the full completion)
