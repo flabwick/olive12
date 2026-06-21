@@ -34,7 +34,7 @@ describe('RichTextEditor', () => {
     expect(() => wrap(<RichTextEditor value="initial" onChange={onChange} editable={true} />)).not.toThrow()
   })
 
-  it('renders the embedded card view with title and body for a known [[cardId]]', async () => {
+  it('renders the embedded card view with CardHeader controls for a known [[cardId]]', async () => {
     const entries = [{ id: 'card-1', title: 'My Note', body: 'Hello world' }]
     render(
       <RichTextEditorProvider>
@@ -44,7 +44,10 @@ describe('RichTextEditor', () => {
       </RichTextEditorProvider>
     )
     await waitFor(() => expect(document.querySelector('.embedded-card-view')).toBeInTheDocument())
-    expect(screen.getByText('My Note')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'My Note' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Collapse card' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove card' })).toBeInTheDocument()
   })
 
   it('renders the missing fallback for an unknown [[cardId]]', async () => {
