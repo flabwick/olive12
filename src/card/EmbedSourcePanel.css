@@ -1,9 +1,10 @@
 .embed-source-panel {
+  margin: 0 var(--col-pad) 0.5rem;
+  max-width: var(--col-max);
   border: 1px solid var(--olive-border, #b89868);
   border-radius: 0.375rem;
   background: var(--olive-parchment, #ede0ca);
   box-shadow: 2px 2px 0 #b09070;
-  margin-top: 0.25rem;
   overflow: hidden;
 }
 

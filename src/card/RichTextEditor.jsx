@@ -1,10 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { markdownToHtml, htmlToMarkdown } from './richTextLogic'
 import { useRichTextEditorContext } from './RichTextEditorContext'
-import { EmbedSourcePanel } from './EmbedSourcePanel'
-import { useEmbedEntries } from './EmbedEntriesContext'
 import { EmbeddedCardNode } from './EmbeddedCardNode'
 import './RichTextEditor.css'
 
@@ -36,8 +34,6 @@ export function RichTextEditor({
   editorSurface = 'tab',
 }) {
   const { registerEditor, clearEditor } = useRichTextEditorContext()
-  const embedEntries = useEmbedEntries()
-  const [embedOpen, setEmbedOpen] = useState(false)
 
   const editor = useEditor({
     extensions: [StarterKit, EmbeddedCardNode],
@@ -75,13 +71,6 @@ export function RichTextEditor({
     }
   }, [editor, editable, clearEditor, cardId])
 
-  function handleEmbedSelect(selectedCardId) {
-    if (editor) {
-      editor.chain().focus().insertContent({ type: 'embeddedCard', attrs: { cardId: selectedCardId } }).run()
-    }
-    setEmbedOpen(false)
-  }
-
   if (!editor) return null
 
   return (
@@ -92,28 +81,6 @@ export function RichTextEditor({
         onFocus={() => { if (editable) registerEditor(cardId, editorSurface, editor) }}
         onBlur={() => clearEditor(cardId)}
       />
-      {editable && (
-        <div className="rich-text-editor__embed-bar">
-          <button
-            type="button"
-            className="rich-text-editor__embed-btn"
-            aria-label="Embed card"
-            onMouseDown={(e) => {
-              e.preventDefault()
-              setEmbedOpen((v) => !v)
-            }}
-          >
-            [[+]]
-          </button>
-          {embedOpen && (
-            <EmbedSourcePanel
-              entries={embedEntries}
-              onSelect={handleEmbedSelect}
-              onClose={() => setEmbedOpen(false)}
-            />
-          )}
-        </div>
-      )}
     </div>
   )
 }

@@ -5,7 +5,7 @@ export function EmbedSourcePanel({ entries = [], onSelect, onClose }) {
   const [filter, setFilter] = useState('')
 
   const filtered = filter
-    ? entries.filter((e) => e.card.title?.toLowerCase().includes(filter.toLowerCase()))
+    ? entries.filter((e) => e.title?.toLowerCase().includes(filter.toLowerCase()))
     : entries
 
   return (
@@ -34,13 +34,13 @@ export function EmbedSourcePanel({ entries = [], onSelect, onClose }) {
           <li className="embed-source-panel__empty">No cards found.</li>
         ) : (
           filtered.map((e) => (
-            <li key={e.card.id}>
+            <li key={e.id}>
               <button
                 type="button"
                 className="embed-source-panel__item"
-                onClick={() => onSelect(e.card.id)}
+                onClick={() => onSelect(e.id)}
               >
-                {e.card.title || '(untitled)'}
+                {e.title || '(untitled)'}
               </button>
             </li>
           ))

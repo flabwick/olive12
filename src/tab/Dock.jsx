@@ -46,7 +46,7 @@ function PinIcon() {
   )
 }
 
-function FormattingToolbar({ activeEditor, lightningActive, onLightningToggle, onSettings, extraButton }) {
+function FormattingToolbar({ activeEditor, lightningActive, onLightningToggle, onSettings, onEmbedOpen, extraButton }) {
   return (
     <>
       {TOOLBAR_ITEMS.map((btn, i) =>
@@ -70,6 +70,15 @@ function FormattingToolbar({ activeEditor, lightningActive, onLightningToggle, o
         )
       )}
       <span className="dock__sep" aria-hidden="true" />
+      <button
+        type="button"
+        className="dock__btn"
+        aria-label="Embed card"
+        title="Embed card [[ ]]"
+        onMouseDown={(e) => { e.preventDefault(); onEmbedOpen?.() }}
+      >
+        [[]]
+      </button>
       <button
         type="button"
         className={`dock__btn${lightningActive ? ' dock__btn--active' : ''}`}
@@ -102,6 +111,7 @@ export function Dock({
   onSettings,
   onMoveDockCardToTab,
   onMoveToDock,
+  onEmbedOpen,
   lightningActive = false,
   onLightningToggle,
 }) {
@@ -115,6 +125,7 @@ export function Dock({
           lightningActive={lightningActive}
           onLightningToggle={onLightningToggle}
           onSettings={onSettings}
+          onEmbedOpen={onEmbedOpen}
           extraButton={
             <button
               type="button"
@@ -138,6 +149,7 @@ export function Dock({
           lightningActive={lightningActive}
           onLightningToggle={onLightningToggle}
           onSettings={onSettings}
+          onEmbedOpen={onEmbedOpen}
           extraButton={
             <button
               type="button"

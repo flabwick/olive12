@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AuthForm } from './auth/AuthForm'
 import { useRichTextEditorContext, RichTextEditorProvider } from './card/RichTextEditorContext'
 import { EmbedEntriesProvider } from './card/EmbedEntriesContext'
+import { EmbedSourcePanel } from './card/EmbedSourcePanel'
 import { IndexDebugPanel } from './debug/IndexDebugPanel'
 import { FolderPanel } from './layout/FolderPanel'
 import { supabase } from './lib/supabaseClient'
@@ -16,7 +17,7 @@ import { useTabs } from './tab/useTabs'
 import './App.css'
 
 function AppShell({ userId }) {
-  const { activeCardId: activeEditorCardId, activeSurface } = useRichTextEditorContext()
+  const { activeEditor, activeCardId: activeEditorCardId, activeSurface } = useRichTextEditorContext()
 
   const {
     tab,
@@ -71,6 +72,7 @@ function AppShell({ userId }) {
 
   const [folderPanelOpen, setFolderPanelOpen] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
+  const [embedOpen, setEmbedOpen] = useState(false)
   const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false)
   const [indexDebugOpen, setIndexDebugOpen] = useState(false)
   const [lightningActive, setLightningActive] = useState(false)
@@ -107,6 +109,13 @@ function AppShell({ userId }) {
   async function handlePromptSubmit(text) {
     const ok = await runDockPrompt(text)
     if (ok) setPromptOpen(false)
+  }
+
+  function handleEmbedSelect(cardId) {
+    if (activeEditor) {
+      activeEditor.chain().focus().insertContent({ type: 'embeddedCard', attrs: { cardId } }).run()
+    }
+    setEmbedOpen(false)
   }
 
   function handleSettings() {
@@ -180,6 +189,13 @@ function AppShell({ userId }) {
             error={promptError}
           />
         )}
+        {embedOpen && (
+          <EmbedSourcePanel
+            entries={[...shelfEntries, ...libraryEntries]}
+            onSelect={handleEmbedSelect}
+            onClose={() => setEmbedOpen(false)}
+          />
+        )}
         {activeDockCardId && cardsById[activeDockCardId] && (
           <DockCardPanel
             card={cardsById[activeDockCardId]}
@@ -199,6 +215,7 @@ function AppShell({ userId }) {
           onSettings={handleSettings}
           onMoveDockCardToTab={() => moveDockCardToTab(activeDockCardId, addTabCard)}
           onMoveToDock={() => activeEditorCardId && addToDock(activeEditorCardId)}
+          onEmbedOpen={() => setEmbedOpen((v) => !v)}
           lightningActive={lightningActive}
           onLightningToggle={() => setLightningActive((v) => !v)}
         />

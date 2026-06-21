@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { EmbedSourcePanel } from './EmbedSourcePanel'
 
 const SAMPLE_ENTRIES = [
-  { card: { id: 'c1', title: 'Meeting notes', body: '' } },
-  { card: { id: 'c2', title: 'Project plan', body: '' } },
-  { card: { id: 'c3', title: '', body: '' } },
+  { id: 'c1', title: 'Meeting notes', body: '' },
+  { id: 'c2', title: 'Project plan', body: '' },
+  { id: 'c3', title: '', body: '' },
 ]
 
 describe('EmbedSourcePanel', () => {
