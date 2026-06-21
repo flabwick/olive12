@@ -3,8 +3,8 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.875rem;
-  margin: 0 1.5rem 0;
-  max-width: 680px;
+  margin: 0 var(--col-pad) 0;
+  max-width: var(--col-max);
   background: var(--olive-surface, #dfd0b4);
   border: 2px solid var(--olive-border-dark, #2c1810);
   border-bottom: none;

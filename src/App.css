@@ -12,7 +12,7 @@
 .app-shell__content {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem 1.5rem 1rem;
+  padding: 1.5rem var(--col-pad) 1rem;
   display: flex;
   flex-direction: column;
   background-image: radial-gradient(circle, var(--olive-border, #b89868) 0.5px, transparent 0.5px);
@@ -20,23 +20,23 @@
   background-attachment: local;
 }
 
-/* Keep the card column readable on wide screens */
+/* Keep the card column readable on wide screens; center it when viewport is wider */
 .app-shell__content > * {
   width: 100%;
-  max-width: 680px;
+  max-width: var(--col-max);
+  margin-inline: auto;
 }
 
-/* Tab header absorbs the top padding so it's flush with the scroll container top.
-   Without this, sticky top:0 leaves a 1.5rem gap where card content scrolls through. */
+/* Tab header absorbs the top padding so it's flush with the scroll container top. */
 .app-shell__content:has(.tab-header) {
   padding-top: 0;
 }
 
-/* Let the tab header bleed edge-to-edge across the content's side padding so its
-   border-bottom and background span the full container width, not the column width. */
+/* Tab header bleeds edge-to-edge — cancel the column centering and extend to the padding edges */
 .app-shell__content > .tab-header {
-  width: calc(100% + 3rem);
+  width: calc(100% + 2 * var(--col-pad));
   max-width: none;
+  margin-inline: calc(-1 * var(--col-pad));
 }
 
 /* When the folder panel is open it floats above the content (absolute positioning),
@@ -46,8 +46,13 @@
   padding-bottom: calc(50vh + 1rem);
 }
 
-/* Positioning context so FolderPanel can anchor above the dock */
+/* Dock area: constrained to the same column envelope as content, centered.
+   Panels inside (FolderPanel, DockCardPanel) and the Dock itself all use
+   var(--col-pad) side margins, so they track the column on resize. */
 .app-shell__dock-area {
   position: relative;
   flex-shrink: 0;
+  width: 100%;
+  max-width: calc(var(--col-max) + 2 * var(--col-pad));
+  margin-inline: auto;
 }

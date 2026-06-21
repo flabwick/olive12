@@ -19,6 +19,10 @@
   --olive-sage:        #5a7850;
   --olive-accent:      #a84830;
 
+  /* Layout column */
+  --col-max: 680px;
+  --col-pad: 1.5rem;
+
   /* Layered-paper shadow system */
   --olive-shadow:      4px 4px 0 #b09070;
   --olive-shadow-sm:   2px 2px 0 #b09070;

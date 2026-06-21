@@ -3,8 +3,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 0.875rem;
-  margin: 0 1.5rem 1rem;
-  max-width: 680px;
+  margin: 0 var(--col-pad) 1rem;
+  max-width: var(--col-max);
   background: var(--olive-surface, #dfd0b4);
   border: 2px solid var(--olive-border-dark, #2c1810);
   border-radius: 0.625rem;
@@ -26,19 +26,20 @@
   }
 }
 
-/* When a panel or prompt is open above: square the top corners and strip
-   the amber ring. The ring is 1px outside the dock's border-box — at the
-   dock's top that puts it inside the extension, creating a visible artifact.
-   The offset shadow on the sides is enough; the border provides the boundary. */
+/* When a panel is open above: square the top corners and strip the amber ring.
+   The ring is 1px outside the dock's border-box — at the dock's top that puts
+   it inside the extension, creating a visible artifact. */
 .app-shell__dock-area:has(.folder-panel) .dock,
-.app-shell__dock-area:has(.dock-prompt) .dock {
+.app-shell__dock-area:has(.dock-prompt) .dock,
+.app-shell__dock-area:has(.dock-card-panel) .dock {
   border-radius: 0 0 0.625rem 0.625rem;
   box-shadow: 4px 4px 0 #b09070;
 }
 
 @media (prefers-color-scheme: dark) {
   .app-shell__dock-area:has(.folder-panel) .dock,
-  .app-shell__dock-area:has(.dock-prompt) .dock {
+  .app-shell__dock-area:has(.dock-prompt) .dock,
+  .app-shell__dock-area:has(.dock-card-panel) .dock {
     box-shadow: 4px 4px 0 #3a2c1c;
   }
 }

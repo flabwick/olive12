@@ -1,4 +1,6 @@
 .dock-card-panel {
+  margin: 0 var(--col-pad) 0;
+  max-width: var(--col-max);
   border: 2px solid var(--olive-border-dark, #2c1810);
   border-bottom: none;
   border-radius: 0.625rem 0.625rem 0 0;

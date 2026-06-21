@@ -2,9 +2,9 @@
 .folder-panel {
   position: absolute;
   bottom: 100%;
-  left: 1.5rem;
-  right: 1.5rem;
-  max-width: 680px;
+  left: var(--col-pad);
+  right: var(--col-pad);
+  max-width: var(--col-max);
   max-height: 50vh;
   z-index: 50;
 
