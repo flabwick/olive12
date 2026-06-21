@@ -1,7 +1,7 @@
 import { DockPrompt } from './DockPrompt'
 
 export default {
-  title: 'Tab/DockPrompt',
+  title: 'Prompt/DockPrompt',
   component: DockPrompt,
   parameters: { layout: 'fullscreen' },
   args: {
