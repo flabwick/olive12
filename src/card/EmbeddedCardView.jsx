@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { NodeViewWrapper } from '@tiptap/react'
 import { CardHeader } from './CardHeader'
 import { markdownToHtml } from './richTextLogic'
-import { useEmbedEntries } from './EmbedEntriesContext'
+import { useEmbedActions, useEmbedEntries } from './EmbedEntriesContext'
 import './EmbeddedCardView.css'
 
 const MIN_BODY_HEIGHT = 40
@@ -11,6 +11,7 @@ export function EmbeddedCardView({ node, deleteNode }) {
   const { cardId } = node.attrs
   const cards = useEmbedEntries()
   const card = cards.find((c) => c.id === cardId)
+  const { onSaveToShelf } = useEmbedActions()
   const [foldState, setFoldState] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [bodyHeight, setBodyHeight] = useState(null)
@@ -66,6 +67,9 @@ export function EmbeddedCardView({ node, deleteNode }) {
             onToggleFold={() => setFoldState((v) => !v)}
             onFlip={() => setFlipped((v) => !v)}
             onClose={deleteNode}
+            onSaveToShelf={onSaveToShelf && card.location === 'none'
+              ? () => onSaveToShelf(cardId)
+              : undefined}
           />
           {!foldState && (
             <>

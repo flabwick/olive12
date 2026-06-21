@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import './EmbedSourcePanel.css'
 
-export function EmbedSourcePanel({ entries = [], onSelect, onClose }) {
+export function EmbedSourcePanel({ entries = [], onSelect, onClose, onCreateNew }) {
   const [filter, setFilter] = useState('')
 
   const filtered = filter
@@ -29,6 +29,18 @@ export function EmbedSourcePanel({ entries = [], onSelect, onClose }) {
           Cancel
         </button>
       </div>
+      {onCreateNew && (
+        <div className="embed-source-panel__new">
+          <button
+            type="button"
+            className="embed-source-panel__new-btn"
+            onClick={onCreateNew}
+            aria-label="Create new embedded card"
+          >
+            + New card
+          </button>
+        </div>
+      )}
       <ul className="embed-source-panel__list">
         {filtered.length === 0 ? (
           <li className="embed-source-panel__empty">No cards found.</li>

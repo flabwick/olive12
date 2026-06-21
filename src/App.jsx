@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { AuthForm } from './auth/AuthForm'
 import { useRichTextEditorContext, RichTextEditorProvider } from './card/RichTextEditorContext'
-import { EmbedEntriesProvider } from './card/EmbedEntriesContext'
+import { EmbedActionsProvider, EmbedEntriesProvider } from './card/EmbedEntriesContext'
+import { createCard } from './card/createCard'
+import { putCard } from './card/cardStorage'
 import { EmbedSourcePanel } from './card/EmbedSourcePanel'
 import { IndexDebugPanel } from './debug/IndexDebugPanel'
 import { FolderPanel } from './layout/FolderPanel'
@@ -126,6 +128,18 @@ function AppShell({ userId }) {
     setEmbedOpen(false)
   }
 
+  async function handleEmbedCreate() {
+    const card = createCard({ title: '', body: '' })
+    await putCard(card)
+    addToCardsById(card)
+    const editor = embedEditorRef.current
+    if (editor) {
+      editor.chain().focus().insertContent({ type: 'embeddedCard', attrs: { cardId: card.id } }).run()
+    }
+    embedEditorRef.current = null
+    setEmbedOpen(false)
+  }
+
   function handleSettings() {
     setFolderPanelOpen(false)
     setIndexDebugOpen((v) => !v)
@@ -138,7 +152,8 @@ function AppShell({ userId }) {
   }
 
   return (
-    <EmbedEntriesProvider entries={[...shelfEntries, ...libraryEntries]}>
+    <EmbedActionsProvider onSaveToShelf={saveToShelf}>
+    <EmbedEntriesProvider entries={Object.values(cardsById)}>
     <div className="app-shell">
       <div className="app-shell__content">
         {tab && (
@@ -202,6 +217,7 @@ function AppShell({ userId }) {
             entries={[...shelfEntries, ...libraryEntries]}
             onSelect={handleEmbedSelect}
             onClose={() => setEmbedOpen(false)}
+            onCreateNew={handleEmbedCreate}
           />
         )}
         {activeDockCardId && cardsById[activeDockCardId] && (
@@ -250,6 +266,7 @@ function AppShell({ userId }) {
       )}
     </div>
     </EmbedEntriesProvider>
+    </EmbedActionsProvider>
   )
 }
 

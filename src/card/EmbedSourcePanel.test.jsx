@@ -58,4 +58,21 @@ describe('EmbedSourcePanel', () => {
     render(<EmbedSourcePanel entries={[]} onSelect={() => {}} onClose={() => {}} />)
     expect(screen.getByText('No cards found.')).toBeInTheDocument()
   })
+
+  it('does not show the new card button when onCreateNew is not provided', () => {
+    render(<EmbedSourcePanel entries={SAMPLE_ENTRIES} onSelect={() => {}} onClose={() => {}} />)
+    expect(screen.queryByRole('button', { name: 'Create new embedded card' })).not.toBeInTheDocument()
+  })
+
+  it('shows the new card button when onCreateNew is provided', () => {
+    render(<EmbedSourcePanel entries={SAMPLE_ENTRIES} onSelect={() => {}} onClose={() => {}} onCreateNew={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Create new embedded card' })).toBeInTheDocument()
+  })
+
+  it('calls onCreateNew when the new card button is clicked', async () => {
+    const onCreateNew = vi.fn()
+    render(<EmbedSourcePanel entries={SAMPLE_ENTRIES} onSelect={() => {}} onClose={() => {}} onCreateNew={onCreateNew} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Create new embedded card' }))
+    expect(onCreateNew).toHaveBeenCalledOnce()
+  })
 })
