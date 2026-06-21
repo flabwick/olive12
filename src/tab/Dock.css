@@ -104,6 +104,20 @@
   fill: var(--olive-parchment, #ede0ca);
 }
 
+.dock--formatting {
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  justify-content: flex-start;
+}
+
+.dock__sep {
+  width: 1px;
+  height: 1.5rem;
+  background: var(--olive-border, #b89868);
+  margin: 0 0.125rem;
+  flex-shrink: 0;
+}
+
 @media (prefers-color-scheme: dark) {
   .dock__btn {
     background: #231910;
@@ -138,5 +152,9 @@
 
   .dock__tabs-back {
     fill: #231910;
+  }
+
+  .dock__sep {
+    background: #6a4e35;
   }
 }

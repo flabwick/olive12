@@ -4,13 +4,24 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clearIndexDebugEvents } from '../debug/indexPipelineDebug'
 import { CardBack } from './CardBack'
 
+vi.mock('./RichTextEditor', () => ({
+  RichTextEditor: ({ value, onChange, editable, ariaLabel }) => (
+    <textarea
+      value={value ?? ''}
+      onChange={(e) => onChange?.(e.target.value)}
+      aria-label={ariaLabel}
+      readOnly={!editable}
+    />
+  ),
+}))
+
 describe('CardBack', () => {
   afterEach(() => {
     clearIndexDebugEvents()
   })
-  it('renders the back text content', () => {
+  it('renders the back text content in a readOnly editor', () => {
     render(<CardBack back="The back of the card" editing={false} />)
-    expect(screen.getByText('The back of the card')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Card back' })).toHaveValue('The back of the card')
   })
 
   it('renders "No notes" placeholder when back is empty', () => {
@@ -30,11 +41,11 @@ describe('CardBack', () => {
     expect(onFlip).toHaveBeenCalledOnce()
   })
 
-  it('renders a textarea with placeholder in edit mode', () => {
+  it('shows an editable textbox in edit mode', () => {
     render(<CardBack back="" editing={true} />)
-    expect(screen.getByRole('textbox', { name: 'Card back' })).toBeInTheDocument()
-    // eslint-disable-next-line testing-library/no-node-access
-    expect(document.querySelector('p.card-back__notes-text')).toBeNull()
+    const ta = screen.getByRole('textbox', { name: 'Card back' })
+    expect(ta).toBeInTheDocument()
+    expect(ta).not.toHaveAttribute('readonly')
   })
 
   it('calls onBackChange when textarea changes', async () => {

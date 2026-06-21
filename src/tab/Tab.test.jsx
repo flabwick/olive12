@@ -3,6 +3,17 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { Tab } from './Tab'
 
+vi.mock('../card/RichTextEditor', () => ({
+  RichTextEditor: ({ value, onChange, editable, ariaLabel }) => (
+    <textarea
+      value={value ?? ''}
+      onChange={(e) => onChange?.(e.target.value)}
+      aria-label={ariaLabel}
+      readOnly={!editable}
+    />
+  ),
+}))
+
 const makeEntry = (overrides = {}) => ({
   card: { id: 'card-1', title: 'Title', body: 'Body text', type: 'text', location: 'none' },
   position: 0,
@@ -237,7 +248,7 @@ describe('Tab', () => {
           <button type="button">Outside</button>
         </div>,
       )
-      await userEvent.click(screen.getByRole('button', { name: 'Old body' }))
+      await userEvent.click(screen.getByRole('textbox', { name: 'Card body' }))
       const textarea = screen.getByRole('textbox', { name: 'Card body' })
       await userEvent.clear(textarea)
       await userEvent.type(textarea, 'New body')
@@ -324,7 +335,7 @@ describe('Tab', () => {
           <button type="button">Outside</button>
         </div>,
       )
-      await userEvent.click(screen.getByRole('button', { name: 'Body text' }))
+      await userEvent.click(screen.getByRole('textbox', { name: 'Card body' }))
       const textarea = screen.getByRole('textbox', { name: 'Card body' })
       await userEvent.clear(textarea)
       await userEvent.type(textarea, 'Updated')

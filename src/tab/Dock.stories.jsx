@@ -1,8 +1,10 @@
+import { RichTextEditorProvider } from '../card/RichTextEditorContext'
 import { Dock } from './Dock'
 
 export default {
   title: 'Tab/Dock',
   component: Dock,
+  decorators: [(Story) => <RichTextEditorProvider><Story /></RichTextEditorProvider>],
   parameters: { layout: 'fullscreen' },
   args: {
     onAdd: () => {},

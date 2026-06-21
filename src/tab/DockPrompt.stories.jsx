@@ -18,6 +18,10 @@ export const Loading = {
   args: { loading: true },
 }
 
+export const Streaming = {
+  args: { loading: true, streaming: true },
+}
+
 export const WithError = {
   args: { error: 'The AI service is unavailable. Please try again.' },
 }

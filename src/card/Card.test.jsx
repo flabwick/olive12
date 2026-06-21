@@ -3,32 +3,44 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { Card } from './Card'
 
+// Replace Tiptap with a plain textarea so Card tests focus on Card logic,
+// not ProseMirror internals. RichTextEditor has its own test file.
+vi.mock('./RichTextEditor', () => ({
+  RichTextEditor: ({ value, onChange, editable, ariaLabel }) => (
+    <textarea
+      value={value ?? ''}
+      onChange={(e) => onChange?.(e.target.value)}
+      aria-label={ariaLabel}
+      readOnly={!editable}
+    />
+  ),
+}))
+
 describe('Card', () => {
   it('renders the title and body', () => {
     render(<Card title="Meeting notes" body="Discuss roadmap" />)
 
     expect(screen.getByRole('heading', { level: 3, name: 'Meeting notes' })).toBeInTheDocument()
-    expect(screen.getByText('Discuss roadmap')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Card body' })).toHaveValue('Discuss roadmap')
   })
 
-  it('preserves line breaks in the body', () => {
+  it('body textarea always present with aria-label Card body', () => {
     render(<Card title="List" body={'First line\nSecond line'} />)
 
-    expect(screen.getByText(/First line/)).toHaveClass('card__body')
-    expect(screen.getByText((_, element) => element?.tagName === 'P' && element?.textContent === 'First line\nSecond line')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Card body' })).toHaveValue('First line\nSecond line')
   })
 
   it('hides body when foldState is true', () => {
     render(<Card title="Folded" body="Hidden body" foldState={true} />)
 
     expect(screen.getByRole('heading', { level: 3, name: 'Folded' })).toBeInTheDocument()
-    expect(screen.queryByText('Hidden body')).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Card body' })).not.toBeInTheDocument()
   })
 
   it('shows body when foldState is false', () => {
     render(<Card title="Visible" body="Visible body" foldState={false} />)
 
-    expect(screen.getByText('Visible body')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Card body' })).toHaveValue('Visible body')
   })
 
   it('applies card--hidden class when hiddenState is true', () => {
@@ -133,11 +145,11 @@ describe('Card', () => {
       expect(screen.getByRole('heading', { level: 3, name: 'My title' })).toHaveAttribute('tabindex', '0')
     })
 
-    it('clicking the title enters edit mode', async () => {
+    it('clicking the title enters edit mode — title input appears', async () => {
       render(<Card title="My title" body="B" onUpdate={() => {}} />)
       await userEvent.click(screen.getByRole('heading', { level: 3, name: 'My title' }))
       expect(screen.getByRole('textbox', { name: 'Card title' })).toBeInTheDocument()
-      expect(screen.getByRole('textbox', { name: 'Card body' })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Card body' })).not.toHaveAttribute('readonly')
     })
 
     it('title heading has no tabindex when onUpdate is not provided', () => {
@@ -145,21 +157,21 @@ describe('Card', () => {
       expect(screen.getByRole('heading', { level: 3, name: 'My title' })).not.toHaveAttribute('tabindex')
     })
 
-    it('body acts as a button when onUpdate is provided', () => {
+    it('body textarea is always visible with aria-label Card body', () => {
       render(<Card title="T" body="B" onUpdate={() => {}} />)
-      expect(screen.getByRole('button', { name: 'B' })).toBeInTheDocument()
-    })
-
-    it('clicking the body enters edit mode', async () => {
-      render(<Card title="T" body="Body text" onUpdate={() => {}} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Body text' }))
       expect(screen.getByRole('textbox', { name: 'Card body' })).toBeInTheDocument()
-      expect(screen.getByRole('textbox', { name: 'Card title' })).toBeInTheDocument()
     })
 
-    it('edit mode shows draft title and body values', async () => {
+    it('clicking the body area enters edit mode', async () => {
+      render(<Card title="T" body="Body text" onUpdate={() => {}} />)
+      await userEvent.click(screen.getByRole('textbox', { name: 'Card body' }))
+      expect(screen.getByRole('textbox', { name: 'Card title' })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Card body' })).not.toHaveAttribute('readonly')
+    })
+
+    it('entering edit mode shows draft title and body values', async () => {
       render(<Card title="My title" body="My body" onUpdate={() => {}} />)
-      await userEvent.click(screen.getByRole('button', { name: 'My body' }))
+      await userEvent.click(screen.getByRole('textbox', { name: 'Card body' }))
       expect(screen.getByDisplayValue('My title')).toBeInTheDocument()
       expect(screen.getByDisplayValue('My body')).toBeInTheDocument()
     })
@@ -172,7 +184,7 @@ describe('Card', () => {
           <button type="button">Outside</button>
         </div>,
       )
-      await userEvent.click(screen.getByRole('button', { name: 'Old body' }))
+      await userEvent.click(screen.getByRole('textbox', { name: 'Card body' }))
       const textarea = screen.getByRole('textbox', { name: 'Card body' })
       await userEvent.clear(textarea)
       await userEvent.type(textarea, 'New body')
@@ -188,26 +200,25 @@ describe('Card', () => {
           <button type="button">Outside</button>
         </div>,
       )
-      await userEvent.click(screen.getByRole('button', { name: 'B' }))
+      await userEvent.click(screen.getByRole('textbox', { name: 'Card body' }))
       await userEvent.click(screen.getByRole('button', { name: 'Outside' }))
       expect(onUpdate).not.toHaveBeenCalled()
     })
 
-    it('pressing Escape cancels editing and restores original values', async () => {
+    it('pressing Escape cancels editing and body reverts to readOnly with original value', async () => {
       render(<Card title="T" body="B" onUpdate={() => {}} />)
-      await userEvent.click(screen.getByRole('button', { name: 'B' }))
+      await userEvent.click(screen.getByRole('textbox', { name: 'Card body' }))
       const textarea = screen.getByRole('textbox', { name: 'Card body' })
       await userEvent.clear(textarea)
       await userEvent.type(textarea, 'Changed')
       await userEvent.keyboard('{Escape}')
-      expect(screen.queryByRole('textbox', { name: 'Card body' })).not.toBeInTheDocument()
-      expect(screen.getByText('B')).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Card body' })).toHaveValue('B')
     })
 
-    it('body is not clickable without onUpdate', () => {
+    it('body is readOnly when onUpdate is not provided', () => {
       render(<Card title="T" body="B" />)
-      expect(screen.queryByRole('button', { name: 'B' })).not.toBeInTheDocument()
-      expect(screen.getByText('B')).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Card body' })).toHaveAttribute('readonly')
     })
   })
 
@@ -236,8 +247,8 @@ describe('Card', () => {
 
     it('flipped=true renders CardBack instead of body', () => {
       render(<Card title="Q" body="Front body" back="Back content" flipped={true} onFlip={() => {}} />)
-      expect(screen.queryByText('Front body')).not.toBeInTheDocument()
-      expect(screen.getByText('Back content')).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: 'Card body' })).not.toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Card back' })).toHaveValue('Back content')
       expect(screen.getByRole('button', { name: 'Flip to front' })).toBeInTheDocument()
     })
 
@@ -266,7 +277,7 @@ describe('Card', () => {
           <button type="button">Outside</button>
         </div>,
       )
-      await userEvent.click(screen.getByText('Old back'))
+      await userEvent.click(screen.getByRole('textbox', { name: 'Card back' }))
       const textarea = screen.getByRole('textbox', { name: 'Card back' })
       await userEvent.clear(textarea)
       await userEvent.type(textarea, 'New back')
@@ -277,13 +288,13 @@ describe('Card', () => {
     it('Escape cancels back edit without calling onUpdate', async () => {
       const onUpdate = vi.fn()
       render(<Card title="Q" body="B" back="Original" flipped={true} onFlip={() => {}} onUpdate={onUpdate} />)
-      await userEvent.click(screen.getByText('Original'))
+      await userEvent.click(screen.getByRole('textbox', { name: 'Card back' }))
       const textarea = screen.getByRole('textbox', { name: 'Card back' })
       await userEvent.clear(textarea)
       await userEvent.type(textarea, 'Changed')
       await userEvent.keyboard('{Escape}')
       expect(onUpdate).not.toHaveBeenCalled()
-      expect(screen.getByText('Original')).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Card back' })).toHaveValue('Original')
     })
   })
 

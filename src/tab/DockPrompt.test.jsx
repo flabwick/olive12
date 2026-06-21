@@ -53,6 +53,19 @@ describe('DockPrompt', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
   })
 
+  it('shows spinner in submit button when streaming=true and loading=true', () => {
+    render(<DockPrompt loading={true} streaming={true} />)
+    const spinner = document.querySelector('.dock-prompt__spinner')
+    expect(spinner).toBeInTheDocument()
+    expect(spinner).toHaveAttribute('aria-busy', 'true')
+  })
+
+  it('shows Thinking… when loading=true and streaming=false', () => {
+    render(<DockPrompt loading={true} streaming={false} />)
+    expect(screen.getByRole('button', { name: 'Thinking…' })).toBeInTheDocument()
+    expect(document.querySelector('.dock-prompt__spinner')).not.toBeInTheDocument()
+  })
+
   it('displays error text with alert role', () => {
     render(<DockPrompt error="Something went wrong" />)
     expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong')

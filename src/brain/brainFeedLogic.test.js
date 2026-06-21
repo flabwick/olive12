@@ -1,93 +1,104 @@
 import { describe, expect, it } from 'vitest'
-import { detectStaleEntries } from './brainFeedLogic'
+import { createIndexEntry } from './createIndexEntry'
+import { computeContentHash } from '../sync/cardSyncLogic'
+import { getBrainFeedItems, getOrphanCards, getStaleEntries } from './brainFeedLogic'
 
-const makeCard = (id, contentHash = 'hash-a') => ({ id, contentHash })
-const makeEntry = (cardId, contentHash = 'hash-a') => ({ cardId, contentHash })
-const makeLink = (sourceCardId, targetCardId) => ({ sourceCardId, targetCardId })
+function makeLibraryCard(id, title, body = '') {
+  return {
+    id,
+    type: 'text',
+    title,
+    body,
+    config: null,
+    location: 'library',
+    folderId: null,
+    createdAt: 1,
+    updatedAt: 1,
+  }
+}
 
-describe('detectStaleEntries', () => {
-  it('returns empty array when both inputs are empty', () => {
-    expect(detectStaleEntries([], [])).toEqual([])
+describe('getStaleEntries', () => {
+  it('returns empty array for empty inputs', () => {
+    expect(getStaleEntries({}, [])).toEqual([])
   })
 
-  it('returns empty array when cards are empty', () => {
-    expect(detectStaleEntries([], [makeEntry('c1')])).toEqual([])
-  })
-
-  it('returns empty array when index entries are empty', () => {
-    expect(detectStaleEntries([makeCard('c1')], [])).toEqual([])
-  })
-
-  it('detects a stale card when contentHash differs', () => {
-    const result = detectStaleEntries(
-      [makeCard('c1', 'hash-new')],
-      [makeEntry('c1', 'hash-old')],
-    )
-    expect(result).toEqual([{ cardId: 'c1', reason: 'stale' }])
-  })
-
-  it('ignores a non-stale card when contentHash matches and it has links', () => {
-    const result = detectStaleEntries(
-      [makeCard('c1', 'hash-same')],
-      [makeEntry('c1', 'hash-same')],
-      [makeLink('c1', 'c2')],
-    )
-    expect(result).toEqual([])
-  })
-
-  it('detects an orphan card with zero links', () => {
-    const result = detectStaleEntries(
-      [makeCard('c1', 'hash-same')],
-      [makeEntry('c1', 'hash-same')],
-      [],
-    )
-    expect(result).toEqual([{ cardId: 'c1', reason: 'orphan' }])
-  })
-
-  it('does not flag a card as orphan when it appears as a link source', () => {
-    const result = detectStaleEntries(
-      [makeCard('c1', 'hash-same')],
-      [makeEntry('c1', 'hash-same')],
-      [makeLink('c1', 'c2')],
-    )
-    expect(result).toEqual([])
-  })
-
-  it('does not flag a card as orphan when it appears as a link target', () => {
-    const result = detectStaleEntries(
-      [makeCard('c1', 'hash-same')],
-      [makeEntry('c1', 'hash-same')],
-      [makeLink('c2', 'c1')],
-    )
-    expect(result).toEqual([])
-  })
-
-  it('returns stale before orphan check: stale card wins over orphan', () => {
-    const result = detectStaleEntries(
-      [makeCard('c1', 'hash-new')],
-      [makeEntry('c1', 'hash-old')],
-      [],
-    )
-    expect(result).toEqual([{ cardId: 'c1', reason: 'stale' }])
-  })
-
-  it('handles mixed stale and orphan across multiple cards', () => {
-    const cards = [makeCard('c1', 'hash-new'), makeCard('c2', 'hash-same')]
-    const entries = [makeEntry('c1', 'hash-old'), makeEntry('c2', 'hash-same')]
-    const result = detectStaleEntries(cards, entries, [])
-    expect(result).toEqual([
-      { cardId: 'c1', reason: 'stale' },
-      { cardId: 'c2', reason: 'orphan' },
+  it('flags library cards whose content hash differs from the index entry', () => {
+    const card = makeLibraryCard('c1', 'Stale note', 'original body')
+    const entry = createIndexEntry({
+      cardId: 'c1',
+      title: 'Stale note',
+      contentHash: 'wrong-hash',
+    })
+    expect(getStaleEntries({ c1: card }, [entry])).toEqual([
+      { cardId: 'c1', title: 'Stale note', reason: 'stale' },
     ])
   })
 
-  it('does not flag cards not in the index', () => {
-    const result = detectStaleEntries(
-      [makeCard('c1', 'hash-a'), makeCard('c2', 'hash-b')],
-      [makeEntry('c1', 'hash-a')],
-      [],
-    )
-    expect(result).toHaveLength(1)
-    expect(result[0].cardId).toBe('c1')
+  it('does not flag in-sync library cards', () => {
+    const card = makeLibraryCard('c1', 'Fresh note', 'body text')
+    const entry = createIndexEntry({
+      cardId: 'c1',
+      title: 'Fresh note',
+      contentHash: computeContentHash(card),
+    })
+    expect(getStaleEntries({ c1: card }, [entry])).toEqual([])
+  })
+
+  it('excludes non-library cards', () => {
+    const card = { ...makeLibraryCard('c1', 'Shelf note'), location: 'shelf' }
+    const entry = createIndexEntry({ cardId: 'c1', contentHash: 'wrong-hash' })
+    expect(getStaleEntries({ c1: card }, [entry])).toEqual([])
+  })
+})
+
+describe('getOrphanCards', () => {
+  it('returns empty array for empty inputs', () => {
+    expect(getOrphanCards({}, [])).toEqual([])
+  })
+
+  it('flags library cards with no links in or out', () => {
+    const card = makeLibraryCard('c1', 'Lonely note')
+    expect(getOrphanCards({ c1: card }, [])).toEqual([
+      { cardId: 'c1', title: 'Lonely note', reason: 'orphan' },
+    ])
+  })
+
+  it('does not flag library cards linked as source or target', () => {
+    const card = makeLibraryCard('c1', 'Connected note')
+    const asSource = [{ sourceCardId: 'c1', targetCardId: 'c2', linkType: 'embed', createdAt: 1 }]
+    const asTarget = [{ sourceCardId: 'c2', targetCardId: 'c1', linkType: 'embed', createdAt: 1 }]
+    expect(getOrphanCards({ c1: card }, asSource)).toEqual([])
+    expect(getOrphanCards({ c1: card }, asTarget)).toEqual([])
+  })
+
+  it('excludes non-library cards', () => {
+    const card = { ...makeLibraryCard('c1', 'Tab note'), location: 'none' }
+    expect(getOrphanCards({ c1: card }, [])).toEqual([])
+  })
+})
+
+describe('getBrainFeedItems', () => {
+  it('returns empty array for empty inputs', () => {
+    expect(getBrainFeedItems({}, [], [])).toEqual([])
+  })
+
+  it('merges stale and orphan items sorted by title', () => {
+    const staleCard = makeLibraryCard('c1', 'Beta note', 'changed')
+    const orphanCard = makeLibraryCard('c2', 'Alpha note')
+    const entry = createIndexEntry({ cardId: 'c1', contentHash: 'wrong-hash' })
+
+    expect(getBrainFeedItems({ c1: staleCard, c2: orphanCard }, [entry], [])).toEqual([
+      { cardId: 'c2', title: 'Alpha note', reason: 'orphan' },
+      { cardId: 'c1', title: 'Beta note', reason: 'stale' },
+    ])
+  })
+
+  it('dedupes by cardId preferring stale over orphan', () => {
+    const card = makeLibraryCard('c1', 'Both flags', 'changed')
+    const entry = createIndexEntry({ cardId: 'c1', contentHash: 'wrong-hash' })
+
+    expect(getBrainFeedItems({ c1: card }, [entry], [])).toEqual([
+      { cardId: 'c1', title: 'Both flags', reason: 'stale' },
+    ])
   })
 })

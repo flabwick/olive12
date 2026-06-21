@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import './DockPrompt.css'
 
-export function DockPrompt({ onSubmit, onDismiss, loading = false, error = '' }) {
+export function DockPrompt({ onSubmit, onDismiss, loading = false, streaming = false, error = '' }) {
   const [text, setText] = useState('')
 
   function handleSubmit(e) {
@@ -46,7 +46,13 @@ export function DockPrompt({ onSubmit, onDismiss, loading = false, error = '' })
           className="dock-prompt__submit"
           disabled={loading || !text.trim()}
         >
-          {loading ? 'Thinking…' : 'Send →'}
+          {loading && streaming ? (
+            <span className="dock-prompt__spinner" aria-label="Streaming" aria-busy="true" />
+          ) : loading ? (
+            'Thinking…'
+          ) : (
+            'Send →'
+          )}
         </button>
       </div>
     </form>

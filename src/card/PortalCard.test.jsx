@@ -3,6 +3,17 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { PortalCard } from './PortalCard'
 
+vi.mock('./RichTextEditor', () => ({
+  RichTextEditor: ({ value, onChange, editable, ariaLabel }) => (
+    <textarea
+      value={value ?? ''}
+      onChange={(e) => onChange?.(e.target.value)}
+      aria-label={ariaLabel}
+      readOnly={!editable}
+    />
+  ),
+}))
+
 const cardsById = {
   'target-1': { id: 'target-1', title: 'Target Title', body: 'Target body text', type: 'text', config: null },
 }
@@ -81,7 +92,7 @@ describe('PortalCard', () => {
         <button type="button">Outside</button>
       </div>,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Target body text' }))
+    await userEvent.click(screen.getByRole('textbox', { name: 'Card body' }))
     const textarea = screen.getByRole('textbox', { name: 'Card body' })
     await userEvent.clear(textarea)
     await userEvent.type(textarea, 'Edited content')

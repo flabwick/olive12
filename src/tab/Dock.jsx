@@ -1,3 +1,5 @@
+import { useRichTextEditorContext } from '../card/RichTextEditorContext'
+import { TOOLBAR_ITEMS } from '../card/RichTextEditor'
 import './Dock.css'
 
 function CaretUpIcon() {
@@ -58,6 +60,35 @@ export function Dock({
   onIndexDebug,
   indexDebugActive = false,
 }) {
+  const { activeEditor } = useRichTextEditorContext()
+
+  if (activeEditor) {
+    return (
+      <div className="dock dock--formatting" role="toolbar" aria-label="Formatting options">
+        {TOOLBAR_ITEMS.map((btn, i) =>
+          btn === null ? (
+            <span key={`sep-${i}`} className="dock__sep" aria-hidden="true" />
+          ) : (
+            <button
+              key={btn.key}
+              type="button"
+              className={`dock__btn${btn.isActive(activeEditor) ? ' dock__btn--active' : ''}`}
+              title={btn.title}
+              aria-label={btn.title}
+              aria-pressed={btn.isActive(activeEditor)}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                btn.action(activeEditor)
+              }}
+            >
+              {btn.label}
+            </button>
+          )
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="dock" role="toolbar" aria-label="Tab actions">
       <div className="dock__group dock__group--left">

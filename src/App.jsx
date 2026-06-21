@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AuthForm } from './auth/AuthForm'
-import { IndexDebugPanel } from './debug/IndexDebugPanel'
+import { RichTextEditorProvider } from './card/RichTextEditorContext'
 import { FolderPanel } from './layout/FolderPanel'
 import { supabase } from './lib/supabaseClient'
 import { Dock } from './tab/Dock'
@@ -12,13 +12,10 @@ import { TransientCard } from './tab/TransientCard'
 import { useTabs } from './tab/useTabs'
 import './App.css'
 
-const E2E_AUTH_BYPASS = import.meta.env.VITE_E2E_AUTH_BYPASS === 'true'
-const E2E_USER_ID = '00000000-0000-4000-8000-000000000001'
-
 function AppShell({ userId }) {
   const {
     tab,
-    openTabs,
+    tabs,
     activeTabId,
     entries,
     shelfEntries,
@@ -50,12 +47,7 @@ function AppShell({ userId }) {
     allTabCards,
     cardsById,
     brainFeedItems,
-    onBrainAccept,
-    onBrainDismiss,
-    flipCard,
-    isFlipped,
-    getIndexEntry,
-    isIndexing,
+    reindexCard,
   } = useTabs({ userId })
 
   const [folderPanelOpen, setFolderPanelOpen] = useState(false)
@@ -64,7 +56,6 @@ function AppShell({ userId }) {
   const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false)
   const [vaultInitialTab, setVaultInitialTab] = useState('shelf')
   const [highlightedCardId, setHighlightedCardId] = useState(null)
-  const [indexDebugOpen, setIndexDebugOpen] = useState(!E2E_AUTH_BYPASS)
 
   function handleAddCard(fields) {
     addCard(fields)
@@ -122,6 +113,7 @@ function AppShell({ userId }) {
   }
 
   return (
+    <RichTextEditorProvider>
     <div className="app-shell">
       <div className="app-shell__content">
         {tab && (
@@ -147,8 +139,6 @@ function AppShell({ userId }) {
           onSaveToShelf={saveToShelf}
           onMoveToLibrary={moveToLibrary}
           onLocate={handleLocate}
-          flipCard={flipCard}
-          isFlipped={isFlipped}
         />
         {transientOpen && (
           <TransientCard
@@ -168,17 +158,16 @@ function AppShell({ userId }) {
             shelfTabs={shelfTabs}
             libraryTabs={libraryTabs}
             folders={folders}
-            brainFeedItems={brainFeedItems}
             onMoveToLibrary={moveToLibrary}
             onMoveTabToLibrary={handleMoveTabToLibrary}
             onCreateFolder={createFolder}
             onClose={() => setFolderPanelOpen(false)}
             onOpenAsPortal={handleOpenAsPortal}
             onOpenTab={handleOpenSavedTab}
-            onBrainAccept={onBrainAccept}
-            onBrainDismiss={onBrainDismiss}
             initialTab={vaultInitialTab}
             highlightedCardId={highlightedCardId}
+            brainFeedItems={brainFeedItems}
+            onReindex={reindexCard}
           />
         )}
         {promptOpen && (
@@ -196,17 +185,14 @@ function AppShell({ userId }) {
           onPrompt={handlePromptToggle}
           promptDisabled={promptLoading}
           onTabOverview={handleTabOverview}
-          onIndexDebug={() => setIndexDebugOpen((v) => !v)}
-          indexDebugActive={indexDebugOpen}
         />
       </div>
-      <IndexDebugPanel open={indexDebugOpen} onClose={() => setIndexDebugOpen(false)} />
       {tabSwitcherOpen && (
         <TabSwitcher
-          tabs={openTabs}
+          tabs={tabs}
           activeTabId={activeTabId}
           tabEntries={Object.fromEntries(
-            openTabs.map((t) => [
+            tabs.map((t) => [
               t.id,
               allTabCards
                 .filter((tc) => tc.tabId === t.id)
@@ -222,6 +208,7 @@ function AppShell({ userId }) {
         />
       )}
     </div>
+    </RichTextEditorProvider>
   )
 }
 
@@ -232,12 +219,6 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false)
 
   useEffect(() => {
-    if (E2E_AUTH_BYPASS) {
-      setUserId(E2E_USER_ID)
-      setSessionChecked(true)
-      return undefined
-    }
-
     supabase.auth.getSession().then(({ data }) => {
       setUserId(data.session?.user?.id ?? null)
       setSessionChecked(true)

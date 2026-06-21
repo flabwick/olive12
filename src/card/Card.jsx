@@ -1,15 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CardBack } from './CardBack'
 import { CardHeader } from './CardHeader'
+import { RichTextEditor } from './RichTextEditor'
 import './Card.css'
 
 const MIN_BODY_HEIGHT = 40
-
-function autoResize(el) {
-  if (!el) return
-  el.style.height = 'auto'
-  el.style.height = el.scrollHeight + 'px'
-}
 
 export function Card({
   title,
@@ -40,10 +35,8 @@ export function Card({
   const [draftBody, setDraftBody] = useState(body)
   const [draftBack, setDraftBack] = useState(back)
   const [bodyHeight, setBodyHeight] = useState(null)
-  const bodyRef = useRef(null)
   const titleInputRef = useRef(null)
   const bodyAreaRef = useRef(null)
-  const pendingBodyHeightRef = useRef(null)
   const focusTargetRef = useRef('body')
 
   useEffect(() => {
@@ -59,21 +52,10 @@ export function Card({
     if (focusTargetRef.current === 'title') {
       titleInputRef.current?.focus()
       titleInputRef.current?.select()
-    } else if (focusTargetRef.current === 'body') {
-      bodyRef.current?.focus()
     }
+    // body focus is handled by RichTextEditor's editable-change effect
     // 'back' focus is handled by CardBack's internal useEffect
   }, [editing])
-
-  useLayoutEffect(() => {
-    if (!editing || !bodyRef.current) return
-    const el = bodyRef.current
-    if (pendingBodyHeightRef.current !== null) {
-      el.style.height = pendingBodyHeightRef.current + 'px'
-      pendingBodyHeightRef.current = null
-    }
-    autoResize(el)
-  }, [editing, draftBody])
 
   // If content outgrows a manual resize, expand back to fit — cards are not height-capped.
   useLayoutEffect(() => {
@@ -85,7 +67,6 @@ export function Card({
   }, [body, back, bodyHeight, flipped, editing])
 
   function startEditing(target = 'body') {
-    pendingBodyHeightRef.current = bodyAreaRef.current?.offsetHeight ?? null
     focusTargetRef.current = target
     setDraftTitle(title)
     setDraftBody(body)
@@ -195,30 +176,17 @@ export function Card({
                 />
               </div>
             ) : (
-              <>
-                {editing ? (
-                  <textarea
-                    ref={bodyRef}
-                    className="card__body card__body--edit"
-                    value={draftBody}
-                    onChange={(e) => {
-                      setDraftBody(e.target.value)
-                      autoResize(e.target)
-                    }}
-                    aria-label="Card body"
-                  />
-                ) : (
-                  <p
-                    className="card__body"
-                    onClick={onUpdate ? () => startEditing('body') : undefined}
-                    role={onUpdate ? 'button' : undefined}
-                    tabIndex={onUpdate ? 0 : undefined}
-                    onKeyDown={onUpdate ? (e) => e.key === 'Enter' && startEditing() : undefined}
-                  >
-                    {body}
-                  </p>
-                )}
-              </>
+              <div
+                onClick={!editing && onUpdate ? () => startEditing('body') : undefined}
+                className="card__body-rte-wrapper"
+              >
+                <RichTextEditor
+                  value={editing ? draftBody : body}
+                  onChange={setDraftBody}
+                  editable={editing && !!onUpdate}
+                  ariaLabel="Card body"
+                />
+              </div>
             )}
           </div>
           {!flipped && (

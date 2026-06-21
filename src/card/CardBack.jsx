@@ -1,12 +1,7 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { getLastErrorForCard, logIndexEvent, INDEX_STAGES } from '../debug/indexPipelineDebug'
+import { RichTextEditor } from './RichTextEditor'
 import './CardBack.css'
-
-function autoResize(el) {
-  if (!el) return
-  el.style.height = 'auto'
-  el.style.height = el.scrollHeight + 'px'
-}
 
 function fmtDate(ts) {
   if (!ts) return '—'
@@ -29,18 +24,9 @@ export function CardBack({
   indexLoading = false,
   indexDebugOpen = true,
 }) {
-  const textareaRef = useRef(null)
   const showWiki = location === 'library'
   const lastError = cardId ? getLastErrorForCard(cardId) : null
   const loggedRef = useRef(null)
-
-  useEffect(() => {
-    if (editing) textareaRef.current?.focus()
-  }, [editing])
-
-  useLayoutEffect(() => {
-    if (editing) autoResize(textareaRef.current)
-  }, [editing, back])
 
   useEffect(() => {
     if (!cardId || loggedRef.current === `${location}:${!!indexEntry}:${indexLoading}`) return
@@ -146,20 +132,19 @@ export function CardBack({
       )}
 
       <div className="card-back__notes">
-        {editing ? (
-          <textarea
-            ref={textareaRef}
-            className="card-back__notes-input"
+        {!editing && !back && (
+          <p className="card-back__notes-text">
+            <span className="card-back__notes-empty">No notes</span>
+          </p>
+        )}
+        {(editing || back) && (
+          <RichTextEditor
             value={back}
-            onChange={(e) => {
-              onBackChange?.(e.target.value)
-              autoResize(e.target)
-            }}
+            onChange={onBackChange}
+            editable={editing}
+            ariaLabel="Card back"
             placeholder="Add notes…"
-            aria-label="Card back"
           />
-        ) : (
-          <p className="card-back__notes-text">{back || <span className="card-back__notes-empty">No notes</span>}</p>
         )}
       </div>
       <dl className="card-back__meta">

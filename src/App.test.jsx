@@ -77,6 +77,7 @@ describe('App', () => {
     await db.tab_cards.clear()
     await db.folders.clear()
     await db.links.clear()
+    vi.unstubAllGlobals()
   })
 
   // ── Existing app shell tests (unchanged behaviour) ───────────────────────
@@ -170,10 +171,22 @@ describe('App', () => {
     expect(screen.queryByRole('textbox', { name: 'Prompt input' })).not.toBeInTheDocument()
   })
 
-  it('submitting DockPrompt calls invoke and creates a card on success', async () => {
+  it('submitting DockPrompt streams a card via fetch and creates a card on success', async () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
-    invokeMock.mockResolvedValue({ data: { title: 'AI result', body: 'AI body' }, error: null })
+    vi.stubGlobal('requestAnimationFrame', (fn) => { fn(0); return 0 })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+    const encoder = new TextEncoder()
+    const sseBody = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"AI result"}}]}\n'))
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"\\n\\nAI body"}}]}\n'))
+        controller.enqueue(encoder.encode('data: [DONE]\n'))
+        controller.close()
+      },
+    })
+    const sseResponse = new Response(sseBody, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse))
 
     render(<App />)
     await waitFor(() => screen.getByRole('button', { name: 'Prompt' }))
@@ -181,7 +194,6 @@ describe('App', () => {
     await userEvent.type(screen.getByRole('textbox', { name: 'Prompt input' }), 'Make a card')
     await userEvent.click(screen.getByRole('button', { name: 'Send →' }))
 
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledOnce())
     await waitFor(() => screen.getByRole('heading', { name: 'AI result' }))
     expect(screen.getByRole('heading', { name: 'AI result' })).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Prompt input' })).not.toBeInTheDocument())
@@ -410,8 +422,9 @@ describe('App', () => {
       await waitFor(() => screen.getByRole('heading', { name: 'Inside tab' }))
 
       await userEvent.click(screen.getByRole('heading', { level: 2 }))
-      await userEvent.clear(screen.getByRole('textbox'))
-      await userEvent.type(screen.getByRole('textbox'), 'Saved workspace')
+      const tabNameInput = screen.getByDisplayValue('Main')
+      await userEvent.clear(tabNameInput)
+      await userEvent.type(tabNameInput, 'Saved workspace')
       await userEvent.keyboard('{Enter}')
       await userEvent.click(screen.getByRole('button', { name: 'Save tab to Shelf' }))
 

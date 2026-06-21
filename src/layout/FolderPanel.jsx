@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BrainFeed } from '../brain/BrainFeed'
+import { BrainFeedList } from '../brain/BrainFeedList'
 import { ShelfRow } from '../vault/ShelfRow'
 import { FolderTree } from '../vault/FolderTree'
 import { VaultTabRow } from '../vault/VaultTabRow'
@@ -13,17 +13,16 @@ export function FolderPanel({
   shelfTabs = [],
   libraryTabs = [],
   folders = [],
-  brainFeedItems = [],
   onMoveToLibrary,
   onMoveTabToLibrary,
   onCreateFolder,
   onClose,
   onOpenAsPortal,
   onOpenTab,
-  onBrainAccept,
-  onBrainDismiss,
   initialTab = 'shelf',
   highlightedCardId,
+  brainFeedItems = [],
+  onReindex,
 }) {
   const [tab, setTab] = useState(initialTab)
 
@@ -83,11 +82,7 @@ export function FolderPanel({
         )}
 
         {tab === 'brain' && (
-          <BrainFeed
-            items={brainFeedItems}
-            onAccept={onBrainAccept}
-            onDismiss={onBrainDismiss}
-          />
+          <BrainFeedList items={brainFeedItems} onReindex={onReindex} />
         )}
       </div>
 
