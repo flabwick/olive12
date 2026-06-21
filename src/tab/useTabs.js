@@ -37,6 +37,8 @@ import {
   putTab,
   putTabCard,
 } from './tabStorage'
+import { getDockCardIds } from './dockCardStorage'
+import { isOrphanTabCandidate } from './tabVaultLogic'
 
 const ACTIVE_TAB_KEY = 'olive12:activeTabId'
 
@@ -82,7 +84,12 @@ export function useTabs({ userId } = {}) {
 
       if (activeTab) {
         const knownIds = new Set(allTabCards.map((tc) => tc.cardId))
-        const orphans = freshCards.filter((c) => !knownIds.has(c.id))
+        const dockIds = new Set(await getDockCardIds())
+        const orphans = freshCards.filter((c) => {
+          if (knownIds.has(c.id)) return false
+          if (dockIds.has(c.id)) return false
+          return isOrphanTabCandidate(c, allTabCards, freshById)
+        })
 
         if (orphans.length > 0) {
           const maxPos = allTabCards.reduce((m, tc) => Math.max(m, tc.position), -1)
@@ -317,6 +324,18 @@ export function useTabs({ userId } = {}) {
       return card
     },
     [activeTab, tabCards, cardsById, reloadLinks],
+  )
+
+  const addTabCard = useCallback(
+    async (cardId) => {
+      if (!activeTab) return
+      const activeTabCards = tabCards.filter((tc) => tc.tabId === activeTab.id)
+      const position = nextPosition(activeTabCards)
+      const tc = createTabCard({ tabId: activeTab.id, cardId, position })
+      setTabCards((prev) => [...prev, tc])
+      await putTabCard(tc)
+    },
+    [activeTab, tabCards],
   )
 
   const updateCard = useCallback(
@@ -640,6 +659,7 @@ export function useTabs({ userId } = {}) {
     moveTabToLibrary,
     addCard,
     addPortalCard,
+    addTabCard,
     updateCard,
     removeCard,
     reorder,

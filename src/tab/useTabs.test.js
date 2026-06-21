@@ -38,6 +38,7 @@ describe('useTabs', () => {
     await db.folders.clear()
     await db.links.clear()
     await db.index_entries.clear()
+    await db.dock_cards.clear()
     localStorage.clear()
   })
 
@@ -921,6 +922,94 @@ describe('useTabs', () => {
       await act(async () => { await result.current.moveToLibrary('card-uuid') })
 
       expect(syncMocks.scheduleSync).toHaveBeenCalledTimes(1)
+    })
+
+    it('addTabCard creates tab_card for existing card without creating new card record', async () => {
+      // Pre-seed a tab and a card (no tab_card) before mount, no userId so reconcile won't run
+      await db.tabs.put({
+        id: 'pre-tab', name: 'Main', kind: 'blank', order: 0,
+        savedLocation: 'none', savedFolderId: null,
+        createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000,
+      })
+      await db.cards.put({
+        id: 'dock-card', type: 'text', title: 'Dock', body: '', back: '', config: null,
+        location: 'none', folderId: null,
+        createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000, dirty: true,
+      })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(result.current.cardsById['dock-card']).toBeDefined()
+      expect(result.current.entries).toHaveLength(0)
+
+      await act(async () => { await result.current.addTabCard('dock-card') })
+
+      expect(result.current.entries).toHaveLength(1)
+      expect(result.current.entries[0].card.id).toBe('dock-card')
+
+      const cards = await getAllCards()
+      expect(cards).toHaveLength(1)
+
+      const tcs = await getAllTabCards()
+      expect(tcs).toHaveLength(1)
+      expect(tcs[0].cardId).toBe('dock-card')
+      expect(tcs[0].tabId).toBe('pre-tab')
+    })
+
+    it('reconcile on load skips dock-pinned cards (does not create tab_card for them)', async () => {
+      syncMocks.createCardSyncScheduler.mockReturnValue({
+        scheduleSync: syncMocks.scheduleSync,
+        runNow: syncMocks.runNow,
+      })
+
+      await db.tabs.put({
+        id: 'test-tab', name: 'Main', kind: 'blank', order: 0,
+        savedLocation: 'none', savedFolderId: null,
+        createdAt: 1_000, updatedAt: 1_000,
+      })
+      await db.cards.put({
+        id: 'dock-only', type: 'text', title: 'Dock', body: '', back: '', config: null,
+        location: 'none', folderId: null,
+        createdAt: 1_000, updatedAt: 1_000, dirty: false,
+      })
+      await db.dock_cards.put({ cardId: 'dock-only', order: 0 })
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await waitFor(() => expect(syncMocks.runNow).toHaveBeenCalled())
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50))
+      })
+
+      expect(result.current.entries.some((e) => e.card?.id === 'dock-only')).toBe(false)
+      const tcs = await getAllTabCards()
+      expect(tcs.some((tc) => tc.cardId === 'dock-only')).toBe(false)
+    })
+
+    it('reconcile still creates tab_card for genuine orphans not in dock', async () => {
+      syncMocks.createCardSyncScheduler.mockReturnValue({
+        scheduleSync: syncMocks.scheduleSync,
+        runNow: syncMocks.runNow,
+      })
+
+      await db.tabs.put({
+        id: 'test-tab', name: 'Main', kind: 'blank', order: 0,
+        savedLocation: 'none', savedFolderId: null,
+        createdAt: 1_000, updatedAt: 1_000,
+      })
+      await db.cards.put({
+        id: 'genuine-orphan', type: 'text', title: 'Orphan', body: '', back: '', config: null,
+        location: 'none', folderId: null,
+        createdAt: 1_000, updatedAt: 1_000, dirty: false,
+      })
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await waitFor(() => expect(result.current.entries).toHaveLength(1))
+
+      expect(result.current.entries[0].card.id).toBe('genuine-orphan')
     })
 
     it('card mutations do not throw and work correctly without userId', async () => {
