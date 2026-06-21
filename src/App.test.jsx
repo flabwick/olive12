@@ -292,5 +292,31 @@ describe('App', () => {
     })
   })
 
-  // saved tab lifecycle test (uses TabSwitcher via TabHeader) is restored in Slice 8.
+  // ── Tab switcher via TabHeader ───────────────────────────────────────────
+  describe('tab switcher lifecycle', () => {
+    it('clicking Tab overview button opens the tab switcher dialog', async () => {
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Tab overview' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+      await waitFor(() => screen.getByRole('dialog', { name: 'Tab switcher' }))
+      expect(screen.getByRole('dialog', { name: 'Tab switcher' })).toBeInTheDocument()
+    })
+
+    it('tab switcher shows the current tab and a New tab tile', async () => {
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Tab overview' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+      await waitFor(() => screen.getByRole('dialog', { name: 'Tab switcher' }))
+      expect(screen.getByRole('button', { name: 'New tab' })).toBeInTheDocument()
+    })
+
+    it('pressing Escape closes the tab switcher', async () => {
+      render(<App />)
+      await waitFor(() => screen.getByRole('button', { name: 'Tab overview' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+      await waitFor(() => screen.getByRole('dialog', { name: 'Tab switcher' }))
+      await userEvent.keyboard('{Escape}')
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Tab switcher' })).not.toBeInTheDocument())
+    })
+  })
 })

@@ -131,6 +131,7 @@ function AppShell({ userId }) {
             onRename={(name) => renameTab(tab.id, name)}
             onSaveToShelf={tab.savedLocation === 'none' ? () => saveTabToShelf(tab.id) : undefined}
             onMoveToLibrary={tab.savedLocation === 'shelf' ? () => moveTabToLibrary(tab.id) : undefined}
+            onTabOverview={handleTabOverview}
           />
         )}
         <Tab

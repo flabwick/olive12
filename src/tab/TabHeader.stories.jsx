@@ -12,6 +12,7 @@ export const Default = {
     savedLocation: 'none',
     onRename: (name) => console.log('rename:', name),
     onSaveToShelf: () => console.log('save to shelf'),
+    onTabOverview: () => console.log('tab overview'),
   },
 }
 

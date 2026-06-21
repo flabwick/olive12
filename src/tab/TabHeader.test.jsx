@@ -78,9 +78,21 @@ describe('TabHeader', () => {
     expect(screen.getByRole('button', { name: 'Tab in Library' })).toBeDisabled()
   })
 
-  it('save button not rendered when neither callback provided and savedLocation is none', () => {
+  it('no buttons rendered when no callbacks provided and savedLocation is none', () => {
     render(<TabHeader name="Tab" savedLocation="none" />)
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('renders Tab overview button when onTabOverview is provided', () => {
+    render(<TabHeader name="Tab" savedLocation="none" onTabOverview={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Tab overview' })).toBeInTheDocument()
+  })
+
+  it('clicking Tab overview button calls onTabOverview', () => {
+    const onTabOverview = vi.fn()
+    render(<TabHeader name="Tab" savedLocation="none" onTabOverview={onTabOverview} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Tab overview' }))
+    expect(onTabOverview).toHaveBeenCalledOnce()
   })
 
   it('shows (untitled) placeholder when name is empty', () => {

@@ -14,6 +14,7 @@ test.describe('Tab management flow', () => {
     await page.fill('[aria-label="Email"]', TEST_EMAIL)
     await page.fill('[aria-label="Password"]', TEST_PASSWORD)
     await page.click('button:has-text("Sign in")')
+    // Tab overview button is now on TabHeader (not dock)
     await page.waitForSelector('[aria-label="Tab overview"]', { timeout: 10000 })
   })
 
@@ -21,7 +22,7 @@ test.describe('Tab management flow', () => {
     // Verify we start with one tab (default "Main")
     await expect(page.locator('h2').first()).toBeVisible()
 
-    // Open tab switcher
+    // Open tab switcher via TabHeader button
     await page.click('[aria-label="Tab overview"]')
     await expect(page.getByRole('dialog', { name: 'Tab switcher' })).toBeVisible()
 
@@ -67,18 +68,26 @@ test.describe('Tab management flow', () => {
   })
 
   test('open vault panel → shelf tab → click Open in tab → portal card appears in active tab', async ({ page }) => {
-    // Add a text card and save it to shelf
-    await page.click('[aria-label="Add card"]')
-    await page.waitForSelector('[aria-label="New card"]')
-    await page.fill('[aria-label="Title"]', 'Shelf source card')
-    await page.fill('[aria-label="Body"]', 'Content of the shelf card')
-    await page.click('button:has-text("Add")')
+    // Create a new card via the dock "Pin new card" button
+    await page.click('[aria-label="Pin new card"]')
+    await page.waitForSelector('[aria-role="complementary"]', { timeout: 5000 }).catch(() => {
+      return page.waitForSelector('.dock-card-panel', { timeout: 5000 })
+    })
 
-    // Save the card to shelf via its Save to Shelf button
+    // Fill in title and body in the dock card panel
+    const titleInput = page.getByLabel('Card title')
+    await titleInput.fill('Shelf source card')
+    await page.locator('.rich-text-editor .ProseMirror').click()
+    await page.keyboard.type('Content of the shelf card')
+
+    // Move the card to the tab (DOCK_EDITOR state shows Move button)
+    await page.click('[aria-label="Move card to tab"]')
+
+    // Save the card to shelf via its Save to Shelf button in the tab
     await page.click('[aria-label="Save to Shelf"]')
 
-    // Open the vault panel (Folders button in dock)
-    await page.click('[aria-label="Folders"]')
+    // Open the vault panel (Library button in dock)
+    await page.click('[aria-label="Library"]')
     await expect(page.getByRole('dialog', { name: 'Vault and Brain' })).toBeVisible()
 
     // Shelf tab is active by default — click Open in tab for our card
@@ -93,7 +102,7 @@ test.describe('Tab management flow', () => {
   })
 
   test('open vault panel → Brain tab → shows brain feed list', async ({ page }) => {
-    await page.click('[aria-label="Folders"]')
+    await page.click('[aria-label="Library"]')
     await expect(page.getByRole('dialog', { name: 'Vault and Brain' })).toBeVisible()
 
     await page.getByRole('tab', { name: 'Brain' }).click()

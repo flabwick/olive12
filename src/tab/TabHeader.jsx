@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './TabHeader.css'
 
-export function TabHeader({ name, savedLocation, onRename, onSaveToShelf, onMoveToLibrary }) {
+export function TabHeader({ name, savedLocation, onRename, onSaveToShelf, onMoveToLibrary, onTabOverview }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
   const inputRef = useRef(null)
@@ -70,6 +70,16 @@ export function TabHeader({ name, savedLocation, onRename, onSaveToShelf, onMove
           onClick={handleSaveClick}
         >
           {savedLocation === 'none' ? '+' : '✓'}
+        </button>
+      )}
+      {onTabOverview && (
+        <button
+          type="button"
+          className="tab-header__tabs"
+          aria-label="Tab overview"
+          onClick={onTabOverview}
+        >
+          ≡
         </button>
       )}
     </div>
