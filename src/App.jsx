@@ -48,6 +48,8 @@ function AppShell({ userId }) {
     cardsById,
     brainFeedItems,
     reindexCard,
+    flipCard,
+    isFlippedCard,
   } = useTabs({ userId })
 
   const [folderPanelOpen, setFolderPanelOpen] = useState(false)
@@ -139,6 +141,8 @@ function AppShell({ userId }) {
           onSaveToShelf={saveToShelf}
           onMoveToLibrary={moveToLibrary}
           onLocate={handleLocate}
+          flipCard={flipCard}
+          isFlipped={isFlippedCard}
         />
         {transientOpen && (
           <TransientCard

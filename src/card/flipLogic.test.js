@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canFlip } from './flipLogic'
+import { canFlip, isFlipped, toggleFlip } from './flipLogic'
 
 describe('canFlip', () => {
   it('returns true for a text card with non-empty back', () => {
@@ -24,5 +24,37 @@ describe('canFlip', () => {
 
   it('returns false for undefined', () => {
     expect(canFlip(undefined)).toBe(false)
+  })
+})
+
+describe('toggleFlip', () => {
+  it('adds a missing id', () => {
+    const result = toggleFlip(new Set(), 'card-1')
+    expect(result.has('card-1')).toBe(true)
+  })
+
+  it('removes an existing id', () => {
+    const result = toggleFlip(new Set(['card-1']), 'card-1')
+    expect(result.has('card-1')).toBe(false)
+  })
+
+  it('does not mutate the original Set', () => {
+    const original = new Set(['card-1'])
+    toggleFlip(original, 'card-1')
+    expect(original.has('card-1')).toBe(true)
+  })
+})
+
+describe('isFlipped', () => {
+  it('returns true when the id is present', () => {
+    expect(isFlipped(new Set(['card-1']), 'card-1')).toBe(true)
+  })
+
+  it('returns false when the id is absent', () => {
+    expect(isFlipped(new Set(['card-2']), 'card-1')).toBe(false)
+  })
+
+  it('returns false on an empty Set', () => {
+    expect(isFlipped(new Set(), 'card-1')).toBe(false)
   })
 })

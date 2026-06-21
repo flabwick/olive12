@@ -7,6 +7,7 @@ export default {
     title: 'Meeting notes',
     folded: false,
     hidden: false,
+    flipped: false,
     editing: false,
     onToggleFold: () => {},
     onToggleHide: () => {},
@@ -60,5 +61,43 @@ export const NoControls = {
     onToggleHide: undefined,
     onMoveUp: undefined,
     onMoveDown: undefined,
+  },
+}
+
+export const AllControls = {
+  args: {
+    title: 'All controls — flip between eye and close',
+    onFlip: () => {},
+    onClose: () => {},
+  },
+}
+
+export const FlipActive = {
+  args: {
+    title: 'Flip button active (showing back)',
+    onFlip: () => {},
+    onClose: () => {},
+    flipped: true,
+  },
+}
+
+export const FlipOnly = {
+  args: {
+    title: 'Flip only — no move arrows, no eye, no close',
+    onToggleFold: undefined,
+    onToggleHide: undefined,
+    onMoveUp: undefined,
+    onMoveDown: undefined,
+    onFlip: () => {},
+  },
+}
+
+export const HiddenCard = {
+  args: {
+    title: 'Hidden card — eye fully visible',
+    hidden: true,
+    onToggleHide: () => {},
+    onFlip: () => {},
+    onClose: () => {},
   },
 }

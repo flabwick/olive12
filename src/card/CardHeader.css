@@ -119,6 +119,11 @@
   flex-shrink: 0;
 }
 
+.card-header__control svg {
+  display: block;
+  flex-shrink: 0;
+}
+
 .card-header__control {
   display: flex;
   align-items: center;

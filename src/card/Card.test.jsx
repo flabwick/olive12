@@ -225,23 +225,23 @@ describe('Card', () => {
   describe('flip', () => {
     it('flip button is present when onFlip is provided, regardless of back content', () => {
       render(<Card title="Q" body="Some body" back="" onFlip={() => {}} />)
-      expect(screen.getByRole('button', { name: 'Flip card' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
     })
 
     it('flip button is present even when back has content', () => {
       render(<Card title="Q" body="Some body" back="The answer" onFlip={() => {}} />)
-      expect(screen.getByRole('button', { name: 'Flip card' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
     })
 
     it('flip button is absent when onFlip is not provided', () => {
       render(<Card title="Q" body="Some body" back="The answer" />)
-      expect(screen.queryByRole('button', { name: 'Flip card' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Show card back' })).not.toBeInTheDocument()
     })
 
     it('flip button calls onFlip when clicked', async () => {
       const onFlip = vi.fn()
       render(<Card title="Q" body="Some body" back="The answer" onFlip={onFlip} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Flip card' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Show card back' }))
       expect(onFlip).toHaveBeenCalledOnce()
     })
 

@@ -287,6 +287,48 @@ describe('useTabs', () => {
     expect(result.current.entries[0].hiddenState).toBe(false)
   })
 
+  describe('flip state', () => {
+    it('flipCard toggles a card id into flippedCardIds', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+      expect(result.current.isFlippedCard('card-uuid')).toBe(false)
+      act(() => { result.current.flipCard('card-uuid') })
+      expect(result.current.isFlippedCard('card-uuid')).toBe(true)
+    })
+
+    it('flipCard called twice on the same id un-flips it', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+      act(() => { result.current.flipCard('card-uuid') })
+      act(() => { result.current.flipCard('card-uuid') })
+      expect(result.current.isFlippedCard('card-uuid')).toBe(false)
+    })
+
+    it('isFlippedCard returns false for cards that have not been flipped', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(result.current.isFlippedCard('nonexistent-card')).toBe(false)
+    })
+  })
+
   it('removeCard removes the card from entries', async () => {
     vi.spyOn(crypto, 'randomUUID')
       .mockReturnValueOnce('tab-uuid')

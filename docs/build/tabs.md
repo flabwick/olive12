@@ -185,10 +185,8 @@ e2e/
 | `promptLoading` | `boolean` | `true` while the dock-prompt edge function is in flight |
 | `promptError` | `string` | Error message from last failed prompt call; `''` when no error |
 | `indexEntries` | `IndexEntry[]` | Wiki index records loaded from Dexie |
-| `indexLoadingIds` | `Set<string>` | Card ids currently being indexed |
-| `flippedCardIds` | `Set<string>` | Tab entry card ids showing back face |
-| `dismissedBrainIds` | `Set<string>` | Brain feed items dismissed this session |
-| `indexDebugOpen` | `boolean` | Whether IndexDebugPanel is visible (AppShell; default true) |
+| `allLinks` | `Link[]` | All link records loaded from Dexie on mount; refreshed after any card mutation |
+| `flippedCardIds` | `Set<string>` | Card ids currently showing their back face (session-only; not persisted) |
 
 ### Three `useEffect` hooks
 
@@ -228,7 +226,7 @@ All tab mutation functions (`addTab`, `removeTab`, `renameTab`, `saveTabToShelf`
 
 | Property | Type | Description |
 |---|---|---|
-| `entries` | `Entry[]` | Cards for the active tab in position order: `{ card, position, foldState, hiddenState, indexEntry?, indexLocation?, indexLoading? }` |
+| `entries` | `Entry[]` | Cards for the active tab in position order: `{ card, position, foldState, hiddenState, indexEntry }`. `indexEntry` is the IndexEntry for the card (or its portal target); `null` if none exists. |
 | `shelfEntries` | `Card[]` | All `location === 'shelf'` cards, sorted by `createdAt` asc |
 | `libraryEntries` | `Card[]` | All `location === 'library'` cards, sorted by `updatedAt` desc |
 | `shelfTabs` | `Tab[]` | All tabs with `savedLocation === 'shelf'` |
@@ -250,12 +248,9 @@ All tab mutation functions (`addTab`, `removeTab`, `renameTab`, `saveTabToShelf`
 | `promptLoading` | `boolean` | `true` while the edge function call is in flight |
 | `promptError` | `string` | Error message from the last failed call; `''` when no error |
 | `brainFeedItems` | `BrainFeedItem[]` | `{ cardId, title, reason: 'stale'\|'orphan' }` derived from library cards + index entries |
-| `onBrainAccept` | function | `(cardId)` — **stub** (console.log); intended to re-index |
-| `onBrainDismiss` | function | `(cardId)` — hides item from feed for session |
-| `flipCard` | function | `(cardId)` — toggles flip; on library cards without index, may trigger `indexCard` |
-| `isFlipped` | function | `(cardId) → boolean` |
-| `getIndexEntry` | function | `(cardId) → IndexEntry \| undefined` |
-| `isIndexing` | function | `(cardId) → boolean` |
+| `flipCard` | function | `(cardId)` — toggles flip state for the card (session-only, not persisted) |
+| `isFlippedCard` | function | `(cardId) → boolean` — whether `cardId` is in the `flippedCardIds` Set |
+| `reindexCard` | function | `(cardId, cardOverride?)` — manually invokes `wiki-index` and persists the result |
 
 `shelfEntries`, `libraryEntries`, `shelfTabs`, and `libraryTabs` are derived — no extra storage calls.
 
@@ -351,7 +346,7 @@ TabSwitcher?                 ← fixed full-screen overlay, outside app-shell fl
 
 ### Tab
 
-`Tab({ entries, folders, cardsById, onReorder, onUpdate, onUpdateBack, onRemove, onFold, onUnfold, onHide, onUnhide, onSaveToShelf, onMoveToLibrary, onLocate, onFlip, isFlipped })` — presentational. Renders cards in position order. Each entry may include `indexEntry`, `indexLocation`, `indexLoading` for portal target resolution.
+`Tab({ entries, folders, cardsById, onReorder, onUpdate, onRemove, onFold, onUnfold, onHide, onUnhide, onSaveToShelf, onMoveToLibrary, onLocate, flipCard, isFlipped })` — presentational. Renders cards in position order. Each entry includes `indexEntry` (resolved to the portal target's entry for portal cards). `flipCard(cardId)` and `isFlipped(cardId)` come from `useTabs` via `AppShell`.
 
 **Flip:** `onFlip(cardId)` and `isFlipped(cardId)` passed to `Card` / `PortalCard`. When flipped, front body hidden and `CardBack` shown.
 
@@ -391,7 +386,7 @@ Slide-up panel. Three tabs: **Shelf** (VaultTabRow tab entries + ShelfRow card e
 |---|---|
 | `createTab.test.js` | `createTab` defaults/custom/unique ids; `savedLocation`/`savedFolderId` defaults; `createTabCard` defaults; `nextPosition`; `reorderTabCard`; `setTabCardFold`; `setTabCardHidden`; `removeTabCard`; `updateTabFields`; `setTabName`; `removeTab` (removes and renumbers); `reorderTabs`; `saveTabToShelf`; `moveTabToLibrary` |
 | `tabStorage.test.js` | Empty reads; `putTab` round-trip + upsert; `deleteTab`; `putTabCard` round-trip, foldState/hiddenState, position upsert; `deleteTabCard`; `deleteAllTabCards` |
-| `useTabs.test.js` | Default tab on first mount; state loaded on mount; `addCard`; `addPortalCard` (creates portal, appends at end, dedup — same target twice is no-op, target card already in tab is no-op); `updateCard`; `removeCard`; `reorder`; `fold`/`unfold`; `hide`/`unhide`; `saveToShelf` (moves card to shelf, replaces tab instance with portal at same position, persists); `moveToLibrary` (state + Dexie + wiki-index invoke); flip triggers index on library card; shelf flip does not invoke wiki-index; `shelfEntries`/`libraryEntries` derivation + sort; `shelfTabs`/`libraryTabs` derivation; `createFolder`; `moveToLibrary` with folderId; remount persistence; multi-tab: `addTab`, `removeTab`, `renameTab`, `saveTabToShelf`, `moveTabToLibrary`, `switchTab`; localStorage: `activeTabId` persisted on switch, restored on remount; sync wiring: scheduler created, `runNow` called, `scheduleSync` on mutations, orphan card detection, `removeCard` with userId calls `deleteRemoteCard`; `runDockPrompt`: invoke args, card created, returns true/false, excludes hidden cards; `brainFeedItems` stale/orphan; `flipCard`/`isFlipped`; index fields on entries for portal targets |
+| `useTabs.test.js` | Default tab on first mount; state loaded on mount; `addCard`; `addPortalCard` (creates portal, appends at end, dedup — same target twice is no-op, target card already in tab is no-op); `updateCard`; `removeCard`; `reorder`; `fold`/`unfold`; `hide`/`unhide`; `saveToShelf` (moves card to shelf, replaces tab instance with portal at same position, persists); `moveToLibrary` (state + Dexie + wiki-index invoke); `shelfEntries`/`libraryEntries` derivation + sort; `shelfTabs`/`libraryTabs` derivation; `createFolder`; `moveToLibrary` with folderId; remount persistence; multi-tab: `addTab`, `removeTab`, `renameTab`, `saveTabToShelf`, `moveTabToLibrary`, `switchTab`; localStorage: `activeTabId` persisted on switch, restored on remount; sync wiring: scheduler created, `runNow` called, `scheduleSync` on mutations, orphan card detection, `removeCard` with userId calls `deleteRemoteCard`; `runDockPrompt`: invoke args, card created, returns true/false, excludes hidden cards; `brainFeedItems` stale/orphan; `flipCard` toggles/un-flips; `isFlippedCard` boolean |
 | `TabHeader.test.jsx` | Renders name and save button; click → edit mode; Enter commits; blur commits; Escape cancels; shelf state button; library state button (disabled); no button when no handlers |
 | `TabSwitcher.test.jsx` | Renders all tiles; active tile highlighted; card counts; shelf/library badges; switch on tile click; add tile; close on × click; close on backdrop click; Escape closes; remove tile calls `onRemoveTab`; save button calls `onSaveTab` |
 | `Tab.test.jsx` | Empty state; renders title+body; fold hides body; hidden card class; position order; all callbacks; portal card renders target title/body; portal placeholder when null target; portal onUpdate routes to target id; null target not editable; onLocate called with target id |

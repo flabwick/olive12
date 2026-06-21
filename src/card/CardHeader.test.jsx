@@ -91,7 +91,7 @@ describe('CardHeader', () => {
     expect(onMoveDown).toHaveBeenCalledOnce()
   })
 
-  it('renders four buttons when all callbacks are provided', () => {
+  it('renders five buttons when all callbacks are provided', () => {
     render(
       <CardHeader
         title="A"
@@ -99,9 +99,10 @@ describe('CardHeader', () => {
         onMoveDown={() => {}}
         onToggleFold={() => {}}
         onToggleHide={() => {}}
+        onFlip={() => {}}
       />,
     )
-    expect(screen.getAllByRole('button')).toHaveLength(4)
+    expect(screen.getAllByRole('button')).toHaveLength(5)
   })
 
   it('renders title as input when editing is true', () => {
@@ -165,26 +166,42 @@ describe('CardHeader', () => {
   })
 
   describe('flip', () => {
-    it('renders Flip card button when onFlip is provided', () => {
+    it('renders flip button with "Show card back" label when onFlip is provided', () => {
       render(<CardHeader title="Q" onFlip={() => {}} />)
-      expect(screen.getByRole('button', { name: 'Flip card' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
     })
 
-    it('does not render Flip card button when onFlip is absent', () => {
+    it('does not render flip button when onFlip is absent', () => {
       render(<CardHeader title="Q" />)
-      expect(screen.queryByRole('button', { name: 'Flip card' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Show card back' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Show card front' })).not.toBeInTheDocument()
     })
 
-    it('calls onFlip when Flip card is clicked', async () => {
+    it('calls onFlip when flip button is clicked', async () => {
       const onFlip = vi.fn()
       render(<CardHeader title="Q" onFlip={onFlip} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Flip card' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Show card back' }))
       expect(onFlip).toHaveBeenCalledOnce()
+    })
+
+    it('flip button aria-label is "Show card back" when flipped is false', () => {
+      render(<CardHeader title="Q" onFlip={() => {}} flipped={false} />)
+      expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
+    })
+
+    it('flip button aria-label is "Show card front" when flipped is true', () => {
+      render(<CardHeader title="Q" onFlip={() => {}} flipped={true} />)
+      expect(screen.getByRole('button', { name: 'Show card front' })).toBeInTheDocument()
     })
 
     it('flip button has aria-pressed=true when flipped', () => {
       render(<CardHeader title="Q" onFlip={() => {}} flipped={true} />)
-      expect(screen.getByRole('button', { name: 'Flip card' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: 'Show card front' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    it('flip button renders when only onFlip is provided (no move arrows, no eye, no close)', () => {
+      render(<CardHeader title="Q" onFlip={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
     })
   })
 })

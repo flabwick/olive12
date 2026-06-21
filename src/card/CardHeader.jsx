@@ -60,9 +60,9 @@ function EyeIcon({ hidden }) {
   if (hidden) {
     return (
       <svg
-        viewBox="0 0 16 12"
-        width="16"
-        height="12"
+        viewBox="-1 -1 18 14"
+        width="12"
+        height="9"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.5"
@@ -80,9 +80,9 @@ function EyeIcon({ hidden }) {
 
   return (
     <svg
-      viewBox="0 0 16 10"
-      width="16"
-      height="10"
+      viewBox="-1 -1 18 12"
+      width="12"
+      height="8"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"
@@ -203,17 +203,6 @@ export function CardHeader({
 
       {hasRightControls && (
         <div className="card-header__controls">
-          {onFlip && (
-            <button
-              type="button"
-              className={`card-header__control${flipped ? ' card-header__control--active' : ''}`}
-              onClick={onFlip}
-              aria-label="Flip card"
-              aria-pressed={flipped}
-            >
-              <FlipIcon />
-            </button>
-          )}
           {onMoveUp && (
             <button
               type="button"
@@ -242,6 +231,17 @@ export function CardHeader({
               aria-label={hidden ? 'Show card' : 'Dim card'}
             >
               <EyeIcon hidden={hidden} />
+            </button>
+          )}
+          {onFlip && (
+            <button
+              type="button"
+              className={`card-header__control${flipped ? ' card-header__control--active' : ''}`}
+              onClick={onFlip}
+              aria-label={flipped ? 'Show card front' : 'Show card back'}
+              aria-pressed={flipped}
+            >
+              <FlipIcon />
             </button>
           )}
           {onClose && (

@@ -293,7 +293,7 @@ describe('Tab', () => {
         card: { id: 'card-1', title: 'Q', body: 'Body', type: 'text', location: 'none', back: 'Answer' },
       })
       render(<Tab entries={[entry]} isFlipped={() => false} flipCard={flipCard} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Flip card' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Show card back' }))
       expect(flipCard).toHaveBeenCalledWith('card-1')
     })
 
@@ -306,7 +306,7 @@ describe('Tab', () => {
         hiddenState: false,
       }
       render(<Tab entries={[portalEntry]} isFlipped={() => false} flipCard={flipCard} />)
-      expect(screen.getByRole('button', { name: 'Flip card' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
     })
 
     it('PortalCard flip button calls flipCard with portal card id', async () => {
@@ -321,7 +321,7 @@ describe('Tab', () => {
         hiddenState: false,
       }
       render(<Tab entries={[portalEntry]} cardsById={cardsById} isFlipped={() => false} flipCard={flipCard} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Flip card' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Show card back' }))
       expect(flipCard).toHaveBeenCalledWith('portal-1')
     })
   })

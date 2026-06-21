@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { isFlipped as isFlippedFn, toggleFlip } from '../card/flipLogic'
 import { parseStreamChunk } from '../prompt/streamParser'
 import { deleteCard, getAllCards, putCard } from '../card/cardStorage'
 import { deleteLinksForSource, rebuildLinksForCard } from '../card/linkStorage'
@@ -48,6 +49,7 @@ export function useTabs({ userId } = {}) {
   const [folders, setFolders] = useState([])
   const [indexEntries, setIndexEntries] = useState([])
   const [allLinks, setAllLinks] = useState([])
+  const [flippedCardIds, setFlippedCardIds] = useState(() => new Set())
   const [promptLoading, setPromptLoading] = useState(false)
   const [promptError, setPromptError] = useState('')
   const schedulerRef = useRef(null)
@@ -458,15 +460,30 @@ export function useTabs({ userId } = {}) {
     return folder
   }, [])
 
+  const flipCard = useCallback((cardId) => {
+    setFlippedCardIds((prev) => toggleFlip(prev, cardId))
+  }, [])
+
+  const isFlippedCard = useCallback((cardId) => {
+    return isFlippedFn(flippedCardIds, cardId)
+  }, [flippedCardIds])
+
   const entries = tabCards
     .filter((tc) => tc.tabId === activeTabId)
     .sort((a, b) => a.position - b.position)
-    .map((tc) => ({
-      card: cardsById[tc.cardId],
-      position: tc.position,
-      foldState: tc.foldState,
-      hiddenState: tc.hiddenState,
-    }))
+    .map((tc) => {
+      const card = cardsById[tc.cardId]
+      const lookupId = card?.type === 'portal'
+        ? (card.config?.target_card_id ?? tc.cardId)
+        : tc.cardId
+      return {
+        card,
+        position: tc.position,
+        foldState: tc.foldState,
+        hiddenState: tc.hiddenState,
+        indexEntry: indexEntries.find((e) => e.cardId === lookupId) ?? null,
+      }
+    })
     .filter((entry) => entry.card !== undefined)
 
   const shelfEntries = Object.values(cardsById)
@@ -638,5 +655,7 @@ export function useTabs({ userId } = {}) {
     promptError,
     brainFeedItems,
     reindexCard,
+    flipCard,
+    isFlippedCard,
   }
 }

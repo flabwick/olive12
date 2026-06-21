@@ -43,7 +43,10 @@ export function Tab({
         const indexProps = {
           indexEntry: entry.indexEntry,
           indexLoading: entry.indexLoading ?? false,
-          location: entry.card.type === 'portal' ? 'none' : (entry.card.location ?? 'none'),
+          // For portal cards, use the target card's location so the wiki section shows correctly
+          location: entry.card.type === 'portal'
+            ? (cardsById[entry.card.config?.target_card_id]?.location ?? 'none')
+            : (entry.card.location ?? 'none'),
         }
 
         if (entry.card.type === 'portal') {

@@ -32,6 +32,7 @@ src/
     CardBack.jsx                # Back face: notes, metadata, wiki index (library only)
     CardBack.css
     CardBack.test.jsx           # [TEST]
+    CardBack.stories.jsx        # [STORY]
     LocationButton.jsx          # Dumb: save-to-shelf / move-to-library / in-library button
     LocationButton.css
     LocationButton.test.jsx     # [TEST]
@@ -126,9 +127,9 @@ Dumb header strip at the top of every card. Props:
 | `flipped` | boolean | When true, flip button gets active styling |
 | `onClose` | function \| undefined | If provided, renders the X close button |
 
-Layout: `[fold-caret] [title or input] [LocationButton] [flip] [up] [down] [eye] [X]`
+Layout: `[fold-caret] [title or input] [LocationButton] [up] [down] [eye] [flip] [X]`
 
-Aria labels: **Collapse card / Expand card** (fold), **Dim card / Show card** (hide), **Move card up**, **Move card down**, **Remove card**.
+Aria labels: **Collapse card / Expand card** (fold), **Dim card / Show card** (hide), **Move card up**, **Move card down**, **Show card back / Show card front** (flip — dynamic based on `flipped`), **Remove card**.
 
 ## LocationButton component
 
@@ -179,13 +180,15 @@ Portal cards pass the **target** card's location and index fields (resolved in `
 
 ## flipLogic.js
 
-Pure helper (exported, not yet wired to hide the flip button in UI):
+Pure helpers. No React, no side effects.
 
 | Function | Behaviour |
 |---|---|
 | `canFlip(card)` | `true` when `type === 'text'` and `back` is non-empty after trim |
+| `toggleFlip(flippedSet, cardId)` | Returns a **new** `Set` with `cardId` added if absent, removed if present. Does not mutate the input. |
+| `isFlipped(flippedSet, cardId)` | Returns `boolean` — whether `cardId` is in `flippedSet`. |
 
-Flip state lives in `useTabs` as `flippedCardIds` (Set). `flipCard(cardId)` toggles membership; `isFlipped(cardId)` reads it. The flip button renders whenever `onFlip` is passed to `CardHeader`, regardless of `canFlip`.
+Flip state lives in `useTabs` as `flippedCardIds` (a `Set<string>`). `flipCard(cardId)` uses `toggleFlip` to produce a new set; `isFlippedCard(cardId)` uses `isFlipped` to read it. The flip button renders whenever `onFlip` is passed to `CardHeader`, unconditionally — `canFlip` is not consulted.
 
 ## PortalCard component
 
@@ -214,7 +217,7 @@ The `.portal-card` wrapper has `position: relative`; the `.portal-card__locate` 
 | `FolderPickerOverlay.test.jsx` | Renders folder list; root option; onSelect called with folderId; onDismiss called |
 | `Card.test.jsx` | Renders title/body; fold hides body and resize handle; hidden applies `.card--hidden`; resize handle present/absent; inline editing (click title, click body, commit on blur, cancel on Escape, no save if unchanged) |
 | `PortalCard.test.jsx` | Renders target title/body when resolved; placeholder when target null; placeholder when cardsById missing target; fold hides body; hiddenState applies card--hidden; onClose/onMoveUp/onMoveDown callbacks; onUpdate called with edited fields (committed on blur); null target not editable; Show in vault button present/absent (requires both target and onLocate); calls onLocate on click |
-| `flipLogic.test.js` | canFlip for text/portal/empty back |
+| `flipLogic.test.js` | `canFlip` for text/portal/empty back; `toggleFlip` adds/removes/non-mutating; `isFlipped` true/false/empty |
 | `CardBack.test.jsx` | Notes render; index section library-only; loading state; debug details |
 
 ## Not built yet
