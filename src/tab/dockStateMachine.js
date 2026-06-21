@@ -4,7 +4,8 @@ export const DOCK_STATE = {
   TAB_EDITOR: 'tab_editor',
 }
 
-export function computeDockState({ activeDockCardId, activeEditorCardId }) {
+export function computeDockState({ activeDockCardId, activeEditorCardId, activeSurface }) {
+  if (activeEditorCardId && activeSurface === 'dock') return DOCK_STATE.DOCK_EDITOR
   if (activeEditorCardId) return DOCK_STATE.TAB_EDITOR
   if (activeDockCardId) return DOCK_STATE.DOCK_EDITOR
   return DOCK_STATE.BASE

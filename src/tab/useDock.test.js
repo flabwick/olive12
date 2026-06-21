@@ -82,6 +82,19 @@ describe('useDock', () => {
     expect(await getAllTabCards()).toHaveLength(0)
   })
 
+  it('createAndPinCard calls onCreated with the new card', async () => {
+    const { result } = renderHook(() => useDock({}))
+    await waitFor(() => expect(result.current.dockCardIds).toEqual([]))
+
+    const onCreated = vi.fn()
+    await act(async () => {
+      await result.current.createAndPinCard(onCreated)
+    })
+
+    expect(onCreated).toHaveBeenCalledOnce()
+    expect(onCreated.mock.calls[0][0]).toMatchObject({ id: 'test-card-uuid', title: '', body: '' })
+  })
+
   it('moveDockCardToTab calls addTabCard and removeFromDock', async () => {
     await db.dock_cards.put({ cardId: 'card-1', order: 0 })
     const { result } = renderHook(() => useDock({}))

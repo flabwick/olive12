@@ -25,6 +25,14 @@ describe('computeDockState', () => {
     expect(computeDockState({ activeDockCardId: 'card-1', activeEditorCardId: 'card-2' })).toBe(DOCK_STATE.TAB_EDITOR)
   })
 
+  it('returns DOCK_EDITOR when editing the active dock card (activeSurface=dock)', () => {
+    expect(computeDockState({ activeDockCardId: 'card-1', activeEditorCardId: 'card-1', activeSurface: 'dock' })).toBe(DOCK_STATE.DOCK_EDITOR)
+  })
+
+  it('returns TAB_EDITOR when editing a tab surface even if ids match', () => {
+    expect(computeDockState({ activeDockCardId: 'card-1', activeEditorCardId: 'card-1', activeSurface: 'tab' })).toBe(DOCK_STATE.TAB_EDITOR)
+  })
+
   it('treats empty string ids as falsy and returns BASE', () => {
     expect(computeDockState({ activeDockCardId: '', activeEditorCardId: '' })).toBe(DOCK_STATE.BASE)
   })

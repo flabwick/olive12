@@ -338,6 +338,10 @@ export function useTabs({ userId } = {}) {
     [activeTab, tabCards],
   )
 
+  const addToCardsById = useCallback((card) => {
+    setCardsById((prev) => ({ ...prev, [card.id]: card }))
+  }, [])
+
   const updateCard = useCallback(
     async (cardId, fields) => {
       const card = cardsById[cardId]
@@ -660,6 +664,7 @@ export function useTabs({ userId } = {}) {
     addCard,
     addPortalCard,
     addTabCard,
+    addToCardsById,
     updateCard,
     removeCard,
     reorder,

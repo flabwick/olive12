@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { AuthForm } from './auth/AuthForm'
 import { useRichTextEditorContext, RichTextEditorProvider } from './card/RichTextEditorContext'
+import { IndexDebugPanel } from './debug/IndexDebugPanel'
 import { FolderPanel } from './layout/FolderPanel'
 import { supabase } from './lib/supabaseClient'
 import { Dock } from './tab/Dock'
+import { DockCardPanel } from './tab/DockCardPanel'
 import { DockPrompt } from './tab/DockPrompt'
 import { Tab } from './tab/Tab'
 import { TabHeader } from './tab/TabHeader'
@@ -13,7 +15,7 @@ import { useTabs } from './tab/useTabs'
 import './App.css'
 
 function AppShell({ userId }) {
-  const { activeCardId: activeEditorCardId } = useRichTextEditorContext()
+  const { activeCardId: activeEditorCardId, activeSurface } = useRichTextEditorContext()
 
   const {
     tab,
@@ -32,6 +34,7 @@ function AppShell({ userId }) {
     saveTabToShelf,
     moveTabToLibrary,
     addTabCard,
+    addToCardsById,
     addPortalCard,
     updateCard,
     removeCard,
@@ -63,11 +66,12 @@ function AppShell({ userId }) {
     addToDock,
     createAndPinCard,
     moveDockCardToTab,
-  } = useDock({ cardsById, activeEditorCardId })
+  } = useDock({ cardsById, activeEditorCardId, activeSurface })
 
   const [folderPanelOpen, setFolderPanelOpen] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
   const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false)
+  const [indexDebugOpen, setIndexDebugOpen] = useState(false)
   const [lightningActive, setLightningActive] = useState(false)
   const [vaultInitialTab, setVaultInitialTab] = useState('shelf')
   const [highlightedCardId, setHighlightedCardId] = useState(null)
@@ -102,6 +106,11 @@ function AppShell({ userId }) {
   async function handlePromptSubmit(text) {
     const ok = await runDockPrompt(text)
     if (ok) setPromptOpen(false)
+  }
+
+  function handleSettings() {
+    setFolderPanelOpen(false)
+    setIndexDebugOpen((v) => !v)
   }
 
   function handleTabOverview() {
@@ -168,14 +177,23 @@ function AppShell({ userId }) {
             error={promptError}
           />
         )}
+        {activeDockCardId && cardsById[activeDockCardId] && (
+          <DockCardPanel
+            card={cardsById[activeDockCardId]}
+            cardId={activeDockCardId}
+            onClose={closeDockCard}
+            onUpdate={updateCard}
+          />
+        )}
+        <IndexDebugPanel open={indexDebugOpen} onClose={() => setIndexDebugOpen(false)} />
         <Dock
           dockState={dockState}
           dockCardEntries={dockCardEntries}
           activeDockCardId={activeDockCardId}
-          onAddDockCard={createAndPinCard}
+          onAddDockCard={() => createAndPinCard(addToCardsById)}
           onOpenDockCard={openDockCard}
           onFolderOpen={handleFolderOpen}
-          onSettings={handleTabOverview}
+          onSettings={handleSettings}
           onMoveDockCardToTab={() => moveDockCardToTab(activeDockCardId, addTabCard)}
           onMoveToDock={() => activeEditorCardId && addToDock(activeEditorCardId)}
           lightningActive={lightningActive}

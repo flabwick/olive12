@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from './db/vaultDb'
@@ -129,57 +129,22 @@ describe('App', () => {
     expect(screen.queryByRole('dialog', { name: 'Vault and Brain' })).not.toBeInTheDocument()
   })
 
-  // ── Tab switcher tests ───────────────────────────────────────────────────
-  // Settings button temporarily opens the tab switcher until Slice 8 wires it to TabHeader.
-  describe('tab switcher', () => {
-    it('Settings button opens the tab switcher', async () => {
-      render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Settings' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-      expect(screen.getByRole('dialog', { name: 'Tab switcher' })).toBeInTheDocument()
-    })
+  // ── Settings / IndexDebugPanel tests ────────────────────────────────────
+  it('clicking Settings opens the index debug panel', async () => {
+    render(<App />)
+    await waitFor(() => screen.getByRole('button', { name: 'Settings' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(screen.getByRole('dialog', { name: 'Index pipeline debug' })).toBeInTheDocument()
+  })
 
-    it('closing the tab switcher removes it from the screen', async () => {
-      render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Settings' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-      fireEvent.keyDown(document, { key: 'Escape' })
-      expect(screen.queryByRole('dialog', { name: 'Tab switcher' })).not.toBeInTheDocument()
-    })
-
-    it('creating a new tab from the switcher adds a tab', async () => {
-      render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Settings' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-
-      const initialTiles = document.querySelectorAll('.tab-switcher__tile:not(.tab-switcher__tile--add)')
-      const initialCount = initialTiles.length
-
-      await userEvent.click(screen.getByRole('button', { name: 'New tab' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-
-      await waitFor(() => {
-        const tiles = document.querySelectorAll('.tab-switcher__tile:not(.tab-switcher__tile--add)')
-        expect(tiles.length).toBe(initialCount + 1)
-      })
-    })
-
-    it('switching tabs via the switcher changes the active tab header', async () => {
-      vi.spyOn(crypto, 'randomUUID')
-        .mockReturnValueOnce('tab-1')
-        .mockReturnValueOnce('tab-2')
-
-      render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Settings' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-      await userEvent.click(screen.getByRole('button', { name: 'New tab' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-
-      const tiles = document.querySelectorAll('.tab-switcher__tile:not(.tab-switcher__tile--add)')
-      await userEvent.click(tiles[0])
-
-      expect(screen.queryByRole('dialog', { name: 'Tab switcher' })).not.toBeInTheDocument()
-    })
+  it('clicking Pin new card shows the dock card panel', async () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('new-dock-card')
+    vi.spyOn(Date, 'now').mockReturnValue(T)
+    render(<App />)
+    await waitFor(() => screen.getByRole('button', { name: 'Pin new card' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Pin new card' }))
+    await waitFor(() => screen.getByRole('complementary', { name: 'Dock card' }))
+    expect(screen.getByRole('complementary', { name: 'Dock card' })).toBeInTheDocument()
   })
 
   // ── Auth gate tests ──────────────────────────────────────────────────────
@@ -327,36 +292,5 @@ describe('App', () => {
     })
   })
 
-  describe('saved tab lifecycle', () => {
-    it('closing a saved tab from the switcher keeps it on the shelf and allows reopening with cards', async () => {
-      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-fallback')
-      vi.spyOn(Date, 'now').mockReturnValue(T)
-
-      await seedTab('seeded-tab', 'Main')
-      await seedCard('seeded-card', 'Inside tab')
-      await seedTabCard()
-
-      render(<App />)
-      await waitFor(() => screen.getByRole('heading', { name: 'Inside tab' }))
-
-      await userEvent.click(screen.getByRole('heading', { level: 2 }))
-      const tabNameInput = screen.getByDisplayValue('Main')
-      await userEvent.clear(tabNameInput)
-      await userEvent.type(tabNameInput, 'Saved workspace')
-      await userEvent.keyboard('{Enter}')
-      await userEvent.click(screen.getByRole('button', { name: 'Save tab to Shelf' }))
-
-      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Close Saved workspace' }))
-      fireEvent.keyDown(document, { key: 'Escape' })
-
-      await userEvent.click(screen.getByRole('button', { name: 'Library' }))
-      await waitFor(() => screen.getByRole('dialog', { name: 'Vault and Brain' }))
-      expect(screen.getByText('Saved workspace')).toBeInTheDocument()
-
-      await userEvent.click(screen.getByRole('button', { name: 'Switch to tab' }))
-      await waitFor(() => screen.getByRole('heading', { name: 'Inside tab' }))
-      expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Saved workspace')
-    })
-  })
+  // saved tab lifecycle test (uses TabSwitcher via TabHeader) is restored in Slice 8.
 })
