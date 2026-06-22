@@ -16,15 +16,20 @@ export function EmbeddedCardView({ node, deleteNode }) {
   const [flipped, setFlipped] = useState(false)
   const [bodyHeight, setBodyHeight] = useState(null)
   const bodyAreaRef = useRef(null)
+  const bodyHeightRef = useRef(null)
+  bodyHeightRef.current = bodyHeight
 
-  // If content outgrows a manual resize, expand back to fit.
+  // Reset explicit height only when the card's content changes and now
+  // overflows. NOT triggered by bodyHeight changes (which are from drags) —
+  // that was causing every drag position to snap back immediately.
   useLayoutEffect(() => {
     const area = bodyAreaRef.current
-    if (!area || bodyHeight === null || flipped) return
+    if (!area || bodyHeightRef.current === null || flipped) return
     if (area.scrollHeight > area.clientHeight + 1) {
       setBodyHeight(null)
     }
-  }, [card?.body, card?.back, bodyHeight, flipped])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card?.body, card?.back, flipped])
 
   function startResize(e) {
     e.preventDefault()
