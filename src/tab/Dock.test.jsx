@@ -76,17 +76,51 @@ describe('Dock — BASE state', () => {
 })
 
 describe('Dock — DOCK_EDITOR state', () => {
-  it('renders formatting toolbar buttons', () => {
+  it('renders Exit editor button', () => {
     wrap(<Dock dockState={DOCK_STATE.DOCK_EDITOR} />)
-    expect(screen.getByRole('button', { name: 'Bold (⌘B)' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Italic (⌘I)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Exit editor' })).toBeInTheDocument()
   })
 
-  it('calls onMoveDockCardToTab when "Move card to tab" button is clicked', async () => {
-    const onMoveDockCardToTab = vi.fn()
-    wrap(<Dock dockState={DOCK_STATE.DOCK_EDITOR} onMoveDockCardToTab={onMoveDockCardToTab} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Move card to tab' }))
-    expect(onMoveDockCardToTab).toHaveBeenCalledOnce()
+  it('renders Bold and Italic toolbar buttons', () => {
+    wrap(<Dock dockState={DOCK_STATE.DOCK_EDITOR} />)
+    expect(screen.getByRole('button', { name: 'Bold' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Italic' })).toBeInTheDocument()
+  })
+
+  it('renders all new toolbar buttons', () => {
+    wrap(<Dock dockState={DOCK_STATE.DOCK_EDITOR} />)
+    expect(screen.getByRole('button', { name: 'Highlight' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Code block' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Bullet list' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ordered list' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Indent' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Outdent' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Checkbox list' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Strikethrough' })).toBeInTheDocument()
+  })
+
+  it('renders expandable Heading button', () => {
+    wrap(<Dock dockState={DOCK_STATE.DOCK_EDITOR} />)
+    expect(screen.getByRole('button', { name: 'Heading' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Heading 1' })).not.toBeInTheDocument()
+  })
+
+  it('expands heading options on Heading button click', async () => {
+    wrap(<Dock dockState={DOCK_STATE.DOCK_EDITOR} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Heading' }))
+    expect(screen.getByRole('button', { name: 'Heading 1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Heading 2' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Heading 3' })).toBeInTheDocument()
+  })
+
+  it('does not render Move card to tab button', () => {
+    wrap(<Dock dockState={DOCK_STATE.DOCK_EDITOR} />)
+    expect(screen.queryByRole('button', { name: 'Move card to tab' })).not.toBeInTheDocument()
+  })
+
+  it('does not render Settings button in formatting toolbar', () => {
+    wrap(<Dock dockState={DOCK_STATE.DOCK_EDITOR} />)
+    expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument()
   })
 
   it('calls onLightningToggle when lightning button is clicked', async () => {
@@ -105,19 +139,33 @@ describe('Dock — DOCK_EDITOR state', () => {
     wrap(<Dock dockState={DOCK_STATE.DOCK_EDITOR} />)
     expect(screen.queryByRole('button', { name: 'Pin to dock' })).not.toBeInTheDocument()
   })
+
+  it('does not render Collapse dock panel button', () => {
+    wrap(<Dock dockState={DOCK_STATE.DOCK_EDITOR} />)
+    expect(screen.queryByRole('button', { name: 'Collapse dock panel' })).not.toBeInTheDocument()
+  })
+
+  it('does not render dock card pills in DOCK_EDITOR state', () => {
+    wrap(
+      <Dock
+        dockState={DOCK_STATE.DOCK_EDITOR}
+        dockCardEntries={SAMPLE_ENTRIES}
+        activeDockCardId="c1"
+      />
+    )
+    expect(screen.queryByRole('button', { name: 'First card' })).not.toBeInTheDocument()
+  })
 })
 
 describe('Dock — TAB_EDITOR state', () => {
   it('renders formatting toolbar buttons', () => {
     wrap(<Dock dockState={DOCK_STATE.TAB_EDITOR} />)
-    expect(screen.getByRole('button', { name: 'Bold (⌘B)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Bold' })).toBeInTheDocument()
   })
 
-  it('calls onMoveToDock when "Pin to dock" button is clicked', async () => {
-    const onMoveToDock = vi.fn()
-    wrap(<Dock dockState={DOCK_STATE.TAB_EDITOR} onMoveToDock={onMoveToDock} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Pin to dock' }))
-    expect(onMoveToDock).toHaveBeenCalledOnce()
+  it('does not render Pin to dock button', () => {
+    wrap(<Dock dockState={DOCK_STATE.TAB_EDITOR} />)
+    expect(screen.queryByRole('button', { name: 'Pin to dock' })).not.toBeInTheDocument()
   })
 
   it('does not render Move card to tab button', () => {
@@ -125,10 +173,8 @@ describe('Dock — TAB_EDITOR state', () => {
     expect(screen.queryByRole('button', { name: 'Move card to tab' })).not.toBeInTheDocument()
   })
 
-  it('calls onSettings when settings button is clicked', async () => {
-    const onSettings = vi.fn()
-    wrap(<Dock dockState={DOCK_STATE.TAB_EDITOR} onSettings={onSettings} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    expect(onSettings).toHaveBeenCalledOnce()
+  it('does not render Settings button', () => {
+    wrap(<Dock dockState={DOCK_STATE.TAB_EDITOR} />)
+    expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument()
   })
 })

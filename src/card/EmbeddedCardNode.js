@@ -33,12 +33,9 @@ export const EmbeddedCardNode = Node.create({
   },
 
   addNodeView() {
-    // stopEvent: () => true tells ProseMirror not to handle any DOM events that
-    // originate inside this NodeView. Without this, ProseMirror's default
-    // stopEvent implementation returns false for mousedown on selectable atom
-    // nodes, causing it to claim the event and start a node-selection drag
-    // before any React handlers run. Drag/drop events are passed through so
-    // the surrounding editor can still handle them normally.
+    // stopEvent: () => true tells ProseMirror not to handle DOM events inside
+    // this NodeView (except drag). Without this, ProseMirror claims mousedown
+    // on atom nodes and starts a selection drag before React handlers run.
     return ReactNodeViewRenderer(EmbeddedCardView, {
       stopEvent: ({ event }) => !event.type.startsWith('drag'),
     })

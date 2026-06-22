@@ -54,15 +54,26 @@ describe('DockCardPanel', () => {
     expect(document.querySelector('.card__body-rte-wrapper')).toBeInTheDocument()
   })
 
-  it('renders a flip button in the card header', () => {
+  it('does not render a flip button', () => {
     wrap(<DockCardPanel card={SAMPLE_CARD} cardId="c1" onClose={() => {}} onUpdate={() => {}} />)
-    expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Show card back' })).not.toBeInTheDocument()
   })
 
-  it('flip button toggles the card to its back face', async () => {
+  it('renders Move to tab button when onMoveToTab is provided', () => {
+    wrap(<DockCardPanel card={SAMPLE_CARD} cardId="c1" onClose={() => {}} onUpdate={() => {}} onMoveToTab={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Move to tab' })).toBeInTheDocument()
+  })
+
+  it('calls onMoveToTab when Move to tab button is clicked', async () => {
+    const onMoveToTab = vi.fn()
+    wrap(<DockCardPanel card={SAMPLE_CARD} cardId="c1" onClose={() => {}} onUpdate={() => {}} onMoveToTab={onMoveToTab} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Move to tab' }))
+    expect(onMoveToTab).toHaveBeenCalledOnce()
+  })
+
+  it('does not render Move to tab button when onMoveToTab is absent', () => {
     wrap(<DockCardPanel card={SAMPLE_CARD} cardId="c1" onClose={() => {}} onUpdate={() => {}} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Show card back' }))
-    expect(screen.getByRole('button', { name: 'Show card front' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Move to tab' })).not.toBeInTheDocument()
   })
 
   it('renders with editorSurface dock (Card body wrapper present)', () => {

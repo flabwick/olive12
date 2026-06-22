@@ -74,8 +74,7 @@ Props:
 | `onOpenAsPortal` | function \| undefined | `(cardId)` — open shelf/library card as portal in active tab |
 | `onOpenTab` | function \| undefined | `(tabId)` — switch to a saved tab and close panel |
 | `brainFeedItems` | `BrainFeedItem[]` | Stale/orphan library cards for Brain tab |
-| `onBrainAccept` | function \| undefined | `(cardId)` — accept maintenance item (stub in AppShell) |
-| `onBrainDismiss` | function \| undefined | `(cardId)` — dismiss from feed for session |
+| `onReindex` | function \| undefined | `(cardId)` — manually re-index a library card (passed to `BrainFeedList`) |
 | `initialTab` | string | Which pane to open on first render: `'shelf'` (default), `'library'`, or `'brain'` |
 | `highlightedCardId` | string \| undefined | If set, the matching card row in Shelf or Library is visually highlighted |
 
@@ -87,7 +86,7 @@ Owns `activeTab` state (which of the three panes is selected), seeded from `init
 |---|---|
 | Shelf | `VaultTabRow` list (saved tabs) followed by `ShelfRow` list (saved cards). Empty state shown only when both lists are empty. |
 | Library | `VaultTabRow` list (library tabs) above `FolderTree`. Tab list only rendered when `libraryTabs.length > 0`. |
-| Brain | `BrainFeed` — list of stale/orphan library cards with Accept/Dismiss actions. Empty: "No maintenance needed." See [brain.md](./brain.md). |
+| Brain | `BrainFeedList` — list of stale/orphan library cards with Re-index button. Empty: "No issues found." See [brain.md](./brain.md). |
 
 X button calls `onClose`, removing the panel from the DOM (state in `AppShell`).
 
@@ -131,7 +130,7 @@ Appears in the Shelf pane (tabs with `savedLocation: 'shelf'`) and at the top of
 |---|---|
 | `createFolder.test.js` | Default fields, custom name/parentId, unique ids |
 | `folderStorage.test.js` | Empty read, putFolder round-trip, upsert, deleteFolder, parentId round-trip |
-| `FolderPanel.test.jsx` | Shelf/Library/Brain tabs render; close button; onClose called; shelf empty state (only when both cards and tabs empty); shelf entries; library tree renders; Brain feed items + dismiss; onMoveToLibrary callback; onOpenAsPortal on shelf card; onOpenAsPortal on library card; initialTab opens correct pane; highlightedCardId adds highlight class to matching shelf row; shelfTabs renders VaultTabRow; onOpenTab called with tab id; onMoveTabToLibrary called with tab id; libraryTabs renders in Library pane; onOpenTab from Library pane |
+| `FolderPanel.test.jsx` | Shelf/Library/Brain tabs render; close button; onClose called; shelf empty state (only when both cards and tabs empty); shelf entries; library tree renders; Brain feed items + Re-index button; onMoveToLibrary callback; onOpenAsPortal on shelf card; onOpenAsPortal on library card; initialTab opens correct pane; highlightedCardId adds highlight class to matching shelf row; shelfTabs renders VaultTabRow; onOpenTab called with tab id; onMoveTabToLibrary called with tab id; libraryTabs renders in Library pane; onOpenTab from Library pane |
 | `ShelfRow.test.jsx` | Renders title, type, date; Move to Library button present/absent; Open in tab button present/absent; callbacks; highlighted class applied/absent |
 | `VaultTabRow.test.jsx` | Renders tab name, "tab" badge, date; Switch to tab button present/absent; Move to Library button present/absent; onOpen called with tab id; onMoveToLibrary called |
 | `FolderTree.test.jsx` | Tree root; folder names; nested folders; cards in folders; root-level cards; expanded by default; collapse/expand toggle; New folder button; subfolder creation callback; Open in tab button; highlightedCardId highlights matching card row |
@@ -141,7 +140,7 @@ Appears in the Shelf pane (tabs with `savedLocation: 'shelf'`) and at the top of
 - Folder rename or deletion from the UI
 - Folder sync to Supabase
 - Search or filter within Shelf/Library
-- Brain accept → re-index (stub only)
+- Brain accept/dismiss persistence (currently stateless)
 - Card removal from Shelf/Library back to tab
 - Multi-level folder nesting UI polish
 - Highlight for tabs in the vault (currently only cards can be highlighted)

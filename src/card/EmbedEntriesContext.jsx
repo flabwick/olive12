@@ -14,11 +14,22 @@ export function useEmbedEntries() {
   return useContext(EmbedEntriesContext)
 }
 
-const EmbedActionsContext = createContext({ onSaveToShelf: null })
+const EmbedActionsContext = createContext({
+  onSaveToShelf: null,
+  onMoveToDock: null,
+  onMoveToTab: null,
+  onUpdate: null,
+})
 
-export function EmbedActionsProvider({ onSaveToShelf = null, children }) {
+export function EmbedActionsProvider({
+  onSaveToShelf = null,
+  onMoveToDock = null,
+  onMoveToTab = null,
+  onUpdate = null,
+  children,
+}) {
   return (
-    <EmbedActionsContext.Provider value={{ onSaveToShelf }}>
+    <EmbedActionsContext.Provider value={{ onSaveToShelf, onMoveToDock, onMoveToTab, onUpdate }}>
       {children}
     </EmbedActionsContext.Provider>
   )

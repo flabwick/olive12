@@ -378,6 +378,19 @@ export function useTabs({ userId } = {}) {
     [tabCards, cardsById, reloadLinks],
   )
 
+  const detachCardFromTab = useCallback(
+    async (cardId) => {
+      const tc = tabCards.find((t) => t.cardId === cardId)
+      const nextTabCards = removeTabCard(tabCards, cardId)
+      setTabCards(nextTabCards)
+      await Promise.all([
+        ...(tc ? [deleteTabCard(tc.tabId, cardId)] : []),
+        ...nextTabCards.map((t) => putTabCard(t)),
+      ])
+    },
+    [tabCards],
+  )
+
   const reorder = useCallback(
     async (cardId, toPosition) => {
       const nextTabCards = reorderTabCard(tabCards, cardId, toPosition)
@@ -667,6 +680,7 @@ export function useTabs({ userId } = {}) {
     addToCardsById,
     updateCard,
     removeCard,
+    detachCardFromTab,
     reorder,
     fold,
     unfold,

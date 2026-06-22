@@ -15,13 +15,13 @@
 
 @media (prefers-color-scheme: dark) {
   .card {
-    border-color: #6a4e35;
-    background: #1c1510;
-    box-shadow: 4px 4px 0 #3a2c1c;
+    border-color: #383528;
+    background: #201e16;
+    box-shadow: 4px 4px 0 #0a0a08;
   }
 
   .card:not(.card--hidden):hover {
-    box-shadow: 6px 6px 0 #2a1c0c;
+    box-shadow: 7px 7px 0 #080806;
   }
 }
 
@@ -35,6 +35,12 @@
 
 .card__body-area {
   position: relative;
+  -webkit-overflow-scrolling: touch;
+}
+
+.card__body-area--scrollable {
+  touch-action: pan-y;
+  overflow-y: auto;
 }
 
 .card__body {
@@ -77,6 +83,31 @@
   cursor: ns-resize;
   user-select: none;
   flex-shrink: 0;
+  touch-action: none;
+}
+
+.card__resize-handle.resize-handle--arming::after {
+  opacity: 0.7;
+  background: #a07050;
+}
+
+.card__resize-handle.resize-handle--active {
+  touch-action: none;
+}
+
+.card__resize-handle.resize-handle--active::after {
+  opacity: 1;
+  background: #a07050;
+}
+
+@media (pointer: coarse) {
+  .card__resize-handle {
+    height: 1.25rem;
+  }
+
+  .card__resize-handle::after {
+    opacity: 0.8;
+  }
 }
 
 .card__resize-handle::after {
@@ -98,14 +129,14 @@
 @media (prefers-color-scheme: dark) {
   .card__body,
   .card__body--edit {
-    color: #9e8e80;
+    color: #c8c4b0;
   }
 
   .card__resize-handle::after {
-    background: #4a3a28;
+    background: #383528;
   }
 
   .card__resize-handle:hover::after {
-    background: #7a5a38;
+    background: #686050;
   }
 }

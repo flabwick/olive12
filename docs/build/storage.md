@@ -201,12 +201,22 @@ Between test files: Vitest runs each file in its own worker, so each file gets a
 | `indexEntryStorage.test.js` | Empty read; put round-trip; `getIndexEntry` found/undefined; upsert (no duplicate); `deleteIndexEntry`; `searchIndexEntries` — title match, tag match, summary match, no-match → [], case-insensitive, sorted by updatedAt desc |
 | `dockCardStorage.test.js` | Empty read; `addDockCard` round-trip; order appended correctly; `removeDockCard`; `getDockCardIds` returns sorted ids |
 
+## tabVaultLogic.js
+
+`src/tab/tabVaultLogic.js` — pure helpers for tab-level card lifecycle decisions.
+
+| Function | Behaviour |
+|---|---|
+| `isCardOnTab(cardId, tabCards, cardsById)` | Returns `true` if the card appears directly or via a portal in any tab |
+| `isOrphanTabCandidate(card, tabCards, cardsById)` | Returns `true` for unsaved (`location === 'none'`) non-portal cards with no tab placement — candidates for auto-insertion after sync |
+
+These are used during the initial reconcile in `useTabs` to detect orphan cards pulled from another device, excluding dock-pinned cards.
+
 ## Not built yet
 
 - Querying or filtering cards by `location` or `folderId` (fields stored but no Dexie index exists)
 - `dirty` flag on tabs, tab_cards, or folders
 - Tombstoning / soft-delete (`deleted: true`)
-- Card deletion sync (no remote delete when a local card is removed)
 - `user_id` on any local Dexie table
 - Index entry deletion from Dexie when a card is deleted (index_entries row in Supabase is auto-removed via FK cascade, but the local Dexie record is not cleaned up)
 - `indexEntrySupabaseStorage.js` adapter (Supabase writes are done inline in `useTabs` for now)

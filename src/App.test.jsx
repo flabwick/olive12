@@ -236,12 +236,12 @@ describe('App', () => {
       await seedTabCard()
 
       render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Save to Shelf' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
+      await waitFor(() => screen.getByRole('button', { name: 'Save card' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Save card' }))
 
       await waitFor(() => screen.getByRole('heading', { name: 'Vault note' }))
       expect(document.querySelector('.portal-card')).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'Save to Shelf' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save card' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Saved to Shelf — click to move to Library' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'In Library' })).not.toBeInTheDocument()
     })
@@ -255,8 +255,8 @@ describe('App', () => {
       await seedTabCard()
 
       const { unmount } = render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Save to Shelf' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
+      await waitFor(() => screen.getByRole('button', { name: 'Save card' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Save card' }))
       await waitFor(() => screen.getByRole('heading', { name: 'Persist me' }))
 
       unmount()
@@ -265,7 +265,7 @@ describe('App', () => {
 
       expect(screen.getAllByRole('heading', { name: 'Persist me' })).toHaveLength(1)
       expect(document.querySelector('.portal-card')).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'Save to Shelf' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save card' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Saved to Shelf — click to move to Library' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'In Library' })).not.toBeInTheDocument()
     })
@@ -279,8 +279,8 @@ describe('App', () => {
       await seedTabCard()
 
       render(<App />)
-      await waitFor(() => screen.getByRole('button', { name: 'Save to Shelf' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
+      await waitFor(() => screen.getByRole('button', { name: 'Save card' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Save card' }))
       await waitFor(() => screen.getByRole('heading', { name: 'Keep on shelf' }))
 
       await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))

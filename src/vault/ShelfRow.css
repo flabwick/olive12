@@ -66,3 +66,37 @@
   color: var(--olive-text, #2c1810);
   transform: translateX(1px);
 }
+
+@media (prefers-color-scheme: dark) {
+  .shelf-row {
+    border-bottom-color: #303020;
+  }
+
+  .shelf-row__title {
+    color: #e4e0d0;
+  }
+
+  .shelf-row__type {
+    background: #252218;
+    color: #686458;
+  }
+
+  .shelf-row__date {
+    color: #686458;
+  }
+
+  .shelf-row--highlighted {
+    background: rgba(144, 106, 48, 0.15);
+  }
+
+  .shelf-row__move-btn {
+    border-color: #383528;
+    color: #908870;
+  }
+
+  .shelf-row__move-btn:hover {
+    background: #2c2a20;
+    border-color: #706850;
+    color: #e4e0d0;
+  }
+}

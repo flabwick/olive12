@@ -1,17 +1,18 @@
 # Dock Prompt — implementation
 
-This document describes the dock-prompt slice: a one-shot AI loop accessible from the Dock that sends the active tab's visible cards as context and creates a new card from the response.
+This document describes the dock-prompt slice: a streaming AI loop accessible from the Dock that sends the active tab's visible cards as context and creates (then streams into) a new card from the response.
 
-For the Dock UI and `useTabs` hook this extends, see [tabs.md](./tabs.md). For Supabase setup and the `OPENROUTER_API_KEY` secret, see [supabase-setup.md](./supabase-setup.md). For card storage, see [storage.md](./storage.md).
+For the Dock UI and `useTabs` hook this extends, see [tabs.md](./build/tabs.md). For Supabase setup and the `OPENROUTER_API_KEY` secret, see [build/supabase-setup.md](./build/supabase-setup.md). For card storage, see [build/storage.md](./build/storage.md).
 
 ## What this slice adds
 
-1. A **Prompt** button in the Dock's left group. Clicking it opens the `DockPrompt` form above the Dock (same positioning slot as `FolderPanel`).
-2. A **`DockPrompt`** component: a textarea + Send/Cancel buttons + inline error display.
-3. A **`dock-prompt` Supabase Edge Function** that receives `{ prompt, contextCards }`, calls OpenRouter, and returns `{ title, body }` for a new card.
-4. **`assembleContext`** — pure function that filters the current tab's entries to only visible (non-hidden) cards and returns `[{ id, title, body }]`.
-5. **`buildPrompt`** — pure function that constructs the OpenRouter messages array from a prompt string and context cards.
-6. **`runDockPrompt(promptText)`** in `useTabs` — assembles context, invokes the edge function, and creates a new card on success. Exposes `promptLoading` and `promptError` state.
+1. A **`DockPrompt`** component: a textarea + Send/Cancel buttons + inline error display.
+2. A **`dock-prompt` Supabase Edge Function** that receives `{ prompt, contextCards }`, calls OpenRouter with streaming enabled, and sends SSE chunks back.
+3. **`assembleContext`** — pure function that filters the current tab's entries to only visible (non-hidden) cards.
+4. **`buildPrompt`** — pure function that constructs the OpenRouter messages array.
+5. **`parseDockPromptContent`** — pure function that parses the plain-text model response into `{ title, body }`.
+6. **`streamParser.parseStreamChunk`** — pure function that extracts a delta string from an SSE `data:` line.
+7. **`runDockPrompt(promptText)`** in `useTabs` — assembles context, creates an empty card immediately, opens an SSE stream, and updates the card incrementally as chunks arrive.
 
 ## File map
 
@@ -22,66 +23,62 @@ src/
     assembleContext.test.js     # [TEST] 6 unit tests
     buildPrompt.js              # Pure: builds OpenRouter messages array
     buildPrompt.test.js         # [TEST] 7 unit tests
+    parseDockPromptContent.js   # Pure: title/body from first-line format
+    parseDockPromptContent.test.js # [TEST]
+    streamParser.js             # Pure: SSE line → delta string | null
+    streamParser.test.js        # [TEST]
     DockPrompt.jsx              # Dumb component: textarea + send + error
     DockPrompt.css
     DockPrompt.test.jsx         # [TEST] 9 tests
     DockPrompt.stories.jsx      # [STORY] Default, Loading, WithError
   tab/
-    Dock.jsx                    # 3-state toolbar; lightning button (AI prompt) exists but not yet wired to DockPrompt
+    Dock.jsx                    # 2-state toolbar; lightning button (AI prompt) — not yet wired to DockPrompt
     useTabs.js                  # runDockPrompt, promptLoading, promptError
-    useTabs.test.js             # 5 runDockPrompt tests
+    useTabs.test.js             # runDockPrompt tests
   App.jsx                       # AppShell: promptOpen state, DockPrompt render, handlePromptSubmit
   App.test.jsx                  # Prompt wiring tests
 supabase/
   functions/
     dock-prompt/
-      index.ts                  # Deno Edge Function: OpenRouter call → { title, body }
+      index.ts                  # Deno Edge Function: OpenRouter SSE streaming
 ```
 
 ## Context assembly
 
-`assembleContext(entries)` takes the `entries` array from `useTabs` and returns cards eligible for LLM context:
-
-- **Hidden cards excluded** (`hiddenState: true`) — the user's explicit "out of sight" toggle.
-- **Folded cards included** — folding is a display affordance, not a content exclusion.
-- Output: `[{ id, title, body }]` in the same order as the input array (position order).
+`assembleContext(entries)` — excludes hidden cards (`hiddenState: true`), includes folded cards. Returns `[{ id, title, body }]` in position order.
 
 ## Prompt construction
 
-`buildPrompt(prompt, contextCards)` returns a two-element messages array for the OpenRouter chat completions API:
+`buildPrompt(prompt, contextCards)` returns a two-element messages array:
 
-- System message: instructs the model to respond with a single JSON object `{ "title": "...", "body": "..." }` — no markdown fences, no explanation.
-- User message: the context cards formatted as titled blocks separated by `---` dividers, followed by the user's prompt.
+- **System message:** instructs the model to write a short title on line 1, leave a blank line, then write the full response as plain text (no JSON, no markdown).
+- **User message:** context cards formatted as titled blocks with `---` dividers, followed by the user's prompt.
 
-This function is mirrored inline in `supabase/functions/dock-prompt/index.ts`. If the prompt wording changes, update both.
+Mirrored inline in the edge function — keep both in sync if wording changes.
+
+## Response parsing
+
+`parseDockPromptContent(content)` — client-side parser for the accumulated plain-text response:
+
+- Title = line 1 (max 80 chars; falls back to `'Response'` if blank or too long).
+- Body = everything after line 1 (blank lines between title and body are skipped).
+- Edge case: if the model skips the format and opens with a long paragraph, title becomes `'Response'` and body is the full text.
+
+`parseStreamChunk(line)` — parses a single `data:` SSE line. Returns the `choices[0].delta.content` string, or `null` for `[DONE]`, non-data lines, or parse errors.
 
 ## Edge Function — dock-prompt
 
-**Deploy command** (run by the human outside this session):
+**Deploy:**
 ```bash
+supabase secrets set OPENROUTER_API_KEY=<key>
 supabase functions deploy dock-prompt
 ```
 
-**Prerequisites:**
-- `OPENROUTER_API_KEY` secret set: `supabase secrets set OPENROUTER_API_KEY=<key>`
-- Supabase CLI linked to the project
+**Request:** `{ "prompt": "string", "contextCards": [{ "id": "...", "title": "...", "body": "..." }] }`
 
-**Request shape:**
-```json
-{ "prompt": "string", "contextCards": [{ "id": "...", "title": "...", "body": "..." }] }
-```
+**Response:** SSE stream (`text/event-stream`). Each `data:` line is an OpenRouter chunk with `choices[0].delta.content`. Final `data: [DONE]` line signals end of stream.
 
-**Response shape on success:**
-```json
-{ "title": "string", "body": "string" }
-```
-
-**Error shape:**
-```json
-{ "error": "string", "detail": "optional string" }
-```
-
-**Model config** (top of `index.ts`, the only place model selection lives):
+**Model config** (top of `index.ts`):
 ```ts
 const MODEL_CONFIG = {
   model: 'meta-llama/llama-3.2-3b-instruct',
@@ -90,57 +87,48 @@ const MODEL_CONFIG = {
 }
 ```
 
-To change models: edit `MODEL_CONFIG.model` and run `supabase functions deploy dock-prompt`. No UI, no database config, no per-user setting.
+To change model: edit `MODEL_CONFIG.model` and redeploy.
 
-If the model returns non-JSON, the function falls back to `{ title: 'Response', body: <raw content> }` so the caller always gets a usable card.
+## Hook — `runDockPrompt` in useTabs
 
-## Hook additions — useTabs
+Streaming flow:
 
-Three new return values from `useTabs({ userId })`:
+1. Assembles context from visible tab entries.
+2. Creates an empty card immediately (appears in tab at once).
+3. Uses `fetch` directly (not `supabase.functions.invoke`) to open the SSE stream.
+4. Reads stream via `ReadableStream.getReader()`. For each chunk, calls `parseStreamChunk` on each `data:` line.
+5. On first `\n` in accumulated text: extracts title, sets it on the card.
+6. Subsequent chunks update the body via `requestAnimationFrame` batching.
+7. On stream end: applies final `parseDockPromptContent` result; falls back to JSON parse if no SSE deltas received.
+8. Each card update calls `putCard` and `schedulerRef.current?.scheduleSync()`.
 
-| Property | Type | Description |
-|---|---|---|
-| `runDockPrompt` | `async (promptText: string) → boolean` | Assembles context, invokes `dock-prompt`, calls `addCard` on success. Returns `true` on success, `false` on error. |
-| `promptLoading` | `boolean` | `true` while the edge function call is in flight |
-| `promptError` | `string` | Error message from the last failed call; `''` when no error |
-
-`runDockPrompt` clears `promptError` at the start of each call. It does not clear `promptLoading` while `addCard` is writing to Dexie — the loading state covers the whole operation.
+Returns `true` on success, `false` on error. `promptLoading` and `promptError` exposed from `useTabs`.
 
 ## App wiring
 
-`AppShell` owns `promptOpen` state. When `promptOpen` is true, `<DockPrompt>` is rendered above the dock. `handlePromptSubmit` calls `runDockPrompt` and closes the panel on success.
+`AppShell` owns `promptOpen` state. `handlePromptSubmit` calls `runDockPrompt` and closes the panel on success (for non-streaming callers — in streaming mode the card is already visible and the panel is closed after the stream ends).
 
-The Dock's lightning bolt button (visible in DOCK_EDITOR and TAB_EDITOR states) toggles `lightningActive` for visual feedback, but is **not yet wired to `setPromptOpen`**. The DockPrompt panel is currently unreachable from the UI — that wiring is part of the AI prompt UX slice (not yet built).
+**Current status:** The Dock's lightning button (in DOCK_EDITOR and TAB_EDITOR states) toggles `lightningActive` for visual feedback but is **not yet wired to `setPromptOpen`**. The DockPrompt panel is not currently reachable from the UI.
 
 ## Tests
 
 | File | What it covers |
 |---|---|
 | `assembleContext.test.js` | Empty, maps to {id,title,body}, excludes hidden, includes folded, preserves order, all-hidden |
-| `buildPrompt.test.js` | Two-element array, system message contains JSON instruction, user message contains prompt, context card titles/bodies included, placeholder when no cards, untitled cards use "Card N", multiple cards separated by dividers |
-| `DockPrompt.test.jsx` | Renders textarea + buttons; Send disabled when empty; enables after typing; onSubmit called with trimmed text; onDismiss called; whitespace-only input doesn't fire onSubmit; loading state disables inputs and changes button text; error shown with alert role; no alert when error is empty |
-| `Dock.test.jsx` | Prompt button renders; onPrompt callback called; promptDisabled disables button; click does not fire when disabled |
-| `useTabs.test.js` | invoke called with correct prompt+contextCards; new card created from AI response; returns true on success; sets promptError and returns false on error; hidden cards excluded from contextCards |
-| `App.test.jsx` | Prompt button in dock; clicking opens DockPrompt; Cancel closes DockPrompt; submit calls invoke and creates card then closes form |
-
-## OpenRouter dependency
-
-- **API key**: `OPENROUTER_API_KEY` — set as a Supabase secret, never in the frontend.
-- **Endpoint**: `https://openrouter.ai/api/v1/chat/completions`
-- **Default model**: `meta-llama/llama-3.2-3b-instruct` (set in `MODEL_CONFIG` at the top of `index.ts`)
-- OpenRouter is the only external AI dependency in this slice.
+| `buildPrompt.test.js` | Two-element array, system message (plain-text), user message contains prompt, card titles/bodies, placeholder, untitled → "Card N", dividers |
+| `parseDockPromptContent.test.js` | Normal title+body; single line; body-only (title too long); blank response; title-only |
+| `streamParser.test.js` | Returns delta; null for [DONE]; null for non-data; null for parse errors |
+| `DockPrompt.test.jsx` | Renders textarea + buttons; Send disabled when empty; enables after typing; onSubmit with trimmed text; onDismiss; whitespace-only no-op; loading state; error alert present/absent |
+| `useTabs.test.js` | Creates card; streaming updates; returns true on success; sets promptError/returns false on error; excludes hidden cards |
+| `App.test.jsx` | Prompt panel wiring |
 
 ## Not built yet
 
-Explicitly out of scope — do not add without a new slice:
-
-- Lightning button → DockPrompt panel wiring (button exists in formatting toolbar, panel and logic ready)
-- Approve/deny/diff UI before the card is created
-- Editing existing cards via LLM
-- Streaming responses (current implementation waits for the full completion)
-- Job queue, `jobs` table, Realtime, cost estimation, credits ledger
-- Model picker UI or per-user model preference
-- Multi-provider abstraction beyond OpenRouter
-- Card links / recursive context (context is the flat visible card list only)
-- Container, portal, process card context handling
+- Lightning button → DockPrompt panel wiring
+- Streaming cancel / abort controller
+- Approve/deny UI before the card is committed
+- Editing existing cards via AI
+- Job queue, credits, cost estimation
+- Model picker or per-user model preference
 - Prompt history / replay
+- Multi-provider abstraction beyond OpenRouter

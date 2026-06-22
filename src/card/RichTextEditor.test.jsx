@@ -46,7 +46,6 @@ describe('RichTextEditor', () => {
     await waitFor(() => expect(document.querySelector('.embedded-card-view')).toBeInTheDocument())
     expect(screen.getByRole('heading', { name: 'My Note' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Collapse card' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Remove card' })).toBeInTheDocument()
   })
 

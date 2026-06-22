@@ -1,5 +1,5 @@
+import { useState } from 'react'
 import { useRichTextEditorContext } from '../card/RichTextEditorContext'
-import { TOOLBAR_ITEMS } from '../card/RichTextEditor'
 import { DOCK_STATE } from './dockStateMachine'
 import './Dock.css'
 
@@ -30,74 +30,170 @@ function LightningIcon() {
   )
 }
 
-function ArrowRightIcon() {
+function HighlightIcon() {
+  return (
+    <svg width="12" height="11" viewBox="0 0 12 11" fill="none" aria-hidden="true">
+      <path d="M2 7l4-6 4 4-3 4H4L2 7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      <line x1="1" y1="10" x2="11" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IndentIcon() {
   return (
     <svg width="14" height="12" viewBox="0 0 14 12" fill="none" aria-hidden="true">
-      <path d="M1 6H13M8 1L13 6L8 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="1" y1="2" x2="13" y2="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="5" y1="6" x2="13" y2="6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="5" y1="10" x2="13" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M1 4.5l2.5 1.5L1 7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
     </svg>
   )
 }
 
-function PinIcon() {
+function OutdentIcon() {
   return (
-    <svg width="13" height="15" viewBox="0 0 13 15" fill="none" aria-hidden="true">
-      <path d="M6.5 14V8M3 1H10L9 5H4L3 1ZM4 5L2 8H11L9 5H4Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    <svg width="14" height="12" viewBox="0 0 14 12" fill="none" aria-hidden="true">
+      <line x1="1" y1="2" x2="13" y2="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="5" y1="6" x2="13" y2="6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="5" y1="10" x2="13" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M4 4.5L1.5 6 4 7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
     </svg>
   )
 }
 
-function FormattingToolbar({ activeEditor, lightningActive, onLightningToggle, onSettings, onEmbedOpen, extraButton }) {
+function CheckboxIcon() {
   return (
-    <>
-      {TOOLBAR_ITEMS.map((btn, i) =>
-        btn === null ? (
-          <span key={`sep-${i}`} className="dock__sep" aria-hidden="true" />
-        ) : (
-          <button
-            key={btn.key}
-            type="button"
-            className={`dock__btn${activeEditor && btn.isActive(activeEditor) ? ' dock__btn--active' : ''}`}
-            title={btn.title}
-            aria-label={btn.title}
-            aria-pressed={activeEditor ? btn.isActive(activeEditor) : false}
-            onMouseDown={(e) => {
-              e.preventDefault()
-              if (activeEditor) btn.action(activeEditor)
-            }}
-          >
-            {btn.label}
-          </button>
-        )
-      )}
-      <span className="dock__sep" aria-hidden="true" />
-      <button
-        type="button"
-        className="dock__btn"
-        aria-label="Embed card"
-        title="Embed card [[ ]]"
-        onMouseDown={(e) => { e.preventDefault(); onEmbedOpen?.() }}
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <rect x="1" y="1" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <path d="M3.5 6l2 2 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function DockBtn({ active, label, title, onMouseDown, onClick, children, ariaExpanded }) {
+  return (
+    <button
+      type="button"
+      className={`dock__btn${active ? ' dock__btn--active' : ''}`}
+      aria-label={label}
+      aria-pressed={active !== undefined ? active : undefined}
+      aria-expanded={ariaExpanded}
+      title={title}
+      onMouseDown={onMouseDown}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  )
+}
+
+function FormattingToolbar({
+  activeEditor,
+  lightningActive,
+  onLightningToggle,
+  onEmbedOpen,
+}) {
+  const [headingOpen, setHeadingOpen] = useState(false)
+
+  function press(editorFn) {
+    return (e) => {
+      e.preventDefault()
+      if (activeEditor) editorFn(activeEditor)
+    }
+  }
+
+  function active(type, attrs) {
+    return activeEditor ? activeEditor.isActive(type, attrs) : false
+  }
+
+  function indentListItem(e) {
+    e.preventDefault()
+    if (!activeEditor) return
+    if (!activeEditor.chain().focus().sinkListItem('listItem').run()) {
+      activeEditor.chain().focus().sinkListItem('taskItem').run()
+    }
+  }
+
+  function outdentListItem(e) {
+    e.preventDefault()
+    if (!activeEditor) return
+    if (!activeEditor.chain().focus().liftListItem('listItem').run()) {
+      activeEditor.chain().focus().liftListItem('taskItem').run()
+    }
+  }
+
+  return (
+    <div className="dock__scroll">
+      <DockBtn
+        label="Exit editor"
+        onClick={() => activeEditor?.commands.blur()}
       >
-        [[]]
-      </button>
-      <button
-        type="button"
-        className={`dock__btn${lightningActive ? ' dock__btn--active' : ''}`}
-        aria-label="AI prompt"
-        aria-pressed={lightningActive}
+        ‹
+      </DockBtn>
+
+      <span className="dock__sep" aria-hidden="true" />
+
+      <DockBtn
+        active={lightningActive}
+        label="AI prompt"
         onMouseDown={(e) => { e.preventDefault(); onLightningToggle?.() }}
       >
         <LightningIcon />
-      </button>
-      {extraButton}
-      <button
-        type="button"
-        className="dock__btn"
-        aria-label="Settings"
-        onClick={onSettings}
+      </DockBtn>
+
+      <DockBtn label="Embed card" title="Embed card [[ ]]" onMouseDown={(e) => { e.preventDefault(); onEmbedOpen?.() }}>
+        {'[[]]'}
+      </DockBtn>
+
+      <span className="dock__sep" aria-hidden="true" />
+
+      <DockBtn label="Undo" title="Undo (⌘Z)" onMouseDown={press(e => e.chain().focus().undo().run())}>↩</DockBtn>
+      <DockBtn label="Redo" title="Redo (⇧⌘Z)" onMouseDown={press(e => e.chain().focus().redo().run())}>↪</DockBtn>
+
+      <span className="dock__sep" aria-hidden="true" />
+
+      <DockBtn
+        active={active('heading')}
+        label="Heading"
+        ariaExpanded={headingOpen}
+        onMouseDown={(e) => { e.preventDefault(); setHeadingOpen(v => !v) }}
       >
-        <MenuIcon />
-      </button>
-    </>
+        H
+      </DockBtn>
+      {headingOpen && [1, 2, 3].map(level => (
+        <DockBtn
+          key={level}
+          active={active('heading', { level })}
+          label={`Heading ${level}`}
+          onMouseDown={press(e => { e.chain().focus().toggleHeading({ level }).run(); setHeadingOpen(false) })}
+        >
+          {`H${level}`}
+        </DockBtn>
+      ))}
+
+      <DockBtn active={active('bold')} label="Bold" title="Bold (⌘B)" onMouseDown={press(e => e.chain().focus().toggleBold().run())}>
+        <strong>B</strong>
+      </DockBtn>
+      <DockBtn active={active('italic')} label="Italic" title="Italic (⌘I)" onMouseDown={press(e => e.chain().focus().toggleItalic().run())}>
+        <em>I</em>
+      </DockBtn>
+      <DockBtn active={active('highlight')} label="Highlight" onMouseDown={press(e => e.chain().focus().toggleHighlight().run())}>
+        <HighlightIcon />
+      </DockBtn>
+      <DockBtn active={active('codeBlock')} label="Code block" onMouseDown={press(e => e.chain().focus().toggleCodeBlock().run())}>
+        {'</>'}
+      </DockBtn>
+      <DockBtn active={active('bulletList')} label="Bullet list" onMouseDown={press(e => e.chain().focus().toggleBulletList().run())}>•</DockBtn>
+      <DockBtn active={active('orderedList')} label="Ordered list" onMouseDown={press(e => e.chain().focus().toggleOrderedList().run())}>1.</DockBtn>
+      <DockBtn label="Indent" onMouseDown={indentListItem}><IndentIcon /></DockBtn>
+      <DockBtn label="Outdent" onMouseDown={outdentListItem}><OutdentIcon /></DockBtn>
+      <DockBtn active={active('taskList')} label="Checkbox list" onMouseDown={press(e => e.chain().focus().toggleTaskList().run())}>
+        <CheckboxIcon />
+      </DockBtn>
+      <DockBtn active={active('strike')} label="Strikethrough" onMouseDown={press(e => e.chain().focus().toggleStrike().run())}>
+        <s>S</s>
+      </DockBtn>
+    </div>
   )
 }
 
@@ -109,57 +205,20 @@ export function Dock({
   onOpenDockCard,
   onFolderOpen,
   onSettings,
-  onMoveDockCardToTab,
-  onMoveToDock,
   onEmbedOpen,
   lightningActive = false,
   onLightningToggle,
 }) {
   const { activeEditor } = useRichTextEditorContext()
 
-  if (dockState === DOCK_STATE.DOCK_EDITOR) {
+  if (dockState === DOCK_STATE.DOCK_EDITOR || dockState === DOCK_STATE.TAB_EDITOR) {
     return (
       <div className="dock dock--formatting" role="toolbar" aria-label="Formatting options">
         <FormattingToolbar
           activeEditor={activeEditor}
           lightningActive={lightningActive}
           onLightningToggle={onLightningToggle}
-          onSettings={onSettings}
           onEmbedOpen={onEmbedOpen}
-          extraButton={
-            <button
-              type="button"
-              className="dock__btn"
-              aria-label="Move card to tab"
-              onClick={onMoveDockCardToTab}
-            >
-              <ArrowRightIcon />
-            </button>
-          }
-        />
-      </div>
-    )
-  }
-
-  if (dockState === DOCK_STATE.TAB_EDITOR) {
-    return (
-      <div className="dock dock--formatting" role="toolbar" aria-label="Formatting options">
-        <FormattingToolbar
-          activeEditor={activeEditor}
-          lightningActive={lightningActive}
-          onLightningToggle={onLightningToggle}
-          onSettings={onSettings}
-          onEmbedOpen={onEmbedOpen}
-          extraButton={
-            <button
-              type="button"
-              className="dock__btn"
-              aria-label="Pin to dock"
-              onClick={onMoveToDock}
-            >
-              <PinIcon />
-            </button>
-          }
         />
       </div>
     )
@@ -183,15 +242,15 @@ export function Dock({
             </button>
           )
         })}
-        <button
-          type="button"
-          className="dock__btn"
-          aria-label="Pin new card"
-          onClick={onAddDockCard}
-        >
-          +
-        </button>
       </div>
+      <button
+        type="button"
+        className="dock__btn dock__add-btn"
+        aria-label="Pin new card"
+        onClick={onAddDockCard}
+      >
+        +
+      </button>
       <span className="dock__divider" aria-hidden="true" />
       <div className="dock__actions">
         <button

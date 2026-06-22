@@ -146,61 +146,61 @@
 
 @media (prefers-color-scheme: dark) {
   .index-debug-panel {
-    background: #1c1510;
-    border-color: #8a6235;
-    box-shadow: 6px 6px 0 #3a2c1c;
-    color: #e8d5b8;
+    background: #201e16;
+    border-color: #383528;
+    box-shadow: 6px 6px 0 #0a0a08;
+    color: #e4e0d0;
   }
 
   .index-debug-panel__header {
-    background: #5a3a18;
-    border-bottom-color: #4a2e10;
+    background: #2c2820;
+    border-bottom-color: #3a3628;
   }
 
   .index-debug-panel__count {
-    color: #e8d0a0;
+    color: #e4e0d0;
   }
 
   .index-debug-panel__filter {
     background: rgba(0, 0, 0, 0.2);
-    border-color: rgba(232, 208, 160, 0.25);
-    color: #e8d5b8;
+    border-color: rgba(200, 196, 168, 0.22);
+    color: #e4e0d0;
   }
 
   .index-debug-panel__filter:focus {
-    border-color: #c8a87a;
+    border-color: #706850;
   }
 
   .index-debug-panel__btn {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(232, 208, 160, 0.25);
-    color: #e8d0a0;
+    background: rgba(255, 255, 240, 0.05);
+    border-color: rgba(200, 196, 168, 0.22);
+    color: #e4e0d0;
   }
 
   .index-debug-panel__btn:hover {
-    background: rgba(232, 208, 160, 0.12);
-    border-color: #c8a87a;
+    background: rgba(255, 255, 240, 0.09);
+    border-color: #706850;
   }
 
   .index-debug-panel__list {
-    background: #231910;
+    background: #141210;
   }
 
   .index-debug-panel__row--error {
-    background: rgba(200, 96, 58, 0.12);
-    border-color: rgba(200, 96, 58, 0.25);
+    background: rgba(144, 106, 48, 0.12);
+    border-color: rgba(144, 106, 48, 0.25);
   }
 
   .index-debug-panel__row--ok {
-    background: rgba(90, 120, 80, 0.12);
-    border-color: rgba(90, 120, 80, 0.2);
+    background: rgba(55, 90, 50, 0.15);
+    border-color: rgba(55, 90, 50, 0.22);
   }
 
   .index-debug-panel__stage {
-    color: var(--olive-terracotta, #c8603a);
+    color: var(--olive-terracotta, #906a30);
   }
 
   .index-debug-panel__error {
-    color: var(--olive-terracotta, #c8603a);
+    color: var(--olive-terracotta, #906a30);
   }
 }

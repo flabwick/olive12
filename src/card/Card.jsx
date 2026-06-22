@@ -2,9 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CardBack } from './CardBack'
 import { CardHeader } from './CardHeader'
 import { RichTextEditor } from './RichTextEditor'
+import { useBodyResize } from './useBodyResize'
 import './Card.css'
-
-const MIN_BODY_HEIGHT = 40
 
 export function Card({
   title,
@@ -17,16 +16,14 @@ export function Card({
   foldState = false,
   hiddenState = false,
   location = 'none',
-  folders = [],
   onFlip,
   onToggleFold,
   onToggleHide,
-  onMoveUp,
-  onMoveDown,
+  onSendToDock,
+  onSendToTab,
   onUpdate,
   onClose,
   onSaveToShelf,
-  onMoveToLibrary,
   indexEntry,
   indexLoading = false,
   editorSurface = 'tab',
@@ -38,7 +35,14 @@ export function Card({
   const [bodyHeight, setBodyHeight] = useState(null)
   const titleInputRef = useRef(null)
   const bodyAreaRef = useRef(null)
+  const bodyHeightRef = useRef(null)
   const focusTargetRef = useRef('body')
+  bodyHeightRef.current = bodyHeight
+  const { onPointerDown: onResizePointerDown, isResizingRef } = useBodyResize({
+    areaRef: bodyAreaRef,
+    setBodyHeight,
+    allowExpandToContent: true,
+  })
 
   useEffect(() => {
     if (!editing) {
@@ -59,13 +63,15 @@ export function Card({
   }, [editing])
 
   // If content outgrows a manual resize, expand back to fit — cards are not height-capped.
+  // Only re-check when content changes, not on every drag frame (bodyHeight in deps
+  // caused height to snap back whenever scrollHeight > clientHeight while shrinking).
   useLayoutEffect(() => {
     const area = bodyAreaRef.current
-    if (!area || bodyHeight === null || flipped || editing) return
+    if (!area || bodyHeightRef.current === null || flipped || editing || isResizingRef.current) return
     if (area.scrollHeight > area.clientHeight + 1) {
       setBodyHeight(null)
     }
-  }, [body, back, bodyHeight, flipped, editing])
+  }, [body, back, flipped, editing, isResizingRef])
 
   function startEditing(target = 'body') {
     focusTargetRef.current = target
@@ -89,6 +95,20 @@ export function Card({
     }
   }
 
+  function flushAndThen(action) {
+    if (editing) {
+      setEditing(false)
+      if (flipped) {
+        if (draftBack !== back) onUpdate?.({ back: draftBack })
+      } else {
+        if (draftTitle !== title || draftBody !== body) {
+          onUpdate?.({ title: draftTitle, body: draftBody })
+        }
+      }
+    }
+    action?.()
+  }
+
   function handleKeyDown(e) {
     if (e.key === 'Escape') {
       setEditing(false)
@@ -96,32 +116,6 @@ export function Card({
       setDraftBody(body)
       setDraftBack(back)
     }
-  }
-
-  function startResize(e) {
-    e.preventDefault()
-    const area = bodyAreaRef.current
-    if (!area) return
-    const startY = e.clientY
-    const startHeight = area.offsetHeight
-
-    function onMouseMove(mv) {
-      const delta = mv.clientY - startY
-      const newHeight = startHeight + delta
-      if (newHeight >= area.scrollHeight) {
-        setBodyHeight(null)
-      } else {
-        setBodyHeight(Math.max(MIN_BODY_HEIGHT, newHeight))
-      }
-    }
-
-    function onMouseUp() {
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
-    }
-
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
   }
 
   return (
@@ -138,24 +132,20 @@ export function Card({
         onTitleClick={onUpdate && !flipped ? () => startEditing('title') : undefined}
         folded={foldState}
         hidden={hiddenState}
-        flipped={flipped}
         location={location}
-        folders={folders}
         onSaveToShelf={onSaveToShelf}
-        onMoveToLibrary={onMoveToLibrary}
         onToggleFold={onToggleFold}
         onToggleHide={onToggleHide}
-        onFlip={onFlip}
-        onMoveUp={onMoveUp}
-        onMoveDown={onMoveDown}
+        onSendToDock={onSendToDock ? () => flushAndThen(onSendToDock) : undefined}
+        onSendToTab={onSendToTab ? () => flushAndThen(onSendToTab) : undefined}
         onClose={onClose}
       />
       {!foldState && (
         <>
           <div
-            className="card__body-area"
+            className={`card__body-area${bodyHeight !== null && !flipped ? ' card__body-area--scrollable' : ''}`}
             ref={bodyAreaRef}
-            style={bodyHeight !== null && !flipped ? { height: bodyHeight, overflowY: 'auto' } : undefined}
+            style={bodyHeight !== null && !flipped ? { height: bodyHeight } : undefined}
           >
             {flipped ? (
               <div
@@ -198,7 +188,7 @@ export function Card({
               role="separator"
               aria-label="Resize card"
               aria-orientation="horizontal"
-              onMouseDown={startResize}
+              onPointerDown={onResizePointerDown}
             />
           )}
         </>

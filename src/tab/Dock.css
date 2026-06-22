@@ -17,12 +17,12 @@
 
 @media (prefers-color-scheme: dark) {
   .dock {
-    background: #1b1510;
-    border-color: #8a6235;
+    background: #1c1a14;
+    border-color: #3a3830;
     box-shadow:
-      0 0 0 1px #6a4830,
-      4px 4px 0 #3a2c1c,
-      0 -4px 20px rgba(0, 0, 0, 0.3);
+      0 0 0 1px #2e2c22,
+      4px 4px 0 #0a0a08,
+      0 -4px 20px rgba(0, 0, 0, 0.35);
   }
 }
 
@@ -38,7 +38,7 @@
 @media (prefers-color-scheme: dark) {
   .app-shell__dock-area:has(.folder-panel) .dock,
   .app-shell__dock-area:has(.dock-prompt) .dock {
-    box-shadow: 4px 4px 0 #3a2c1c;
+    box-shadow: 4px 4px 0 #0a0a08;
   }
 }
 
@@ -61,11 +61,27 @@
   overflow-x: auto;
   min-width: 0;
   flex: 1;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--olive-amber, #c8a87a) transparent;
+}
+
+.dock__pills::-webkit-scrollbar {
+  height: 3px;
+}
+
+.dock__pills::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dock__pills::-webkit-scrollbar-thumb {
+  background: var(--olive-amber, #c8a87a);
+  border-radius: 99px;
 }
 
 .dock__pill {
-  height: 2rem;
-  padding: 0 0.625rem;
+  height: 1.625rem;
+  padding: 0 0.5rem;
   border: 2px solid var(--olive-border, #b89868);
   border-radius: 0.375rem;
   background: var(--olive-parchment, #ede0ca);
@@ -89,6 +105,11 @@
   border-color: #8a3018;
   color: #fef8ee;
   box-shadow: 2px 2px 0 #6a2010;
+}
+
+.dock__add-btn {
+  flex-shrink: 0;
+  margin-left: 0.25rem;
 }
 
 .dock__divider {
@@ -161,9 +182,27 @@
 }
 
 .dock--formatting {
-  flex-wrap: wrap;
+  overflow: hidden;
+  padding-inline: 0;
+  gap: 0;
+}
+
+.dock__scroll {
+  display: flex;
+  align-items: center;
   gap: 0.25rem;
-  justify-content: flex-start;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 0.875rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.dock__scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .dock__sep {
@@ -176,41 +215,41 @@
 
 @media (prefers-color-scheme: dark) {
   .dock__btn {
-    background: #231910;
-    border-color: #6a4e35;
-    color: #a07858;
-    box-shadow: 2px 2px 0 #3a2c1c;
+    background: #222018;
+    border-color: #383528;
+    color: #908870;
+    box-shadow: 2px 2px 0 #0a0a08;
   }
 
   .dock__btn:hover:not(:disabled) {
-    background: #4a2e14;
-    border-color: #c8a87a;
-    color: #e8d5b8;
-    box-shadow: 3px 3px 0 #2a1c0c;
+    background: #2e2c22;
+    border-color: #706850;
+    color: #e4e0d0;
+    box-shadow: 3px 3px 0 #080806;
   }
 
   .dock__btn:active:not(:disabled) {
     transform: translate(1px, 1px);
-    box-shadow: 1px 1px 0 #2a1c0c;
+    box-shadow: 1px 1px 0 #080806;
   }
 
   .dock__btn--active {
-    background: #8a3018;
-    border-color: #6a2010;
-    color: #fef8ee;
-    box-shadow: 2px 2px 0 #3a1008;
+    background: var(--olive-terracotta, #906a30);
+    border-color: #705020;
+    color: #f0e8d0;
+    box-shadow: 2px 2px 0 #0a0a08;
   }
 
   .dock__btn--active:hover:not(:disabled) {
-    background: #6a2010;
-    box-shadow: 3px 3px 0 #3a1008;
+    background: #705020;
+    box-shadow: 3px 3px 0 #080806;
   }
 
   .dock__tabs-back {
-    fill: #231910;
+    fill: #222018;
   }
 
   .dock__sep {
-    background: #6a4e35;
+    background: #383528;
   }
 }

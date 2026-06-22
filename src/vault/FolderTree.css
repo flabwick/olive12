@@ -183,61 +183,61 @@
 
 @media (prefers-color-scheme: dark) {
   .folder-tree {
-    color: #e0c9a8;
+    color: #e4e0d0;
   }
 
   .folder-tree__toolbar {
-    border-bottom-color: #3a2c1c;
+    border-bottom-color: #303020;
   }
 
   .folder-tree__new-root-folder {
-    color: #f0d8b0;
-    background: #5a3a1a;
-    border-color: #3a2810;
+    color: #e4e0d0;
+    background: #302e22;
+    border-color: #484638;
   }
 
   .folder-tree__new-root-folder:hover {
-    background: #3a2810;
+    background: #484638;
   }
 
   .folder-tree__children {
-    border-left-color: #3a2c1c;
+    border-left-color: #303020;
   }
 
   .folder-tree__folder-row:hover {
-    background: #2a1e10;
+    background: #242218;
   }
 
   .folder-tree__chevron {
-    color: #7a6050;
+    color: #605848;
   }
 
   .folder-tree__icon--folder {
-    color: #c8a87a;
+    color: #908870;
   }
 
   .folder-tree__icon--file {
-    color: #7a6050;
+    color: #605848;
   }
 
   .folder-tree__folder-name {
-    color: #e0c9a8;
+    color: #e4e0d0;
   }
 
   .folder-tree__new-subfolder {
-    color: #b8956a;
+    color: #807860;
   }
 
   .folder-tree__new-subfolder:hover {
-    background: #3a2c1c;
-    color: #f0d8b0;
+    background: #303020;
+    color: #e4e0d0;
   }
 
   .folder-tree__file-row:hover {
-    background: #2a1e10;
+    background: #242218;
   }
 
   .folder-tree__file-name {
-    color: #b8956a;
+    color: #807860;
   }
 }

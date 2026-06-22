@@ -39,6 +39,10 @@ src/
     assembleContext.test.js         # [TEST] 6 tests
     buildPrompt.js                  # Pure: builds OpenRouter messages array
     buildPrompt.test.js             # [TEST] 7 tests
+    parseDockPromptContent.js       # Pure: parse title/body from plain-text response
+    parseDockPromptContent.test.js  # [TEST]
+    streamParser.js                 # Pure: parse SSE delta line
+    streamParser.test.js            # [TEST]
 supabase/
   functions/
     dock-prompt/
@@ -160,9 +164,11 @@ Returns `{ scheduleSync, runNow }`.
 | `scheduleSync()` | After any card mutation | Debounced `syncDirtyCardsForUser`. Push-only. |
 | `runNow()` | On initial authenticated load | Cancels pending debounce, calls pull → sync in sequence. |
 
-## Dock Prompt — AI card creation
+## Dock Prompt — AI card creation (streaming)
 
-See [prompt.md](prompt.md) for full detail on `assembleContext`, `buildPrompt`, the edge function, `runDockPrompt`, and the `DockPrompt` UI component.
+See [prompt.md](prompt.md) for full detail on `assembleContext`, `buildPrompt`, `parseDockPromptContent`, `streamParser`, the edge function, `runDockPrompt`, and the `DockPrompt` UI component.
+
+Key sync note: `runDockPrompt` uses raw `fetch` (not `supabase.functions.invoke`) so that the SSE stream is not buffered. Card updates during streaming go through `putCard` and `schedulerRef.current?.scheduleSync()` directly.
 
 ## Wiki Index — AI knowledge indexing
 

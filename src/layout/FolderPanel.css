@@ -143,32 +143,32 @@
 
 @media (prefers-color-scheme: dark) {
   .folder-panel {
-    background: #1b1510;
-    border-color: #8a6235;
+    background: #1c1a14;
+    border-color: #3a3830;
     box-shadow:
-      4px 4px 0 #3a2c1c,
-      0 -8px 28px rgba(0, 0, 0, 0.35);
+      4px 4px 0 #0a0a08,
+      0 -8px 28px rgba(0, 0, 0, 0.4);
   }
 
   .folder-panel__nav-bar {
-    background: #201810;
-    border-top-color: #6a4e35;
+    background: #141210;
+    border-top-color: #383528;
   }
 
   .folder-panel__tab--active {
-    color: var(--olive-terracotta, #c8603a);
-    border-bottom-color: var(--olive-terracotta, #c8603a);
+    color: var(--olive-terracotta, #906a30);
+    border-bottom-color: var(--olive-terracotta, #906a30);
   }
 
   .folder-panel__close {
-    border-color: #6a4e35;
-    color: #a08060;
-    box-shadow: 2px 2px 0 #3a2c1c;
+    border-color: #383528;
+    color: #908870;
+    box-shadow: 2px 2px 0 #0a0a08;
   }
 
   .folder-panel__close:hover {
-    background: #3a2a18;
-    border-color: #c8a87a;
-    color: #e8d5b8;
+    background: #2c2a20;
+    border-color: #706850;
+    color: #e4e0d0;
   }
 }

@@ -42,6 +42,7 @@ function AppShell({ userId }) {
     addPortalCard,
     updateCard,
     removeCard,
+    detachCardFromTab,
     reorder,
     fold,
     unfold,
@@ -68,6 +69,7 @@ function AppShell({ userId }) {
     openDockCard,
     closeDockCard,
     addToDock,
+    removeFromDock,
     createAndPinCard,
     moveDockCardToTab,
   } = useDock({ cardsById, activeEditorCardId, activeSurface })
@@ -152,7 +154,12 @@ function AppShell({ userId }) {
   }
 
   return (
-    <EmbedActionsProvider onSaveToShelf={saveToShelf}>
+    <EmbedActionsProvider
+      onSaveToShelf={saveToShelf}
+      onMoveToDock={addToDock}
+      onMoveToTab={addTabCard}
+      onUpdate={updateCard}
+    >
     <EmbedEntriesProvider entries={Object.values(cardsById)}>
     <div className="app-shell">
       <div className="app-shell__content">
@@ -180,6 +187,7 @@ function AppShell({ userId }) {
           onSaveToShelf={saveToShelf}
           onMoveToLibrary={moveToLibrary}
           onLocate={handleLocate}
+          onMoveToDock={(cardId) => { addToDock(cardId); detachCardFromTab(cardId) }}
           flipCard={flipCard}
           isFlipped={isFlippedCard}
         />
@@ -224,8 +232,9 @@ function AppShell({ userId }) {
           <DockCardPanel
             card={cardsById[activeDockCardId]}
             cardId={activeDockCardId}
-            onClose={closeDockCard}
+            onClose={() => removeFromDock(activeDockCardId)}
             onUpdate={updateCard}
+            onMoveToTab={() => moveDockCardToTab(activeDockCardId, addTabCard)}
           />
         )}
         <IndexDebugPanel open={indexDebugOpen} onClose={() => setIndexDebugOpen(false)} />
@@ -237,8 +246,6 @@ function AppShell({ userId }) {
           onOpenDockCard={openDockCard}
           onFolderOpen={handleFolderOpen}
           onSettings={handleSettings}
-          onMoveDockCardToTab={() => moveDockCardToTab(activeDockCardId, addTabCard)}
-          onMoveToDock={() => activeEditorCardId && addToDock(activeEditorCardId)}
           onEmbedOpen={handleEmbedOpen}
           lightningActive={lightningActive}
           onLightningToggle={() => setLightningActive((v) => !v)}

@@ -117,48 +117,6 @@ describe('Tab', () => {
     expect(onUnhide).toHaveBeenCalledWith('card-1')
   })
 
-  describe('reorder', () => {
-    const twoEntries = [
-      makeEntry({ card: { id: 'a', title: 'A', body: 'a', type: 'text' }, position: 0 }),
-      makeEntry({ card: { id: 'b', title: 'B', body: 'b', type: 'text' }, position: 1 }),
-    ]
-
-    it('first card has no Move up button', () => {
-      render(<Tab entries={twoEntries} onReorder={() => {}} />)
-      const upButtons = screen.queryAllByRole('button', { name: 'Move card up' })
-      // Only one up button (for the second card), not two
-      expect(upButtons).toHaveLength(1)
-    })
-
-    it('last card has no Move down button', () => {
-      render(<Tab entries={twoEntries} onReorder={() => {}} />)
-      const downButtons = screen.queryAllByRole('button', { name: 'Move card down' })
-      expect(downButtons).toHaveLength(1)
-    })
-
-    it('single card has no reorder buttons', () => {
-      render(<Tab entries={[makeEntry()]} onReorder={() => {}} />)
-      expect(screen.queryByRole('button', { name: 'Move card up' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'Move card down' })).not.toBeInTheDocument()
-    })
-
-    it('calls onReorder with (cardId, position-1) when up is clicked on second card', async () => {
-      const onReorder = vi.fn()
-      render(<Tab entries={twoEntries} onReorder={onReorder} />)
-      const upButtons = screen.getAllByRole('button', { name: 'Move card up' })
-      await userEvent.click(upButtons[0])
-      expect(onReorder).toHaveBeenCalledWith('b', 0)
-    })
-
-    it('calls onReorder with (cardId, position+1) when down is clicked on first card', async () => {
-      const onReorder = vi.fn()
-      render(<Tab entries={twoEntries} onReorder={onReorder} />)
-      const downButtons = screen.getAllByRole('button', { name: 'Move card down' })
-      await userEvent.click(downButtons[0])
-      expect(onReorder).toHaveBeenCalledWith('a', 1)
-    })
-  })
-
   describe('remove', () => {
     it('renders Remove card button when onRemove is provided', () => {
       render(<Tab entries={[makeEntry()]} onRemove={() => {}} />)
@@ -174,15 +132,15 @@ describe('Tab', () => {
   })
 
   describe('location', () => {
-    it('renders Save to Shelf button when onSaveToShelf is provided and location is "none"', () => {
+    it('renders Save card button when onSaveToShelf is provided and location is "none"', () => {
       render(<Tab entries={[makeEntry()]} onSaveToShelf={() => {}} />)
-      expect(screen.getByRole('button', { name: 'Save to Shelf' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save card' })).toBeInTheDocument()
     })
 
     it('calls onSaveToShelf with the card id when clicked', async () => {
       const onSaveToShelf = vi.fn()
       render(<Tab entries={[makeEntry()]} onSaveToShelf={onSaveToShelf} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Save card' }))
       expect(onSaveToShelf).toHaveBeenCalledWith('card-1')
     })
 
@@ -190,7 +148,7 @@ describe('Tab', () => {
       const entry = makeEntry({ card: { id: 'card-1', title: 'T', body: 'B', type: 'text', location: 'shelf' } })
       render(<Tab entries={[entry]} onMoveToLibrary={() => {}} />)
       expect(screen.queryByRole('button', { name: 'Saved to Shelf — click to move to Library' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'Save to Shelf' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save card' })).not.toBeInTheDocument()
     })
 
     it('does not expose move-to-library from tab card header when on shelf', async () => {
@@ -203,7 +161,7 @@ describe('Tab', () => {
 
     it('renders no location buttons when callbacks are not provided', () => {
       render(<Tab entries={[makeEntry()]} />)
-      expect(screen.queryByRole('button', { name: 'Save to Shelf' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save card' })).not.toBeInTheDocument()
     })
   })
 
@@ -269,60 +227,6 @@ describe('Tab', () => {
       render(<Tab entries={[makePortalEntry('target-1')]} cardsById={cardsById} onLocate={onLocate} />)
       await userEvent.click(screen.getByRole('button', { name: 'Show in vault' }))
       expect(onLocate).toHaveBeenCalledWith('target-1')
-    })
-  })
-
-  describe('flip', () => {
-    it('passes flipped=true to Card when isFlipped returns true for that card id', () => {
-      const isFlipped = (id) => id === 'card-1'
-      render(<Tab entries={[makeEntry()]} isFlipped={isFlipped} flipCard={() => {}} />)
-      const card = screen.getByRole('heading', { level: 3, name: 'Title' }).closest('.card')
-      expect(card).toHaveClass('card--flipped')
-    })
-
-    it('passes flipped=false when isFlipped returns false', () => {
-      const isFlipped = () => false
-      render(<Tab entries={[makeEntry()]} isFlipped={isFlipped} flipCard={() => {}} />)
-      const card = screen.getByRole('heading', { level: 3, name: 'Title' }).closest('.card')
-      expect(card).not.toHaveClass('card--flipped')
-    })
-
-    it('passes onFlip to Card which calls flipCard with the card id', async () => {
-      const flipCard = vi.fn()
-      const entry = makeEntry({
-        card: { id: 'card-1', title: 'Q', body: 'Body', type: 'text', location: 'none', back: 'Answer' },
-      })
-      render(<Tab entries={[entry]} isFlipped={() => false} flipCard={flipCard} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Show card back' }))
-      expect(flipCard).toHaveBeenCalledWith('card-1')
-    })
-
-    it('PortalCard receives flip button when flipCard is provided', () => {
-      const flipCard = vi.fn()
-      const portalEntry = {
-        card: { id: 'portal-1', type: 'portal', config: { target_card_id: null }, title: '', body: '', location: 'none' },
-        position: 0,
-        foldState: false,
-        hiddenState: false,
-      }
-      render(<Tab entries={[portalEntry]} isFlipped={() => false} flipCard={flipCard} />)
-      expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
-    })
-
-    it('PortalCard flip button calls flipCard with portal card id', async () => {
-      const flipCard = vi.fn()
-      const cardsById = {
-        'target-1': { id: 'target-1', title: 'Target', body: 'Body', back: '', type: 'text', config: null },
-      }
-      const portalEntry = {
-        card: { id: 'portal-1', type: 'portal', config: { target_card_id: 'target-1' }, title: '', body: '', location: 'none' },
-        position: 0,
-        foldState: false,
-        hiddenState: false,
-      }
-      render(<Tab entries={[portalEntry]} cardsById={cardsById} isFlipped={() => false} flipCard={flipCard} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Show card back' }))
-      expect(flipCard).toHaveBeenCalledWith('portal-1')
     })
   })
 

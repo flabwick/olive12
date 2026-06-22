@@ -11,13 +11,13 @@ src/
   debug/
     indexPipelineDebug.js       # Event log: logIndexEvent, subscribeIndexDebug, queries
     indexPipelineDebug.test.js  # [TEST]
-    IndexDebugPanel.jsx         # Floating panel: filterable event list
+    IndexDebugPanel.jsx         # Panel: filterable event list; shown when open=true
     IndexDebugPanel.css
   tab/
-    Dock.jsx                    # Settings button (aria: "Settings") opens IndexDebugPanel via AppShell
-    useTabs.js                  # Logs at moveToLibrary, flip, ensureIndex, state update
+    Dock.jsx                    # Settings button (BASE state only) opens IndexDebugPanel via AppShell
+    useTabs.js                  # Logs at moveToLibrary, flip, reindexCard, state update
   brain/
-    indexCard.js                # Logs invoke/parse/dexie/supabase stages
+    indexCard.js                # (legacy) logs invoke/parse/dexie/supabase stages
   card/
     CardBack.jsx                # Logs cardBack:render; inline Index debug <details>
 ```
@@ -54,7 +54,9 @@ In-memory ring buffer (max 200 events). Every event is also `console.log` / `con
 
 ## IndexDebugPanel
 
-Rendered by `AppShell` when `indexDebugOpen` is true. Toggle via the **Settings** button in the Dock (BASE state) or in the formatting toolbar (DOCK_EDITOR / TAB_EDITOR states). `handleSettings` in AppShell closes the folder panel and toggles `indexDebugOpen`.
+`IndexDebugPanel({ open, onClose })` — rendered by `AppShell` always (not conditionally mounted), hidden when `open` is false. Toggle via the **Settings** button in the Dock (BASE state). `handleSettings` in AppShell closes the folder panel and toggles `indexDebugOpen`.
+
+The `open` prop guards the return — when false, returns `null` immediately. This means the subscription (`subscribeIndexDebug`) is always active once the component is mounted, collecting events in the background.
 
 Features: filter box (card id / stage / error text), event count, Clear button, colour-coded rows (`ok` / `error` / `info`).
 

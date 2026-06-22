@@ -16,6 +16,7 @@ export function Tab({
   onSaveToShelf,
   onMoveToLibrary,
   onLocate,
+  onMoveToDock,
   flipCard,
   isFlipped,
 }) {
@@ -35,8 +36,6 @@ export function Tab({
           hiddenState: entry.hiddenState,
           onToggleFold: entry.foldState ? () => onUnfold?.(entry.card.id) : () => onFold?.(entry.card.id),
           onToggleHide: entry.hiddenState ? () => onUnhide?.(entry.card.id) : () => onHide?.(entry.card.id),
-          onMoveUp: index > 0 ? () => onReorder?.(entry.card.id, entry.position - 1) : undefined,
-          onMoveDown: index < entries.length - 1 ? () => onReorder?.(entry.card.id, entry.position + 1) : undefined,
           onClose: onRemove ? () => onRemove(entry.card.id) : undefined,
         }
 
@@ -59,8 +58,6 @@ export function Tab({
                 cardsById={cardsById}
                 {...sharedProps}
                 {...indexProps}
-                flipped={isFlipped ? isFlipped(entry.card.id) : false}
-                onFlip={flipCard ? () => flipCard(entry.card.id) : undefined}
                 onUpdate={target && onUpdate ? (fields) => onUpdate(target.id, fields) : undefined}
                 onLocate={target && onLocate ? () => onLocate(target.id) : undefined}
               />
@@ -77,13 +74,11 @@ export function Tab({
               cardId={entry.card.id}
               createdAt={entry.card.createdAt}
               updatedAt={entry.card.updatedAt}
-              folders={folders}
-              flipped={isFlipped ? isFlipped(entry.card.id) : false}
-              onFlip={flipCard ? () => flipCard(entry.card.id) : undefined}
               {...sharedProps}
               {...indexProps}
               onUpdate={onUpdate ? (fields) => onUpdate(entry.card.id, fields) : undefined}
               onSaveToShelf={onSaveToShelf ? () => onSaveToShelf(entry.card.id) : undefined}
+              onSendToDock={onMoveToDock ? () => onMoveToDock(entry.card.id) : undefined}
             />
           </li>
         )

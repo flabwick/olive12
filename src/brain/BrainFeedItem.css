@@ -54,3 +54,36 @@
   border-color: var(--olive-border-dark, #2c1810);
   color: var(--olive-text, #2c1810);
 }
+
+@media (prefers-color-scheme: dark) {
+  .brain-feed-item {
+    border-bottom-color: #303020;
+  }
+
+  .brain-feed-item__title {
+    color: #e4e0d0;
+  }
+
+  .brain-feed-item__badge--stale {
+    background: #302e22;
+    border-color: #504e3a;
+    color: #e4e0d0;
+  }
+
+  .brain-feed-item__badge--orphan {
+    color: #c8a0c0;
+    background: rgba(90, 50, 85, 0.25);
+    border-color: rgba(200, 160, 192, 0.3);
+  }
+
+  .brain-feed-item__reindex-btn {
+    border-color: #383528;
+    color: #908870;
+  }
+
+  .brain-feed-item__reindex-btn:hover {
+    background: #2c2a20;
+    border-color: #706850;
+    color: #e4e0d0;
+  }
+}

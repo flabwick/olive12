@@ -16,11 +16,11 @@
 
 @media (prefers-color-scheme: dark) {
   .dock-prompt {
-    background: #1b1510;
-    border-color: #8a6235;
+    background: #1c1a14;
+    border-color: #3a3830;
     box-shadow:
-      4px 4px 0 #3a2c1c,
-      0 -4px 20px rgba(0, 0, 0, 0.3);
+      4px 4px 0 #0a0a08,
+      0 -4px 20px rgba(0, 0, 0, 0.35);
   }
 }
 
@@ -51,14 +51,14 @@
 
 @media (prefers-color-scheme: dark) {
   .dock-prompt__input {
-    background: #1c1510;
-    border-color: #6a4e35;
-    color: #d4b898;
+    background: #242218;
+    border-color: #383528;
+    color: #e4e0d0;
   }
 
   .dock-prompt__input:focus {
-    border-color: #c8a87a;
-    box-shadow: 0 0 0 2px rgba(200, 168, 122, 0.1);
+    border-color: #706850;
+    box-shadow: 0 0 0 2px rgba(112, 104, 80, 0.14);
   }
 }
 
@@ -72,7 +72,7 @@
 
 @media (prefers-color-scheme: dark) {
   .dock-prompt__error {
-    color: var(--olive-terracotta, #c8603a);
+    color: var(--olive-terracotta, #906a30);
   }
 }
 
@@ -129,26 +129,26 @@
 
 @media (prefers-color-scheme: dark) {
   .dock-prompt__cancel {
-    background: #231910;
-    border-color: #6a4e35;
-    color: #a07858;
+    background: #201e16;
+    border-color: #383528;
+    color: #908870;
   }
 
   .dock-prompt__cancel:hover:not(:disabled) {
-    background: #3a2a18;
-    border-color: #c8a87a;
-    color: #e8d5b8;
+    background: #2c2a20;
+    border-color: #706850;
+    color: #e4e0d0;
   }
 
   .dock-prompt__submit {
-    background: #8a3018;
-    border-color: #6a2010;
-    box-shadow: 2px 2px 0 #3a1008;
+    background: var(--olive-terracotta, #906a30);
+    border-color: #705020;
+    box-shadow: 2px 2px 0 #0a0a08;
   }
 
   .dock-prompt__submit:hover:not(:disabled) {
-    background: #6a2010;
+    background: #705020;
     transform: translate(-1px, -1px);
-    box-shadow: 3px 3px 0 #3a1008;
+    box-shadow: 3px 3px 0 #080806;
   }
 }

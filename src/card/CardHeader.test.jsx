@@ -14,118 +14,10 @@ describe('CardHeader', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('renders only the caret button when only onToggleFold is provided', () => {
-    render(<CardHeader title="A" onToggleFold={() => {}} />)
-    const buttons = screen.getAllByRole('button')
-    expect(buttons).toHaveLength(1)
-    expect(buttons[0]).toHaveAttribute('aria-label', 'Collapse card')
-  })
-
-  it('renders only the eye button when only onToggleHide is provided', () => {
-    render(<CardHeader title="A" onToggleHide={() => {}} />)
-    const buttons = screen.getAllByRole('button')
-    expect(buttons).toHaveLength(1)
-    expect(buttons[0]).toHaveAttribute('aria-label', 'Dim card')
-  })
-
-  it('renders both buttons when both fold/hide callbacks are provided', () => {
-    render(<CardHeader title="A" onToggleFold={() => {}} onToggleHide={() => {}} />)
-    expect(screen.getAllByRole('button')).toHaveLength(2)
-  })
-
-  it('calls onToggleFold when caret button is clicked', async () => {
-    const onToggleFold = vi.fn()
-    render(<CardHeader title="A" onToggleFold={onToggleFold} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Collapse card' }))
-    expect(onToggleFold).toHaveBeenCalledOnce()
-  })
-
-  it('calls onToggleHide when eye button is clicked', async () => {
-    const onToggleHide = vi.fn()
-    render(<CardHeader title="A" onToggleHide={onToggleHide} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Dim card' }))
-    expect(onToggleHide).toHaveBeenCalledOnce()
-  })
-
-  it('shows Expand label on caret when folded is true', () => {
-    render(<CardHeader title="A" folded={true} onToggleFold={() => {}} />)
-    expect(screen.getByRole('button', { name: 'Expand card' })).toBeInTheDocument()
-  })
-
-  it('shows Show label on eye when hidden is true', () => {
-    render(<CardHeader title="A" hidden={true} onToggleHide={() => {}} />)
-    expect(screen.getByRole('button', { name: 'Show card' })).toBeInTheDocument()
-  })
-
-  it('renders Move card up button when onMoveUp is provided', () => {
-    render(<CardHeader title="A" onMoveUp={() => {}} />)
-    expect(screen.getByRole('button', { name: 'Move card up' })).toBeInTheDocument()
-  })
-
-  it('renders Move card down button when onMoveDown is provided', () => {
-    render(<CardHeader title="A" onMoveDown={() => {}} />)
-    expect(screen.getByRole('button', { name: 'Move card down' })).toBeInTheDocument()
-  })
-
-  it('does not render up button when onMoveUp is not provided', () => {
-    render(<CardHeader title="A" onMoveDown={() => {}} />)
-    expect(screen.queryByRole('button', { name: 'Move card up' })).not.toBeInTheDocument()
-  })
-
-  it('does not render down button when onMoveDown is not provided', () => {
-    render(<CardHeader title="A" onMoveUp={() => {}} />)
-    expect(screen.queryByRole('button', { name: 'Move card down' })).not.toBeInTheDocument()
-  })
-
-  it('calls onMoveUp when up button is clicked', async () => {
-    const onMoveUp = vi.fn()
-    render(<CardHeader title="A" onMoveUp={onMoveUp} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Move card up' }))
-    expect(onMoveUp).toHaveBeenCalledOnce()
-  })
-
-  it('calls onMoveDown when down button is clicked', async () => {
-    const onMoveDown = vi.fn()
-    render(<CardHeader title="A" onMoveDown={onMoveDown} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Move card down' }))
-    expect(onMoveDown).toHaveBeenCalledOnce()
-  })
-
-  it('renders five buttons when all callbacks are provided', () => {
-    render(
-      <CardHeader
-        title="A"
-        onMoveUp={() => {}}
-        onMoveDown={() => {}}
-        onToggleFold={() => {}}
-        onToggleHide={() => {}}
-        onFlip={() => {}}
-      />,
-    )
-    expect(screen.getAllByRole('button')).toHaveLength(5)
-  })
-
   it('renders title as input when editing is true', () => {
     render(<CardHeader title="My card" editing={true} onTitleChange={() => {}} />)
     expect(screen.queryByRole('heading')).not.toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Card title' })).toHaveValue('My card')
-  })
-
-  it('renders Remove card button when onClose is provided', () => {
-    render(<CardHeader title="A" onClose={() => {}} />)
-    expect(screen.getByRole('button', { name: 'Remove card' })).toBeInTheDocument()
-  })
-
-  it('does not render Remove card button when onClose is not provided', () => {
-    render(<CardHeader title="A" />)
-    expect(screen.queryByRole('button', { name: 'Remove card' })).not.toBeInTheDocument()
-  })
-
-  it('calls onClose when Remove card button is clicked', async () => {
-    const onClose = vi.fn()
-    render(<CardHeader title="A" onClose={onClose} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
-    expect(onClose).toHaveBeenCalledOnce()
   })
 
   it('calls onTitleChange when title input changes', async () => {
@@ -135,73 +27,147 @@ describe('CardHeader', () => {
     expect(onTitleChange).toHaveBeenCalled()
   })
 
-  describe('location button', () => {
-    it('renders Save to Shelf button when location is none and onSaveToShelf is provided', () => {
+  describe('fold toggle', () => {
+    it('renders hamburger button when onToggleFold is provided', () => {
+      render(<CardHeader title="A" onToggleFold={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Collapse card' })).toBeInTheDocument()
+    })
+
+    it('shows Expand label when folded is true', () => {
+      render(<CardHeader title="A" folded={true} onToggleFold={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Expand card' })).toBeInTheDocument()
+    })
+
+    it('has fold-toggle class on the fold button', () => {
+      render(<CardHeader title="A" folded={true} onToggleFold={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Expand card' })).toHaveClass('card-header__fold-toggle')
+    })
+
+    it('calls onToggleFold when fold button is clicked', async () => {
+      const onToggleFold = vi.fn()
+      render(<CardHeader title="A" onToggleFold={onToggleFold} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Collapse card' }))
+      expect(onToggleFold).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('eye / hide toggle', () => {
+    it('renders eye button when onToggleHide is provided', () => {
+      render(<CardHeader title="A" onToggleHide={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Dim card' })).toBeInTheDocument()
+    })
+
+    it('shows Show label when hidden is true', () => {
+      render(<CardHeader title="A" hidden={true} onToggleHide={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Show card' })).toBeInTheDocument()
+    })
+
+    it('calls onToggleHide when eye button is clicked', async () => {
+      const onToggleHide = vi.fn()
+      render(<CardHeader title="A" onToggleHide={onToggleHide} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Dim card' }))
+      expect(onToggleHide).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('save indicator', () => {
+    it('renders Save card button when onSaveToShelf provided and location is none', () => {
       render(<CardHeader title="A" location="none" onSaveToShelf={() => {}} />)
-      expect(screen.getByRole('button', { name: 'Save to Shelf' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save card' })).toBeInTheDocument()
     })
 
-    it('renders no location button when no callbacks are provided', () => {
+    it('renders disabled Saved button when onSaveToShelf provided and location is shelf', () => {
+      render(<CardHeader title="A" location="shelf" onSaveToShelf={() => {}} />)
+      const btn = screen.getByRole('button', { name: 'Saved' })
+      expect(btn).toBeInTheDocument()
+      expect(btn).toBeDisabled()
+    })
+
+    it('renders disabled Saved button when location is library', () => {
+      render(<CardHeader title="A" location="library" onSaveToShelf={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Saved' })).toBeDisabled()
+    })
+
+    it('does not render save indicator when onSaveToShelf is absent', () => {
       render(<CardHeader title="A" location="none" />)
-      expect(screen.queryByRole('button', { name: 'Save to Shelf' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save card' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Saved' })).not.toBeInTheDocument()
     })
 
-    it('renders no location button when location is shelf', () => {
-      render(<CardHeader title="A" location="shelf" onMoveToLibrary={() => {}} />)
-      expect(screen.queryByRole('button', { name: 'Saved to Shelf — click to move to Library' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'In Library' })).not.toBeInTheDocument()
-    })
-
-    it('renders no location button when location is library', () => {
-      render(<CardHeader title="A" location="library" />)
-      expect(screen.queryByRole('button', { name: 'In Library' })).not.toBeInTheDocument()
-    })
-
-    it('calls onSaveToShelf when Save to Shelf is clicked', async () => {
+    it('calls onSaveToShelf when Save card is clicked', async () => {
       const onSaveToShelf = vi.fn()
       render(<CardHeader title="A" location="none" onSaveToShelf={onSaveToShelf} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Save card' }))
       expect(onSaveToShelf).toHaveBeenCalledOnce()
     })
   })
 
-  describe('flip', () => {
-    it('renders flip button with "Show card back" label when onFlip is provided', () => {
-      render(<CardHeader title="Q" onFlip={() => {}} />)
-      expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
+  describe('close button', () => {
+    it('renders Remove card button when onClose is provided', () => {
+      render(<CardHeader title="A" onClose={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Remove card' })).toBeInTheDocument()
     })
 
-    it('does not render flip button when onFlip is absent', () => {
-      render(<CardHeader title="Q" />)
+    it('does not render Remove card button when onClose is not provided', () => {
+      render(<CardHeader title="A" />)
+      expect(screen.queryByRole('button', { name: 'Remove card' })).not.toBeInTheDocument()
+    })
+
+    it('calls onClose when Remove card button is clicked', async () => {
+      const onClose = vi.fn()
+      render(<CardHeader title="A" onClose={onClose} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
+      expect(onClose).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('send to dock / send to tab', () => {
+    it('renders Move to dock button when onSendToDock is provided', () => {
+      render(<CardHeader title="A" onSendToDock={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Move to dock' })).toBeInTheDocument()
+    })
+
+    it('does not render Move to dock button when onSendToDock is absent', () => {
+      render(<CardHeader title="A" />)
+      expect(screen.queryByRole('button', { name: 'Move to dock' })).not.toBeInTheDocument()
+    })
+
+    it('calls onSendToDock when Move to dock is clicked', async () => {
+      const onSendToDock = vi.fn()
+      render(<CardHeader title="A" onSendToDock={onSendToDock} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Move to dock' }))
+      expect(onSendToDock).toHaveBeenCalledOnce()
+    })
+
+    it('renders Move to tab button when onSendToTab is provided', () => {
+      render(<CardHeader title="A" onSendToTab={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Move to tab' })).toBeInTheDocument()
+    })
+
+    it('does not render Move to tab button when onSendToTab is absent', () => {
+      render(<CardHeader title="A" />)
+      expect(screen.queryByRole('button', { name: 'Move to tab' })).not.toBeInTheDocument()
+    })
+
+    it('calls onSendToTab when Move to tab is clicked', async () => {
+      const onSendToTab = vi.fn()
+      render(<CardHeader title="A" onSendToTab={onSendToTab} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Move to tab' }))
+      expect(onSendToTab).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('does not render removed controls', () => {
+    it('ignores onMoveUp / onMoveDown (removed from API)', () => {
+      render(<CardHeader title="A" />)
+      expect(screen.queryByRole('button', { name: 'Move card up' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Move card down' })).not.toBeInTheDocument()
+    })
+
+    it('ignores flip props (removed from API)', () => {
+      render(<CardHeader title="A" />)
       expect(screen.queryByRole('button', { name: 'Show card back' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Show card front' })).not.toBeInTheDocument()
-    })
-
-    it('calls onFlip when flip button is clicked', async () => {
-      const onFlip = vi.fn()
-      render(<CardHeader title="Q" onFlip={onFlip} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Show card back' }))
-      expect(onFlip).toHaveBeenCalledOnce()
-    })
-
-    it('flip button aria-label is "Show card back" when flipped is false', () => {
-      render(<CardHeader title="Q" onFlip={() => {}} flipped={false} />)
-      expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
-    })
-
-    it('flip button aria-label is "Show card front" when flipped is true', () => {
-      render(<CardHeader title="Q" onFlip={() => {}} flipped={true} />)
-      expect(screen.getByRole('button', { name: 'Show card front' })).toBeInTheDocument()
-    })
-
-    it('flip button has aria-pressed=true when flipped', () => {
-      render(<CardHeader title="Q" onFlip={() => {}} flipped={true} />)
-      expect(screen.getByRole('button', { name: 'Show card front' })).toHaveAttribute('aria-pressed', 'true')
-    })
-
-    it('flip button renders when only onFlip is provided (no move arrows, no eye, no close)', () => {
-      render(<CardHeader title="Q" onFlip={() => {}} />)
-      expect(screen.getByRole('button', { name: 'Show card back' })).toBeInTheDocument()
     })
   })
 })

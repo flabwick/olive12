@@ -58,3 +58,28 @@
   flex-direction: column;
   gap: 0.875rem;
 }
+
+@media (prefers-color-scheme: dark) {
+  .card-shell__input,
+  .card-shell__textarea {
+    background: #1c1a14;
+    border-color: #383528;
+    color: #e4e0d0;
+  }
+
+  .card-shell__input:focus,
+  .card-shell__textarea:focus {
+    border-color: #706850;
+  }
+
+  .card-shell__button {
+    border-color: #706850;
+    color: #e4e0d0;
+    box-shadow: 2px 2px 0 #0a0a08;
+  }
+
+  .card-shell__button:hover {
+    background: #706850;
+    color: #141410;
+  }
+}

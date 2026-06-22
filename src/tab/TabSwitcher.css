@@ -205,63 +205,63 @@
 
 @media (prefers-color-scheme: dark) {
   .tab-switcher__tile {
-    background: #1c1510;
-    border-color: #6a4e35;
-    box-shadow: 5px 5px 0 #3a2c1c;
+    background: #201e16;
+    border-color: #383528;
+    box-shadow: 5px 5px 0 #0a0a08;
   }
 
   .tab-switcher__tile:not(.tab-switcher__tile--add)::before {
-    background: #5a3a18;
-    border-bottom-color: #4a2e10;
+    background: #2c2820;
+    border-bottom-color: #3a3628;
   }
 
   .tab-switcher__tile:not(.tab-switcher__tile--add):hover {
-    box-shadow: 7px 7px 0 #2a1c0c;
+    box-shadow: 7px 7px 0 #080806;
   }
 
   .tab-switcher__tile--active {
-    border-color: var(--olive-terracotta, #c8603a);
-    box-shadow: 5px 5px 0 #8a3018;
+    border-color: var(--olive-terracotta, #906a30);
+    box-shadow: 5px 5px 0 #604820;
   }
 
   .tab-switcher__tile--active::before {
-    background: #8a3018;
-    border-bottom-color: #6a2010;
+    background: var(--olive-terracotta, #906a30);
+    border-bottom-color: #604820;
   }
 
   .tab-switcher__tile--add {
-    border-color: #4a3828;
-    background: rgba(0, 0, 0, 0.2);
+    border-color: #383528;
+    background: rgba(28, 26, 18, 0.7);
   }
 
   .tab-switcher__tile--add:hover {
-    border-color: #8a6848;
-    background: rgba(255, 255, 255, 0.04);
+    border-color: #504e3a;
+    background: rgba(36, 34, 24, 0.9);
   }
 
   .tab-switcher__close {
-    color: #e8d0a0;
-    border-color: rgba(232, 208, 160, 0.25);
-    background: rgba(255, 255, 255, 0.06);
+    color: #ccc8b0;
+    border-color: rgba(200, 196, 168, 0.25);
+    background: rgba(255, 255, 240, 0.07);
   }
 
   .tab-switcher__tile-name {
-    color: #e8d0a0;
+    color: #e4e0d0;
   }
 
   .tab-switcher__tile-badge {
-    color: var(--olive-terracotta, #c8603a);
-    background: rgba(200, 96, 58, 0.12);
-    border-color: rgba(200, 96, 58, 0.3);
+    color: var(--olive-terracotta, #906a30);
+    background: rgba(144, 106, 48, 0.14);
+    border-color: rgba(144, 106, 48, 0.32);
   }
 
   .tab-switcher__save {
-    border-color: #c8a87a;
-    color: #e8d5b8;
+    border-color: #706850;
+    color: #e4e0d0;
   }
 
   .tab-switcher__save:hover {
-    background: #c8a87a;
-    color: #2c1810;
+    background: #706850;
+    color: #141410;
   }
 }

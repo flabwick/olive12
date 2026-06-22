@@ -70,3 +70,35 @@
   color: var(--olive-text, #2c1810);
   transform: translateX(1px);
 }
+
+@media (prefers-color-scheme: dark) {
+  .vault-tab-row {
+    border-bottom-color: #303020;
+  }
+
+  .vault-tab-row__name {
+    color: #e4e0d0;
+  }
+
+  .vault-tab-row__type {
+    background: #252218;
+    color: #686458;
+  }
+
+  .vault-tab-row__date {
+    color: #686458;
+  }
+
+  .vault-tab-row__open-btn,
+  .vault-tab-row__move-btn {
+    border-color: #383528;
+    color: #908870;
+  }
+
+  .vault-tab-row__open-btn:hover,
+  .vault-tab-row__move-btn:hover {
+    background: #2c2a20;
+    border-color: #706850;
+    color: #e4e0d0;
+  }
+}

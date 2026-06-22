@@ -50,6 +50,24 @@ describe('useDock', () => {
     expect(await db.dock_cards.toArray()).toEqual([])
   })
 
+  it('openDockCard toggles: clicking the active card deselects it', () => {
+    const { result } = renderHook(() => useDock({}))
+
+    act(() => { result.current.openDockCard('card-1') })
+    expect(result.current.activeDockCardId).toBe('card-1')
+
+    act(() => { result.current.openDockCard('card-1') })
+    expect(result.current.activeDockCardId).toBeNull()
+  })
+
+  it('openDockCard switches to a different card', () => {
+    const { result } = renderHook(() => useDock({}))
+
+    act(() => { result.current.openDockCard('card-1') })
+    act(() => { result.current.openDockCard('card-2') })
+    expect(result.current.activeDockCardId).toBe('card-2')
+  })
+
   it('removeFromDock clears activeDockCardId if it matches the removed card', async () => {
     await db.dock_cards.put({ cardId: 'card-1', order: 0 })
     const { result } = renderHook(() => useDock({}))

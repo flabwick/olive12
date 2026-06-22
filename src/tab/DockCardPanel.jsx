@@ -2,9 +2,8 @@ import { useState } from 'react'
 import { Card } from '../card/Card'
 import './DockCardPanel.css'
 
-export function DockCardPanel({ card, cardId, onClose, onUpdate }) {
+export function DockCardPanel({ card, cardId, onClose, onUpdate, onMoveToTab }) {
   const [foldState, setFoldState] = useState(false)
-  const [flipped, setFlipped] = useState(false)
 
   if (!card) return null
 
@@ -17,11 +16,10 @@ export function DockCardPanel({ card, cardId, onClose, onUpdate }) {
         back={card.back || ''}
         location={card.location || 'none'}
         foldState={foldState}
-        flipped={flipped}
         onToggleFold={() => setFoldState((v) => !v)}
-        onFlip={() => setFlipped((v) => !v)}
         onClose={onClose}
         onUpdate={(fields) => onUpdate(cardId, fields)}
+        onSendToTab={onMoveToTab}
         editorSurface="dock"
       />
     </div>

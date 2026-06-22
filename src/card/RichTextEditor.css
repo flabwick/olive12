@@ -87,3 +87,26 @@
   user-select: none;
   white-space: nowrap;
 }
+
+@media (prefers-color-scheme: dark) {
+  .rich-text-editor__content .ProseMirror {
+    color: #c8c4b0;
+  }
+
+  .rich-text-editor__content .ProseMirror code,
+  .rich-text-editor__content .ProseMirror pre {
+    background: #252218;
+    color: #c8c4b0;
+  }
+
+  .rich-text-editor__content .ProseMirror blockquote {
+    border-left-color: #383528;
+    color: #908870;
+  }
+
+  .embedded-card-node {
+    background: #252218;
+    border-color: #383528;
+    color: #a09880;
+  }
+}

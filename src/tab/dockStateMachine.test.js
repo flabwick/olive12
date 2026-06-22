@@ -13,15 +13,15 @@ describe('computeDockState', () => {
     expect(computeDockState({ activeDockCardId: null, activeEditorCardId: null })).toBe(DOCK_STATE.BASE)
   })
 
-  it('returns DOCK_EDITOR when only activeDockCardId is set', () => {
-    expect(computeDockState({ activeDockCardId: 'card-1', activeEditorCardId: null })).toBe(DOCK_STATE.DOCK_EDITOR)
+  it('returns BASE when only activeDockCardId is set (no active editor)', () => {
+    expect(computeDockState({ activeDockCardId: 'card-1', activeEditorCardId: null })).toBe(DOCK_STATE.BASE)
   })
 
   it('returns TAB_EDITOR when only activeEditorCardId is set', () => {
     expect(computeDockState({ activeDockCardId: null, activeEditorCardId: 'card-1' })).toBe(DOCK_STATE.TAB_EDITOR)
   })
 
-  it('returns TAB_EDITOR when both ids are set (TAB_EDITOR wins)', () => {
+  it('returns TAB_EDITOR when both ids are set without dock surface', () => {
     expect(computeDockState({ activeDockCardId: 'card-1', activeEditorCardId: 'card-2' })).toBe(DOCK_STATE.TAB_EDITOR)
   })
 

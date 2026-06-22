@@ -18,9 +18,9 @@
 
 @media (prefers-color-scheme: dark) {
   .tab-header {
-    background: #3a2a10;
-    border-bottom-color: #8a6235;
-    box-shadow: 0 4px 0 #3a2c1c;
+    background: #1c1a14;
+    border-bottom-color: #383528;
+    box-shadow: 0 4px 0 #0a0a08;
   }
 }
 
@@ -49,7 +49,7 @@
 
 @media (prefers-color-scheme: dark) {
   .tab-header__title {
-    color: #e8d0a0;
+    color: #e4e0d0;
   }
 }
 
@@ -71,8 +71,8 @@
 
 @media (prefers-color-scheme: dark) {
   .tab-header__input {
-    color: #e8d0a0;
-    border-bottom-color: var(--olive-terracotta, #c8603a);
+    color: #e4e0d0;
+    border-bottom-color: var(--olive-terracotta, #906a30);
   }
 }
 
@@ -122,24 +122,24 @@
 
 @media (prefers-color-scheme: dark) {
   .tab-header__save {
-    border-color: #c8a87a;
-    color: #e8d0a0;
-    box-shadow: 2px 2px 0 #3a2c1c;
+    border-color: #706850;
+    color: #e4e0d0;
+    box-shadow: 2px 2px 0 #0a0a08;
   }
 
   .tab-header__save:not(:disabled):hover {
-    background: #c8a87a;
-    color: #2c1810;
-    box-shadow: 3px 3px 0 #2a1c0c;
+    background: #706850;
+    color: #141410;
+    box-shadow: 3px 3px 0 #080806;
   }
 
   .tab-header__save:not(:disabled):active {
-    box-shadow: 1px 1px 0 #2a1c0c;
+    box-shadow: 1px 1px 0 #080806;
   }
 
   .tab-header__save:disabled {
-    border-color: var(--olive-sage, #5a7850);
-    color: var(--olive-sage, #5a7850);
+    border-color: #486040;
+    color: #486040;
     box-shadow: none;
   }
 }
@@ -170,14 +170,14 @@
 
 @media (prefers-color-scheme: dark) {
   .tab-header__tabs {
-    border-color: #c8a87a;
-    color: #e8d0a0;
-    box-shadow: 2px 2px 0 #3a2c1c;
+    border-color: #706850;
+    color: #e4e0d0;
+    box-shadow: 2px 2px 0 #0a0a08;
   }
 
   .tab-header__tabs:hover {
-    background: #c8a87a;
-    color: #2c1810;
-    box-shadow: 3px 3px 0 #2a1c0c;
+    background: #706850;
+    color: #141410;
+    box-shadow: 3px 3px 0 #080806;
   }
 }

@@ -1,41 +1,4 @@
-import { LocationButton } from './LocationButton'
 import './CardHeader.css'
-
-function ArrowUpIcon() {
-  return (
-    <svg
-      viewBox="0 0 10 12"
-      width="8"
-      height="11"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M5 11V1M2 4l3-3 3 3" />
-    </svg>
-  )
-}
-
-function ArrowDownIcon() {
-  return (
-    <svg
-      viewBox="0 0 10 12"
-      width="8"
-      height="11"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M5 1v10M2 8l3 3 3-3" />
-    </svg>
-  )
-}
 
 function CaretIcon({ folded }) {
   return (
@@ -59,17 +22,7 @@ function CaretIcon({ folded }) {
 function EyeIcon({ hidden }) {
   if (hidden) {
     return (
-      <svg
-        viewBox="-1 -1 18 14"
-        width="12"
-        height="9"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
+      <svg viewBox="-1 -1 18 14" width="12" height="9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M2 2l12 8" />
         <path d="M6.5 3.5C7 3.2 7.5 3 8 3c2 0 5 2 7 5-.6.9-1.3 1.7-2 2.3" />
         <path d="M3.3 4.7C2.5 5.3 1.7 6.1 1 7c2 3 5 5 7 5 1 0 2-.3 3-.8" />
@@ -77,55 +30,52 @@ function EyeIcon({ hidden }) {
       </svg>
     )
   }
-
   return (
-    <svg
-      viewBox="-1 -1 18 12"
-      width="12"
-      height="8"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
+    <svg viewBox="-1 -1 18 12" width="12" height="8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M1 5C3 2 6 0 8 0s5 2 7 5c-2 3-5 5-7 5S3 8 1 5z" />
       <circle cx="8" cy="5" r="2" />
     </svg>
   )
 }
 
-function CloseIcon() {
+function SaveIcon() {
   return (
-    <svg
-      viewBox="0 0 10 10"
-      width="10"
-      height="10"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M1 1l8 8M9 1l-8 8" />
+    <svg viewBox="0 0 10 12" width="9" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 1h6v10l-3-2-3 2z" />
     </svg>
   )
 }
 
-function FlipIcon() {
+function CheckIcon() {
   return (
-    <svg
-      viewBox="0 0 12 10"
-      width="12"
-      height="10"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M1 2h10M1 5h10M1 8h10" />
+    <svg viewBox="0 0 10 10" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M1.5 5.5l2.5 2.5 5-5" />
+    </svg>
+  )
+}
+
+function SendToDockIcon() {
+  return (
+    <svg viewBox="0 0 10 12" width="9" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 1v7M2 5.5l3 3 3-3" />
+      <line x1="1" y1="11" x2="9" y2="11" />
+    </svg>
+  )
+}
+
+function SendToTabIcon() {
+  return (
+    <svg viewBox="0 0 10 12" width="9" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="1" y1="1" x2="9" y2="1" />
+      <path d="M5 11V4M2 6.5l3-3 3 3" />
+    </svg>
+  )
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+      <path d="M1 1l8 8M9 1l-8 8" />
     </svg>
   )
 }
@@ -134,24 +84,21 @@ export function CardHeader({
   title,
   editing = false,
   onTitleChange,
+  onTitleBlur,
+  onTitleKeyDown,
   inputRef,
   onTitleClick,
   folded = false,
   hidden = false,
-  flipped = false,
   location = 'none',
-  folders = [],
   onSaveToShelf,
-  onMoveToLibrary,
   onToggleFold,
   onToggleHide,
-  onFlip,
-  onMoveUp,
-  onMoveDown,
+  onSendToDock,
+  onSendToTab,
   onClose,
 }) {
-  const hasRightControls = onFlip || onMoveUp || onMoveDown || onToggleHide || onClose
-  const hasLocationButton = location === 'none' && onSaveToShelf
+  const hasControls = onSaveToShelf || onToggleHide || onSendToDock || onSendToTab || onClose
 
   return (
     <div className="card-header">
@@ -165,19 +112,21 @@ export function CardHeader({
           <CaretIcon folded={folded} />
         </button>
       )}
-
       {editing ? (
         <input
           ref={inputRef}
           className="card-header__title-input"
           value={title}
           onChange={(e) => onTitleChange?.(e.target.value)}
+          onBlur={onTitleBlur}
+          onKeyDown={onTitleKeyDown}
           aria-label="Card title"
         />
       ) : (
         <h3
           className={`card-header__title${onTitleClick ? ' card-header__title--editable' : ''}`}
           onClick={onTitleClick}
+          onMouseDown={onTitleClick ? (e) => e.stopPropagation() : undefined}
           tabIndex={onTitleClick ? 0 : undefined}
           onKeyDown={onTitleClick ? (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -186,42 +135,32 @@ export function CardHeader({
             }
           } : undefined}
         >
-          {title}
+          {title || (onTitleClick ? <span className="card-header__title-placeholder">Untitled</span> : null)}
         </h3>
       )}
 
-      {hasLocationButton && (
-        <div className="card-header__location">
-          <LocationButton
-            location={location}
-            folders={folders}
-            onSaveToShelf={onSaveToShelf}
-            onMoveToLibrary={onMoveToLibrary}
-          />
-        </div>
-      )}
-
-      {hasRightControls && (
+      {hasControls && (
         <div className="card-header__controls">
-          {onMoveUp && (
-            <button
-              type="button"
-              className="card-header__control"
-              onClick={onMoveUp}
-              aria-label="Move card up"
-            >
-              <ArrowUpIcon />
-            </button>
-          )}
-          {onMoveDown && (
-            <button
-              type="button"
-              className="card-header__control"
-              onClick={onMoveDown}
-              aria-label="Move card down"
-            >
-              <ArrowDownIcon />
-            </button>
+          {onSaveToShelf && (
+            location !== 'none' ? (
+              <button
+                type="button"
+                className="card-header__control card-header__control--saved"
+                aria-label="Saved"
+                disabled
+              >
+                <CheckIcon />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="card-header__control"
+                onClick={onSaveToShelf}
+                aria-label="Save card"
+              >
+                <SaveIcon />
+              </button>
+            )
           )}
           {onToggleHide && (
             <button
@@ -233,15 +172,24 @@ export function CardHeader({
               <EyeIcon hidden={hidden} />
             </button>
           )}
-          {onFlip && (
+          {onSendToDock && (
             <button
               type="button"
-              className={`card-header__control${flipped ? ' card-header__control--active' : ''}`}
-              onClick={onFlip}
-              aria-label={flipped ? 'Show card front' : 'Show card back'}
-              aria-pressed={flipped}
+              className="card-header__control"
+              onClick={onSendToDock}
+              aria-label="Move to dock"
             >
-              <FlipIcon />
+              <SendToDockIcon />
+            </button>
+          )}
+          {onSendToTab && (
+            <button
+              type="button"
+              className="card-header__control"
+              onClick={onSendToTab}
+              aria-label="Move to tab"
+            >
+              <SendToTabIcon />
             </button>
           )}
           {onClose && (

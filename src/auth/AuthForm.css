@@ -126,48 +126,48 @@
 
 @media (prefers-color-scheme: dark) {
   .auth-form {
-    background: #1c1510;
-    border-color: #c8a87a;
-    box-shadow: 6px 6px 0 #3a2c1c;
+    background: #201e16;
+    border-color: #706850;
+    box-shadow: 6px 6px 0 #0a0a08;
   }
 
   .auth-form::before {
-    background: #c8a87a;
-    color: #2c1810;
+    background: #e4e0d0;
+    color: #141410;
   }
 
   .auth-form__title {
-    color: #e8d5b8;
+    color: #e4e0d0;
   }
 
   .auth-form__fields label {
-    color: #8a6848;
+    color: #686458;
   }
 
   .auth-form__fields input {
-    background: #231910;
-    border-color: #6a4e35;
-    color: #e8d5b8;
+    background: #181610;
+    border-color: #383528;
+    color: #e4e0d0;
   }
 
   .auth-form__fields input:focus {
-    border-color: #c8a87a;
-    box-shadow: 0 0 0 2px rgba(200, 168, 122, 0.12);
+    border-color: #706850;
+    box-shadow: 0 0 0 2px rgba(112, 104, 80, 0.14);
   }
 
   .auth-form__error {
-    color: var(--olive-terracotta, #c8603a);
-    background: rgba(200, 96, 58, 0.1);
-    border-color: rgba(200, 96, 58, 0.25);
+    color: var(--olive-terracotta, #906a30);
+    background: rgba(144, 106, 48, 0.1);
+    border-color: rgba(144, 106, 48, 0.25);
   }
 
   .auth-form__actions button {
-    border-color: #c8a87a;
-    color: #e8d5b8;
+    border-color: #706850;
+    color: #e4e0d0;
   }
 
   .auth-form__actions button:hover:not(:disabled) {
-    background: #c8a87a;
-    color: #2c1810;
+    background: #706850;
+    color: #141410;
   }
 }

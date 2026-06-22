@@ -9,9 +9,9 @@
 
 @media (prefers-color-scheme: dark) {
   .transient-card {
-    border-color: #4a3828;
-    background: #1c1510;
-    box-shadow: 2px 2px 0 #3a2c1c;
+    border-color: #383528;
+    background: #201e16;
+    box-shadow: 2px 2px 0 #0a0a08;
   }
 }
 
@@ -26,8 +26,8 @@
 
 @media (prefers-color-scheme: dark) {
   .transient-card__header {
-    background: #5a3a18;
-    border-bottom-color: #4a2e10;
+    background: #2c2820;
+    border-bottom-color: #3a3628;
   }
 }
 
@@ -42,7 +42,7 @@
 
 @media (prefers-color-scheme: dark) {
   .transient-card__heading {
-    color: #e8d0a0;
+    color: #e4e0d0;
   }
 }
 
@@ -68,9 +68,9 @@
 
 @media (prefers-color-scheme: dark) {
   .transient-card__dismiss {
-    border-color: rgba(232, 208, 160, 0.3);
-    background: rgba(255, 255, 255, 0.06);
-    color: #e8d0a0;
+    border-color: rgba(200, 196, 168, 0.25);
+    background: rgba(255, 255, 240, 0.07);
+    color: #ccc8b0;
   }
 }
 
@@ -84,7 +84,7 @@
 
 @media (prefers-color-scheme: dark) {
   .transient-card__type-row {
-    border-bottom-color: #3a2c1c;
+    border-bottom-color: #303020;
   }
 }
 
@@ -124,14 +124,14 @@
 
 @media (prefers-color-scheme: dark) {
   .transient-card__type {
-    border-color: #4a3828;
-    color: #a08060;
+    border-color: #383528;
+    color: #908870;
   }
 
   .transient-card__type--selected {
-    background: #5a3a18;
-    border-color: #9a7040;
-    color: #e8d0a0;
+    background: #302e22;
+    border-color: #605848;
+    color: #e4e0d0;
   }
 }
 
@@ -162,8 +162,8 @@
 
 @media (prefers-color-scheme: dark) {
   .transient-card__input {
-    color: #e8d9c4;
-    border-bottom-color: #3a2c1c;
+    color: #e4e0d0;
+    border-bottom-color: #303020;
   }
 }
 
@@ -186,7 +186,7 @@
 
 @media (prefers-color-scheme: dark) {
   .transient-card__textarea {
-    color: #9e8e80;
+    color: #c8c4b0;
   }
 }
 
@@ -247,24 +247,24 @@
 
 @media (prefers-color-scheme: dark) {
   .transient-card__cancel {
-    border-color: #4a3828;
-    color: #a08060;
+    border-color: #383528;
+    color: #908870;
   }
 
   .transient-card__cancel:hover {
-    background: #3a2a18;
-    border-color: #c8a87a;
-    color: #e8d5b8;
+    background: #2c2a20;
+    border-color: #706850;
+    color: #e4e0d0;
   }
 
   .transient-card__submit {
-    background: #8a3018;
-    border-color: #6a2010;
-    box-shadow: 2px 2px 0 #3a1008;
+    background: #906a30;
+    border-color: #705020;
+    box-shadow: 2px 2px 0 #0a0a08;
   }
 
   .transient-card__submit:hover {
-    background: #6a2010;
-    box-shadow: 3px 3px 0 #3a1008;
+    background: #705020;
+    box-shadow: 3px 3px 0 #080806;
   }
 }

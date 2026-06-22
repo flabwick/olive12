@@ -70,20 +70,6 @@ describe('PortalCard', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
-  it('calls onMoveUp when Move card up button is clicked', async () => {
-    const onMoveUp = vi.fn()
-    render(<PortalCard config={resolvedConfig} cardsById={cardsById} onMoveUp={onMoveUp} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Move card up' }))
-    expect(onMoveUp).toHaveBeenCalledOnce()
-  })
-
-  it('calls onMoveDown when Move card down button is clicked', async () => {
-    const onMoveDown = vi.fn()
-    render(<PortalCard config={resolvedConfig} cardsById={cardsById} onMoveDown={onMoveDown} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Move card down' }))
-    expect(onMoveDown).toHaveBeenCalledOnce()
-  })
-
   it('calls onUpdate with edited fields when content is committed', async () => {
     const onUpdate = vi.fn()
     render(

@@ -20,7 +20,7 @@ export function useDock({ cardsById = {}, activeEditorCardId = null, activeSurfa
   const dockState = computeDockState({ activeDockCardId, activeEditorCardId, activeSurface })
 
   const openDockCard = useCallback((cardId) => {
-    setActiveDockCardId(cardId)
+    setActiveDockCardId((prev) => (prev === cardId ? null : cardId))
   }, [])
 
   const closeDockCard = useCallback(() => {

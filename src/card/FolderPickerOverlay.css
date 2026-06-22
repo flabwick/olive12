@@ -97,40 +97,40 @@
 
 @media (prefers-color-scheme: dark) {
   .folder-picker {
-    background: #1c1510;
-    border-color: #6a4e35;
-    box-shadow: 6px 6px 0 #3a2c1c;
+    background: #201e16;
+    border-color: #383528;
+    box-shadow: 6px 6px 0 #0a0a08;
   }
 
   .folder-picker__header {
-    background: #5a3a18;
-    border-bottom-color: #4a2e10;
+    background: #2c2820;
+    border-bottom-color: #3a3628;
   }
 
   .folder-picker__title {
-    color: #e8d0a0;
+    color: #e4e0d0;
   }
 
   .folder-picker__close {
-    color: #e8d0a0;
-    border-color: rgba(232, 208, 160, 0.3);
-    background: rgba(255, 255, 255, 0.06);
+    color: #e4e0d0;
+    border-color: rgba(200, 196, 168, 0.28);
+    background: rgba(255, 255, 240, 0.06);
   }
 
   .folder-picker__close:hover {
-    background: rgba(232, 208, 160, 0.12);
+    background: rgba(255, 255, 240, 0.11);
   }
 
   .folder-picker__option {
-    color: #c8a87a;
+    color: #a09880;
   }
 
   .folder-picker__option:hover {
-    background: #2a1e10;
-    color: #e8d5b8;
+    background: #2c2a20;
+    color: #e4e0d0;
   }
 
   .folder-picker__option--root {
-    color: #e8d0a0;
+    color: #e4e0d0;
   }
 }
