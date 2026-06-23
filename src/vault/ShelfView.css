@@ -1,0 +1,13 @@
+.vault-shelf-view {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+}
+
+.vault-shelf-view__empty {
+  font-size: 0.83rem;
+  color: var(--olive-muted, #9ca3af);
+  text-align: center;
+  padding: 24px 12px;
+  margin: 0;
+}

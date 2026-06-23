@@ -11,149 +11,163 @@ const baseProps = {
 }
 
 describe('FolderPanel', () => {
-  it('renders Shelf, Library and Brain tabs', () => {
-    render(<FolderPanel {...baseProps} />)
-    expect(screen.getByRole('tab', { name: 'Shelf' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Library' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Brain' })).toBeInTheDocument()
-  })
-
-  it('renders a close button', () => {
-    render(<FolderPanel {...baseProps} />)
-    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
-  })
-
-  it('calls onClose when close button is clicked', async () => {
-    const onClose = vi.fn()
-    render(<FolderPanel {...baseProps} onClose={onClose} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
-    expect(onClose).toHaveBeenCalledOnce()
-  })
-
   it('shows shelf empty state by default', () => {
     render(<FolderPanel {...baseProps} />)
-    expect(screen.getByText(/Shelf is empty/)).toBeInTheDocument()
+    expect(screen.getByText('Nothing saved to shelf yet.')).toBeInTheDocument()
   })
 
-  it('shows shelf entries when provided', () => {
-    const shelfEntries = [{ id: 's1', title: 'My Card', type: 'note', createdAt: Date.now() }]
+  it('shows shelf card titles when provided', () => {
+    const shelfEntries = [{ id: 's1', title: 'My Card', body: '', location: 'shelf' }]
     render(<FolderPanel {...baseProps} shelfEntries={shelfEntries} />)
     expect(screen.getByText('My Card')).toBeInTheDocument()
   })
 
-  it('switches to Library tab and shows folder tree', async () => {
-    render(<FolderPanel {...baseProps} />)
-    await userEvent.click(screen.getByRole('tab', { name: 'Library' }))
-    expect(screen.getByRole('tree', { name: 'Library' })).toBeInTheDocument()
+  it('shows shelf tabs when provided', () => {
+    const shelfTabs = [{ id: 't1', name: 'Research', savedLocation: 'shelf' }]
+    render(<FolderPanel {...baseProps} shelfTabs={shelfTabs} />)
+    expect(screen.getByText('Research')).toBeInTheDocument()
   })
 
-  it('switches to Brain tab and shows brain feed empty state', async () => {
-    render(<FolderPanel {...baseProps} />)
-    await userEvent.click(screen.getByRole('tab', { name: 'Brain' }))
+  it('shows library view when activeTab is library', () => {
+    render(<FolderPanel {...baseProps} activeTab="library" />)
+    expect(screen.getByText('Nothing in library yet.')).toBeInTheDocument()
+  })
+
+  it('shows brain feed when activeTab is brain', () => {
+    render(<FolderPanel {...baseProps} activeTab="brain" />)
     expect(screen.getByText('No issues found.')).toBeInTheDocument()
   })
 
-  it('switches to Brain tab and shows feed items when provided', async () => {
-    const brainFeedItems = [
-      { cardId: 'c1', title: 'Stale note', reason: 'stale' },
-    ]
-    render(<FolderPanel {...baseProps} brainFeedItems={brainFeedItems} onReindex={() => {}} />)
-    await userEvent.click(screen.getByRole('tab', { name: 'Brain' }))
-    expect(screen.getByText('Stale note')).toBeInTheDocument()
-    expect(screen.getByText('Stale')).toBeInTheDocument()
+  it('opens on the initialTab when provided', () => {
+    render(<FolderPanel {...baseProps} initialTab="library" />)
+    expect(screen.getByText('Nothing in library yet.')).toBeInTheDocument()
   })
 
-  it('calls onMoveToLibrary with card id and null folderId', async () => {
-    const onMoveToLibrary = vi.fn()
-    const shelfEntries = [{ id: 's1', title: 'Card', type: 'note', createdAt: Date.now() }]
-    render(<FolderPanel {...baseProps} shelfEntries={shelfEntries} onMoveToLibrary={onMoveToLibrary} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Move to Library' }))
-    expect(onMoveToLibrary).toHaveBeenCalledWith('s1', null)
+  it('activeTab prop overrides initialTab', () => {
+    render(<FolderPanel {...baseProps} initialTab="shelf" activeTab="library" />)
+    expect(screen.getByText('Nothing in library yet.')).toBeInTheDocument()
   })
 
-  it('calls onOpenAsPortal with card id when Open in tab is clicked on a shelf row', async () => {
-    const onOpenAsPortal = vi.fn()
-    const shelfEntries = [{ id: 's1', title: 'My Card', type: 'note', createdAt: Date.now() }]
-    render(<FolderPanel {...baseProps} shelfEntries={shelfEntries} onOpenAsPortal={onOpenAsPortal} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Open in tab' }))
-    expect(onOpenAsPortal).toHaveBeenCalledWith('s1')
+  it('highlights the matching shelf card', () => {
+    const shelfEntries = [{ id: 's1', title: 'Target card', body: '', location: 'shelf' }]
+    render(<FolderPanel {...baseProps} shelfEntries={shelfEntries} highlightedCardId="s1" />)
+    expect(document.querySelector('.vault-item-row--highlighted')).toBeTruthy()
   })
 
-  it('calls onOpenAsPortal with card id when Open in tab is clicked on a library card', async () => {
-    const onOpenAsPortal = vi.fn()
-    const libraryEntries = [{ id: 'l1', title: 'Library card', type: 'text', folderId: null }]
-    render(<FolderPanel {...baseProps} libraryEntries={libraryEntries} onOpenAsPortal={onOpenAsPortal} />)
-    await userEvent.click(screen.getByRole('tab', { name: 'Library' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Open Library card in tab' }))
-    expect(onOpenAsPortal).toHaveBeenCalledWith('l1')
+  it('does not highlight a shelf card when id does not match', () => {
+    const shelfEntries = [{ id: 's1', title: 'Not highlighted', body: '', location: 'shelf' }]
+    render(<FolderPanel {...baseProps} shelfEntries={shelfEntries} highlightedCardId="other-id" />)
+    expect(document.querySelector('.vault-item-row--highlighted')).toBeNull()
   })
 
-  describe('locate highlight', () => {
-    it('opens on the initialTab when provided', () => {
-      render(<FolderPanel {...baseProps} initialTab="library" />)
-      expect(screen.getByRole('tree', { name: 'Library' })).toBeInTheDocument()
+  describe('vault item selection', () => {
+    it('calls onSelectVaultItem with card and type when a shelf card is clicked', async () => {
+      const onSelectVaultItem = vi.fn()
+      const shelfEntries = [{ id: 's1', title: 'My Card', body: '', location: 'shelf' }]
+      render(<FolderPanel {...baseProps} shelfEntries={shelfEntries} onSelectVaultItem={onSelectVaultItem} />)
+      await userEvent.click(screen.getByText('My Card'))
+      expect(onSelectVaultItem).toHaveBeenCalledWith(expect.objectContaining({ id: 's1' }), 'card')
     })
 
-    it('highlights the matching shelf row when highlightedCardId is set', () => {
-      const shelfEntries = [{ id: 's1', title: 'Target card', type: 'text', createdAt: Date.now() }]
-      render(<FolderPanel {...baseProps} shelfEntries={shelfEntries} highlightedCardId="s1" />)
-      const row = screen.getByRole('listitem')
-      expect(row).toHaveClass('shelf-row--highlighted')
+    it('does not navigate away from list when a card is clicked', async () => {
+      const shelfEntries = [{ id: 's1', title: 'My Card', body: '', location: 'shelf' }]
+      render(<FolderPanel {...baseProps} shelfEntries={shelfEntries} onSelectVaultItem={vi.fn()} />)
+      await userEvent.click(screen.getByText('My Card'))
+      expect(screen.getByText('My Card')).toBeInTheDocument()
     })
 
-    it('does not highlight a shelf row when its id does not match highlightedCardId', () => {
-      const shelfEntries = [{ id: 's1', title: 'Not highlighted', type: 'text', createdAt: Date.now() }]
-      render(<FolderPanel {...baseProps} shelfEntries={shelfEntries} highlightedCardId="other-id" />)
-      expect(screen.getByRole('listitem')).not.toHaveClass('shelf-row--highlighted')
+    it('calls onSelectVaultItem with tab when a shelf tab is clicked', async () => {
+      const onSelectVaultItem = vi.fn()
+      const shelfTabs = [{ id: 't1', name: 'Research', savedLocation: 'shelf' }]
+      render(<FolderPanel {...baseProps} shelfTabs={shelfTabs} onSelectVaultItem={onSelectVaultItem} />)
+      await userEvent.click(screen.getByText('Research'))
+      expect(onSelectVaultItem).toHaveBeenCalledWith(expect.objectContaining({ id: 't1' }), 'tab')
+    })
+
+    it('calls onSelectVaultItem with folder when a folder name is clicked in library tab', async () => {
+      const onSelectVaultItem = vi.fn()
+      const folders = [{ id: 'f1', name: 'Work', parentId: null }]
+      render(
+        <FolderPanel
+          {...baseProps}
+          folders={folders}
+          initialTab="library"
+          onSelectVaultItem={onSelectVaultItem}
+        />,
+      )
+      await userEvent.click(screen.getByText('Work'))
+      expect(onSelectVaultItem).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'f1', name: 'Work' }),
+        'folder',
+      )
+    })
+
+    it('applies vault-item-row--active class when activeVaultItemId matches a shelf card', () => {
+      const shelfEntries = [{ id: 's1', title: 'Active Card', body: '', location: 'shelf' }]
+      render(<FolderPanel {...baseProps} shelfEntries={shelfEntries} activeVaultItemId="s1" />)
+      expect(document.querySelector('.vault-item-row--active')).toBeTruthy()
+    })
+
+    it('does not apply vault-item-row--active when activeVaultItemId does not match', () => {
+      const shelfEntries = [{ id: 's1', title: 'My Card', body: '', location: 'shelf' }]
+      render(<FolderPanel {...baseProps} shelfEntries={shelfEntries} activeVaultItemId="other" />)
+      expect(document.querySelector('.vault-item-row--active')).toBeNull()
     })
   })
 
-  describe('saved tabs in vault', () => {
-    const shelfTab = {
-      id: 'tab-1',
-      name: 'My research',
-      savedLocation: 'shelf',
-      createdAt: new Date('2024-03-15').getTime(),
-    }
-
-    it('shows shelf tab row when shelfTabs is provided', () => {
-      render(<FolderPanel {...baseProps} shelfTabs={[shelfTab]} />)
-      expect(screen.getByText('My research')).toBeInTheDocument()
+  describe('library view', () => {
+    it('shows library cards when in library tab', () => {
+      const libraryEntries = [{ id: 'l1', title: 'Library card', body: '', location: 'library', folderId: null }]
+      render(<FolderPanel {...baseProps} libraryEntries={libraryEntries} initialTab="library" />)
+      expect(screen.getByText('Library card')).toBeInTheDocument()
     })
 
-    it('shelf empty state hidden when shelfTabs has entries even if shelfEntries is empty', () => {
-      render(<FolderPanel {...baseProps} shelfTabs={[shelfTab]} />)
-      expect(screen.queryByText(/Shelf is empty/)).not.toBeInTheDocument()
+    it('shows folder names in library view', () => {
+      const folders = [{ id: 'f1', name: 'Work', parentId: null }]
+      render(<FolderPanel {...baseProps} folders={folders} initialTab="library" />)
+      expect(screen.getByText('Work')).toBeInTheDocument()
     })
 
-    it('calls onOpenTab with tab id when Switch to tab is clicked', async () => {
-      const onOpenTab = vi.fn()
-      render(<FolderPanel {...baseProps} shelfTabs={[shelfTab]} onOpenTab={onOpenTab} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Switch to tab' }))
-      expect(onOpenTab).toHaveBeenCalledWith('tab-1')
+  })
+
+  describe('pick folder mode', () => {
+    it('calls onFolderPicked when a folder is clicked in pickFolderMode', async () => {
+      const onFolderPicked = vi.fn()
+      const folders = [{ id: 'f1', name: 'Work', parentId: null }]
+      render(
+        <FolderPanel
+          {...baseProps}
+          folders={folders}
+          initialTab="library"
+          pickFolderMode
+          onFolderPicked={onFolderPicked}
+        />,
+      )
+      await userEvent.click(screen.getByText('Work'))
+      expect(onFolderPicked).toHaveBeenCalledWith(expect.objectContaining({ id: 'f1' }))
     })
 
-    it('calls onMoveTabToLibrary with tab id when Move to Library is clicked on a shelf tab', async () => {
-      const onMoveTabToLibrary = vi.fn()
-      render(<FolderPanel {...baseProps} shelfTabs={[shelfTab]} onMoveTabToLibrary={onMoveTabToLibrary} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Move to Library' }))
-      expect(onMoveTabToLibrary).toHaveBeenCalledWith('tab-1')
+    it('does not call onSelectVaultItem for card clicks in pickFolderMode', async () => {
+      const onSelectVaultItem = vi.fn()
+      const libraryEntries = [{ id: 'l1', title: 'My Card', body: '', location: 'library', folderId: null }]
+      render(
+        <FolderPanel
+          {...baseProps}
+          libraryEntries={libraryEntries}
+          initialTab="library"
+          pickFolderMode
+          onSelectVaultItem={onSelectVaultItem}
+        />,
+      )
+      await userEvent.click(screen.getByText('My Card'))
+      expect(onSelectVaultItem).not.toHaveBeenCalled()
     })
+  })
 
-    it('shows library tab row in Library view when libraryTabs is provided', async () => {
-      const libraryTab = { ...shelfTab, id: 'tab-2', name: 'Archive tab', savedLocation: 'library' }
-      render(<FolderPanel {...baseProps} libraryTabs={[libraryTab]} />)
-      await userEvent.click(screen.getByRole('tab', { name: 'Library' }))
-      expect(screen.getByText('Archive tab')).toBeInTheDocument()
-    })
-
-    it('calls onOpenTab with tab id when Switch to tab is clicked in Library view', async () => {
-      const onOpenTab = vi.fn()
-      const libraryTab = { ...shelfTab, id: 'tab-2', name: 'Archive tab', savedLocation: 'library' }
-      render(<FolderPanel {...baseProps} libraryTabs={[libraryTab]} onOpenTab={onOpenTab} />)
-      await userEvent.click(screen.getByRole('tab', { name: 'Library' }))
-      await userEvent.click(screen.getByRole('button', { name: 'Switch to tab' }))
-      expect(onOpenTab).toHaveBeenCalledWith('tab-2')
+  describe('selection mode', () => {
+    it('does not show SelectionToolbar initially', () => {
+      render(<FolderPanel {...baseProps} />)
+      expect(screen.queryByRole('toolbar', { name: 'Selection actions' })).not.toBeInTheDocument()
     })
   })
 })

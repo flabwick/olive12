@@ -27,3 +27,21 @@ export function flattenFolderTree(folders, parentId = null, depth = 0) {
     ...flattenFolderTree(folders, f.id, depth + 1),
   ])
 }
+
+export function collectDescendantIds(folders, folderId) {
+  const result = []
+  const queue = [folderId]
+  while (queue.length > 0) {
+    const current = queue.shift()
+    const children = folders.filter((f) => f.parentId === current)
+    for (const child of children) {
+      result.push(child.id)
+      queue.push(child.id)
+    }
+  }
+  return result
+}
+
+export function isFolderDescendant(folders, folderId, targetId) {
+  return collectDescendantIds(folders, folderId).includes(targetId)
+}

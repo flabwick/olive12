@@ -112,20 +112,22 @@ describe('App', () => {
     expect(screen.getByRole('dialog', { name: 'Vault and Brain' })).toBeInTheDocument()
   })
 
-  it('folder panel shows Shelf, Library and Brain tabs', async () => {
+  it('dock shows Shelf, Library and Brain tab buttons when vault is open', async () => {
     render(<App />)
     await waitFor(() => screen.getByRole('button', { name: 'Library' }))
     await userEvent.click(screen.getByRole('button', { name: 'Library' }))
-    expect(screen.getByRole('tab', { name: 'Shelf' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Library' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Brain' })).toBeInTheDocument()
+    await waitFor(() => screen.getByRole('dialog', { name: 'Vault and Brain' }))
+    expect(screen.getByRole('button', { name: 'Shelf' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Library' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Brain' })).toBeInTheDocument()
   })
 
-  it('closing the folder panel via X removes it from the screen', async () => {
+  it('closing the folder panel via Close vault button removes it from the screen', async () => {
     render(<App />)
     await waitFor(() => screen.getByRole('button', { name: 'Library' }))
     await userEvent.click(screen.getByRole('button', { name: 'Library' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => screen.getByRole('button', { name: 'Close vault' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Close vault' }))
     expect(screen.queryByRole('dialog', { name: 'Vault and Brain' })).not.toBeInTheDocument()
   })
 

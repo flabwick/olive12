@@ -81,12 +81,23 @@ describe('nextPosition', () => {
     expect(nextPosition([])).toBe(0)
   })
 
-  it('returns the length of the list', () => {
+  it('returns max position + 1 for contiguous positions', () => {
     const tabCards = [
       { tabId: 't', cardId: 'a', position: 0, foldState: false, hiddenState: false },
       { tabId: 't', cardId: 'b', position: 1, foldState: false, hiddenState: false },
     ]
     expect(nextPosition(tabCards)).toBe(2)
+  })
+
+  it('returns max position + 1 for non-contiguous positions, not the count', () => {
+    // If positions are 5, 10, 15 and count is 3, returning 3 would insert
+    // a new card at the TOP (before position 5). Must return 16 instead.
+    const tabCards = [
+      { tabId: 't', cardId: 'a', position: 5, foldState: false, hiddenState: false },
+      { tabId: 't', cardId: 'b', position: 10, foldState: false, hiddenState: false },
+      { tabId: 't', cardId: 'c', position: 15, foldState: false, hiddenState: false },
+    ]
+    expect(nextPosition(tabCards)).toBe(16)
   })
 })
 

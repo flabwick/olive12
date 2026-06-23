@@ -1,11 +1,9 @@
 import { useState } from 'react'
 import { BrainFeedList } from '../brain/BrainFeedList'
-import { ShelfRow } from '../vault/ShelfRow'
-import { FolderTree } from '../vault/FolderTree'
-import { VaultTabRow } from '../vault/VaultTabRow'
+import { ShelfView } from '../vault/ShelfView'
+import { LibraryView } from '../vault/LibraryView'
+import { SelectionToolbar } from '../vault/SelectionToolbar'
 import './FolderPanel.css'
-
-const TABS = ['shelf', 'library', 'brain']
 
 export function FolderPanel({
   shelfEntries = [],
@@ -20,99 +18,118 @@ export function FolderPanel({
   onOpenAsPortal,
   onOpenTab,
   initialTab = 'shelf',
+  activeTab: propActiveTab,
   highlightedCardId,
+  activeVaultItemId,
+  onSelectVaultItem,
   brainFeedItems = [],
   onReindex,
+  moveCardToFolder,
+  moveFolder,
+  bulkMoveCards,
+  bulkDeleteCards,
+  bulkMoveTabs,
+  onUploadCard,
+  pickFolderMode = false,
+  onFolderPicked,
 }) {
-  const [tab, setTab] = useState(initialTab)
+  const [internalTab, setInternalTab] = useState(initialTab)
+  const activeTab = propActiveTab !== undefined ? propActiveTab : internalTab
+  const [selected, setSelected] = useState(new Set())
+  const [selectMode, setSelectMode] = useState(false)
+  const [openFolderIds, setOpenFolderIds] = useState(new Set())
 
-  const shelfEmpty = shelfEntries.length === 0 && shelfTabs.length === 0
+  function handleItemClick(item, type) {
+    if (pickFolderMode) return
+    onSelectVaultItem?.(item, type)
+  }
+
+  function handleFolderClick(folder) {
+    if (pickFolderMode) {
+      onFolderPicked?.(folder)
+    } else {
+      onSelectVaultItem?.(folder, 'folder')
+    }
+  }
+
+  function toggleSelect(id) {
+    setSelectMode(true)
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false)
+    setSelected(new Set())
+  }
+
+  async function handleBulkDelete() {
+    const allCards = [...shelfEntries, ...libraryEntries]
+    const cardIds = [...selected].filter((id) => allCards.some((c) => c.id === id))
+    if (cardIds.length > 0 && bulkDeleteCards) await bulkDeleteCards(cardIds)
+    exitSelectMode()
+  }
+
+  function toggleFolder(id) {
+    setOpenFolderIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   return (
-    <div className="folder-panel" role="dialog" aria-label="Vault and Brain" aria-modal="true">
-      {/* Content sits at the top, scrolls if it overflows */}
-      <div className="folder-panel__body">
-        {tab === 'shelf' && (
-          shelfEmpty ? (
-            <p className="folder-panel__empty">Shelf is empty. Save some cards from your tab.</p>
-          ) : (
-            <div className="folder-panel__shelf-list" role="list">
-              {shelfTabs.map((t) => (
-                <VaultTabRow
-                  key={t.id}
-                  tab={t}
-                  onOpen={onOpenTab ? () => onOpenTab(t.id) : undefined}
-                  onMoveToLibrary={onMoveTabToLibrary ? () => onMoveTabToLibrary(t.id) : undefined}
-                />
-              ))}
-              {shelfEntries.map((card) => (
-                <ShelfRow
-                  key={card.id}
-                  card={card}
-                  onMoveToLibrary={onMoveToLibrary ? () => onMoveToLibrary(card.id, null) : undefined}
-                  onOpenAsPortal={onOpenAsPortal}
-                  highlighted={card.id === highlightedCardId}
-                />
-              ))}
-            </div>
-          )
+    <div className="vault-panel" role="dialog" aria-label="Vault and Brain" aria-modal="true">
+      <div className="vault-panel__body">
+        {activeTab === 'shelf' && (
+          <ShelfView
+            cards={shelfEntries}
+            tabs={shelfTabs}
+            selected={selected}
+            selectMode={selectMode}
+            highlightedCardId={highlightedCardId}
+            activeItemId={activeVaultItemId}
+            onSelect={toggleSelect}
+            onItemClick={handleItemClick}
+          />
         )}
 
-        {tab === 'library' && (
-          <>
-            {libraryTabs.length > 0 && (
-              <div className="folder-panel__shelf-list" role="list">
-                {libraryTabs.map((t) => (
-                  <VaultTabRow
-                    key={t.id}
-                    tab={t}
-                    onOpen={onOpenTab ? () => onOpenTab(t.id) : undefined}
-                  />
-                ))}
-              </div>
-            )}
-            <FolderTree
-              folders={folders}
-              cards={libraryEntries}
-              onCreateFolder={onCreateFolder}
-              onOpenAsPortal={onOpenAsPortal}
-              highlightedCardId={highlightedCardId}
-            />
-          </>
+        {activeTab === 'library' && (
+          <LibraryView
+            cards={libraryEntries}
+            tabs={libraryTabs}
+            folders={folders}
+            selected={selected}
+            selectMode={selectMode}
+            openFolderIds={openFolderIds}
+            activeItemId={activeVaultItemId}
+            onSelect={toggleSelect}
+            onItemClick={handleItemClick}
+            onFolderClick={handleFolderClick}
+            onCreateFolder={onCreateFolder}
+            onUploadCard={onUploadCard}
+            onToggleFolder={toggleFolder}
+          />
         )}
 
-        {tab === 'brain' && (
+        {activeTab === 'brain' && (
           <BrainFeedList items={brainFeedItems} onReindex={onReindex} />
         )}
       </div>
 
-      {/* Tab nav pinned to the bottom of the panel */}
-      <div className="folder-panel__nav-bar">
-        <nav className="folder-panel__nav" role="tablist">
-          {TABS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              role="tab"
-              aria-selected={tab === t}
-              className={`folder-panel__tab${tab === t ? ' folder-panel__tab--active' : ''}`}
-              onClick={() => setTab(t)}
-            >
-              {t.charAt(0).toUpperCase() + t.slice(1)}
-            </button>
-          ))}
-        </nav>
-        <button
-          type="button"
-          className="folder-panel__close"
-          aria-label="Close"
-          onClick={onClose}
-        >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
-            <path d="M1 1l8 8M9 1l-8 8" />
-          </svg>
-        </button>
-      </div>
+      {selectMode && (
+        <SelectionToolbar
+          count={selected.size}
+          onMove={() => {}}
+          onDelete={handleBulkDelete}
+          onDone={exitSelectMode}
+        />
+      )}
     </div>
   )
 }

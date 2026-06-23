@@ -4,12 +4,18 @@ import { parseStreamChunk } from '../prompt/streamParser'
 import { deleteCard, getAllCards, putCard } from '../card/cardStorage'
 import { deleteLinksForSource, rebuildLinksForCard } from '../card/linkStorage'
 import { createCard, updateCardFields } from '../card/createCard'
-import { createFolder as makeFolderObject } from '../folder/createFolder'
-import { getAllFolders, putFolder } from '../folder/folderStorage'
+import {
+  collectDescendantIds,
+  createFolder as makeFolderObject,
+  isFolderDescendant,
+} from '../folder/createFolder'
+import { deleteFolder as deleteFolderStorage, getAllFolders, putFolder } from '../folder/folderStorage'
 import { supabase } from '../lib/supabaseClient'
 import { assembleContext } from '../prompt/assembleContext'
 import { createCardSyncScheduler } from '../sync/cardSync'
 import { makeCardSupabaseStorage } from '../sync/cardSupabaseStorage'
+import { makeFolderSupabaseStorage } from '../sync/folderSupabaseStorage'
+import { deleteFolderRemote, syncFolders } from '../sync/folderSync'
 import { computeContentHash } from '../sync/cardSyncLogic'
 import { getBrainFeedItems } from '../brain/brainFeedLogic'
 import { createIndexEntry } from '../brain/createIndexEntry'
@@ -27,6 +33,7 @@ import {
   setTabCardFold,
   setTabCardHidden,
   setTabName as setTabNamePure,
+  updateTabFields,
 } from './createTab'
 import {
   deleteAllTabCards,
@@ -37,6 +44,7 @@ import {
   putTab,
   putTabCard,
 } from './tabStorage'
+import { makeTabSupabaseStorage } from './tabSupabaseStorage'
 import { getDockCardIds } from './dockCardStorage'
 import { isOrphanTabCandidate } from './tabVaultLogic'
 
@@ -56,22 +64,82 @@ export function useTabs({ userId } = {}) {
   const [promptError, setPromptError] = useState('')
   const schedulerRef = useRef(null)
   const storageRef = useRef(null)
+  const folderStorageRef = useRef(null)
+  const tabStorageRef = useRef(null)
 
   useEffect(() => {
     if (!userId) {
       schedulerRef.current = null
       storageRef.current = null
+      folderStorageRef.current = null
+      tabStorageRef.current = null
       return
     }
     const storage = makeCardSupabaseStorage(supabase)
     storageRef.current = storage
     schedulerRef.current = createCardSyncScheduler({ userId, debounceMs: 3000, storage })
+    folderStorageRef.current = makeFolderSupabaseStorage(supabase)
+    tabStorageRef.current = makeTabSupabaseStorage(supabase)
   }, [userId])
 
   useEffect(() => {
     if (!isReady || !userId || !schedulerRef.current) return
 
-    schedulerRef.current.runNow().then(async () => {
+    async function doSync() {
+      // 1. Folder sync
+      if (folderStorageRef.current) {
+        await syncFolders(userId, folderStorageRef.current)
+        const freshFolders = await getAllFolders()
+        setFolders(freshFolders)
+      }
+
+      // 2. Card sync
+      await schedulerRef.current.runNow()
+
+      // 3. Pull saved tabs
+      if (tabStorageRef.current) {
+        try {
+          const remoteTabs = await tabStorageRef.current.fetchSavedTabsForUser(userId)
+          const localTabsNow = await getAllTabs()
+          const localById = Object.fromEntries(localTabsNow.map((t) => [t.id, t]))
+
+          for (const row of remoteTabs) {
+            const existing = localById[row.id]
+            if (!existing) {
+              const newTab = {
+                id: row.id,
+                name: row.name,
+                kind: 'blank',
+                order: localTabsNow.length,
+                savedLocation: row.saved_location,
+                savedFolderId: row.saved_folder_id ?? null,
+                isOpen: false,
+                createdAt: new Date(row.created_at).getTime(),
+                updatedAt: new Date(row.updated_at).getTime(),
+              }
+              await putTab(newTab)
+              setTabs((prev) => [...prev, newTab])
+            } else {
+              const remoteTs = new Date(row.updated_at).getTime()
+              if (remoteTs > (existing.updatedAt ?? 0)) {
+                const updated = {
+                  ...existing,
+                  name: row.name,
+                  savedLocation: row.saved_location,
+                  savedFolderId: row.saved_folder_id ?? null,
+                  updatedAt: remoteTs,
+                }
+                await putTab(updated)
+                setTabs((prev) => prev.map((t) => (t.id === row.id ? updated : t)))
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[useTabs] pull saved tabs error:', err)
+        }
+      }
+
+      // 4. Orphan detection
       const [freshCards, allTabCards, allTabs] = await Promise.all([
         getAllCards(),
         getAllTabCards(),
@@ -105,7 +173,9 @@ export function useTabs({ userId } = {}) {
       }
 
       setCardsById(freshById)
-    })
+    }
+
+    doSync()
   }, [isReady, userId])
 
   useEffect(() => {
@@ -217,25 +287,66 @@ export function useTabs({ userId } = {}) {
   const renameTab = useCallback(async (tabId, name) => {
     const nextTabs = setTabNamePure(tabs, tabId, name)
     const updated = nextTabs.find((t) => t.id === tabId)
-    if (updated) await putTab(updated)
+    if (updated) {
+      await putTab(updated)
+      if (updated.savedLocation !== 'none' && tabStorageRef.current) {
+        const cardIds = tabCards.filter((tc) => tc.tabId === tabId).map((tc) => tc.cardId)
+        tabStorageRef.current.upsertSavedTab({
+          id: updated.id,
+          user_id: userId,
+          name: updated.name,
+          saved_location: updated.savedLocation,
+          saved_folder_id: updated.savedFolderId ?? null,
+          card_ids: cardIds,
+          created_at: new Date(updated.createdAt).toISOString(),
+          updated_at: new Date(updated.updatedAt).toISOString(),
+        }).catch((err) => console.error('[useTabs] renameTab upsert:', err))
+      }
+    }
     setTabs(nextTabs)
-  }, [tabs])
+  }, [tabs, tabCards, userId])
 
   const saveTabToShelf = useCallback(async (tabId) => {
     const tab = tabs.find((t) => t.id === tabId)
     if (!tab) return
     const updated = saveTabToShelfPure(tab)
     await putTab(updated)
+    if (tabStorageRef.current) {
+      const cardIds = tabCards.filter((tc) => tc.tabId === tabId).map((tc) => tc.cardId)
+      tabStorageRef.current.upsertSavedTab({
+        id: updated.id,
+        user_id: userId,
+        name: updated.name,
+        saved_location: 'shelf',
+        saved_folder_id: null,
+        card_ids: cardIds,
+        created_at: new Date(updated.createdAt).toISOString(),
+        updated_at: new Date(updated.updatedAt).toISOString(),
+      }).catch((err) => console.error('[useTabs] saveTabToShelf upsert:', err))
+    }
     setTabs((prev) => prev.map((t) => (t.id === tabId ? updated : t)))
-  }, [tabs])
+  }, [tabs, tabCards, userId])
 
   const moveTabToLibrary = useCallback(async (tabId, folderId = null) => {
     const tab = tabs.find((t) => t.id === tabId)
     if (!tab) return
     const updated = moveTabToLibraryPure(tab, folderId)
     await putTab(updated)
+    if (tabStorageRef.current) {
+      const cardIds = tabCards.filter((tc) => tc.tabId === tabId).map((tc) => tc.cardId)
+      tabStorageRef.current.upsertSavedTab({
+        id: updated.id,
+        user_id: userId,
+        name: updated.name,
+        saved_location: 'library',
+        saved_folder_id: folderId ?? null,
+        card_ids: cardIds,
+        created_at: new Date(updated.createdAt).toISOString(),
+        updated_at: new Date(updated.updatedAt).toISOString(),
+      }).catch((err) => console.error('[useTabs] moveTabToLibrary upsert:', err))
+    }
     setTabs((prev) => prev.map((t) => (t.id === tabId ? updated : t)))
-  }, [tabs])
+  }, [tabs, tabCards, userId])
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null
 
@@ -493,8 +604,227 @@ export function useTabs({ userId } = {}) {
     const folder = makeFolderObject({ name, parentId })
     setFolders((prev) => [...prev, folder])
     await putFolder(folder)
+    if (folderStorageRef.current && userId) {
+      syncFolders(userId, folderStorageRef.current).catch((err) =>
+        console.error('[useTabs] createFolder sync:', err),
+      )
+    }
     return folder
-  }, [])
+  }, [userId])
+
+  const deleteSavedTab = useCallback(async (tabId) => {
+    const tab = tabs.find((t) => t.id === tabId)
+    if (!tab) return
+    const updated = updateTabFields(tab, { savedLocation: 'none', savedFolderId: null })
+    await putTab(updated)
+    setTabs((prev) => prev.map((t) => (t.id === tabId ? updated : t)))
+    if (tabStorageRef.current) {
+      tabStorageRef.current.deleteSavedTab(tabId).catch((err) =>
+        console.error('[useTabs] deleteSavedTab remote:', err),
+      )
+    }
+  }, [tabs])
+
+  const renameCard = useCallback(async (cardId, title) => {
+    const card = cardsById[cardId]
+    if (!card) return
+    const updated = updateCardFields(card, { title })
+    setCardsById((prev) => ({ ...prev, [cardId]: updated }))
+    await putCard(updated)
+    schedulerRef.current?.scheduleSync()
+  }, [cardsById])
+
+  const moveCardToFolder = useCallback(async (cardId, folderId) => {
+    const card = cardsById[cardId]
+    if (!card) return
+    const updated = updateCardFields(card, { folderId })
+    setCardsById((prev) => ({ ...prev, [cardId]: updated }))
+    await putCard(updated)
+    schedulerRef.current?.scheduleSync()
+  }, [cardsById])
+
+  const moveCardToShelf = useCallback(async (cardId) => {
+    const card = cardsById[cardId]
+    if (!card) return
+    const updated = updateCardFields(card, { location: 'shelf', folderId: null })
+    setCardsById((prev) => ({ ...prev, [cardId]: updated }))
+    await putCard(updated)
+    schedulerRef.current?.scheduleSync()
+  }, [cardsById])
+
+  const renameFolder = useCallback(async (folderId, name) => {
+    const folder = folders.find((f) => f.id === folderId)
+    if (!folder) return
+    const updated = { ...folder, name, updatedAt: Date.now() }
+    setFolders((prev) => prev.map((f) => (f.id === folderId ? updated : f)))
+    await putFolder(updated)
+    if (folderStorageRef.current && userId) {
+      syncFolders(userId, folderStorageRef.current).catch((err) =>
+        console.error('[useTabs] renameFolder sync:', err),
+      )
+    }
+  }, [folders, userId])
+
+  const deleteFolder = useCallback(async (folderId, mode) => {
+    const folder = folders.find((f) => f.id === folderId)
+    if (!folder) return
+
+    if (mode === 'reassign') {
+      const parentId = folder.parentId ?? null
+
+      // Re-parent direct child folders
+      const childFolders = folders.filter((f) => f.parentId === folderId)
+      const updatedChildFolders = childFolders.map((cf) => ({ ...cf, parentId, updatedAt: Date.now() }))
+      await Promise.all(updatedChildFolders.map((cf) => putFolder(cf)))
+
+      // Re-parent cards in this folder
+      const newCardsById = { ...cardsById }
+      const affectedCards = Object.values(cardsById).filter((c) => c.folderId === folderId)
+      for (const card of affectedCards) {
+        const updated = updateCardFields(card, { folderId: parentId })
+        newCardsById[card.id] = updated
+        await putCard(updated)
+      }
+
+      // Re-parent saved tabs in this folder
+      const affectedTabs = tabs.filter((t) => t.savedFolderId === folderId)
+      const updatedTabs = affectedTabs.map((t) => updateTabFields(t, { savedFolderId: parentId }))
+      await Promise.all(updatedTabs.map((t) => putTab(t)))
+
+      await deleteFolderStorage(folderId)
+
+      setFolders((prev) => [
+        ...prev.filter((f) => f.id !== folderId).map((f) => {
+          const updated = updatedChildFolders.find((cf) => cf.id === f.id)
+          return updated ?? f
+        }),
+      ])
+      setCardsById(newCardsById)
+      setTabs((prev) => prev.map((t) => updatedTabs.find((u) => u.id === t.id) ?? t))
+
+      if (folderStorageRef.current && userId) {
+        deleteFolderRemote(folderId, userId, folderStorageRef.current)
+      }
+    } else if (mode === 'delete-contents') {
+      const descendantIds = collectDescendantIds(folders, folderId)
+      const allFolderIds = [folderId, ...descendantIds]
+      const folderIdSet = new Set(allFolderIds)
+
+      // Delete all cards in these folders
+      const affectedCards = Object.values(cardsById).filter((c) => folderIdSet.has(c.folderId))
+      for (const card of affectedCards) {
+        await deleteCard(card.id)
+        await deleteLinksForSource(card.id)
+        storageRef.current?.deleteRemoteCard(card.id).catch((err) =>
+          console.error('[useTabs] deleteFolder delete card remote:', err),
+        )
+      }
+      const deletedCardIds = new Set(affectedCards.map((c) => c.id))
+
+      // Move saved tabs in these folders to shelf
+      const affectedTabs = tabs.filter((t) => folderIdSet.has(t.savedFolderId))
+      const updatedTabs = affectedTabs.map((t) =>
+        updateTabFields(t, { savedFolderId: null, savedLocation: 'shelf' }),
+      )
+      await Promise.all(updatedTabs.map((t) => putTab(t)))
+
+      // Delete all folders
+      await Promise.all(allFolderIds.map((id) => deleteFolderStorage(id)))
+
+      if (folderStorageRef.current && userId) {
+        for (const id of allFolderIds) {
+          deleteFolderRemote(id, userId, folderStorageRef.current)
+        }
+      }
+
+      const newCardsById = { ...cardsById }
+      for (const id of deletedCardIds) delete newCardsById[id]
+
+      setFolders((prev) => prev.filter((f) => !folderIdSet.has(f.id)))
+      setCardsById(newCardsById)
+      setTabCards((prev) => prev.filter((tc) => !deletedCardIds.has(tc.cardId)))
+      setTabs((prev) => prev.map((t) => updatedTabs.find((u) => u.id === t.id) ?? t))
+      await reloadLinks()
+    }
+  }, [folders, cardsById, tabs, tabCards, userId, reloadLinks])
+
+  const moveFolder = useCallback(async (folderId, newParentId) => {
+    if (newParentId !== null && isFolderDescendant(folders, folderId, newParentId)) return
+    const folder = folders.find((f) => f.id === folderId)
+    if (!folder) return
+    const updated = { ...folder, parentId: newParentId, updatedAt: Date.now() }
+    setFolders((prev) => prev.map((f) => (f.id === folderId ? updated : f)))
+    await putFolder(updated)
+    if (folderStorageRef.current && userId) {
+      syncFolders(userId, folderStorageRef.current).catch((err) =>
+        console.error('[useTabs] moveFolder sync:', err),
+      )
+    }
+  }, [folders, userId])
+
+  const bulkMoveCards = useCallback(async (cardIds, folderId) => {
+    const updates = {}
+    for (const cardId of cardIds) {
+      const card = cardsById[cardId]
+      if (!card) continue
+      const updated = updateCardFields(card, { folderId })
+      updates[cardId] = updated
+      await putCard(updated)
+    }
+    setCardsById((prev) => ({ ...prev, ...updates }))
+    schedulerRef.current?.scheduleSync()
+  }, [cardsById])
+
+  const bulkDeleteCards = useCallback(async (cardIds) => {
+    const cardIdSet = new Set(cardIds)
+    const tcsToDelete = tabCards.filter((tc) => cardIdSet.has(tc.cardId))
+    const newTabCards = tabCards.filter((tc) => !cardIdSet.has(tc.cardId))
+    const newCardsById = { ...cardsById }
+    for (const cardId of cardIds) delete newCardsById[cardId]
+
+    setCardsById(newCardsById)
+    setTabCards(newTabCards)
+
+    await Promise.all(
+      cardIds.flatMap((cardId) => [deleteCard(cardId), deleteLinksForSource(cardId)]),
+    )
+    await Promise.all(tcsToDelete.map((tc) => deleteTabCard(tc.tabId, tc.cardId)))
+
+    if (storageRef.current) {
+      for (const cardId of cardIds) {
+        storageRef.current.deleteRemoteCard(cardId).catch((err) =>
+          console.error('[useTabs] bulkDeleteCards remote:', err),
+        )
+      }
+    }
+
+    await reloadLinks()
+  }, [cardsById, tabCards, reloadLinks])
+
+  const bulkMoveTabs = useCallback(async (tabIds, folderId) => {
+    const updates = {}
+    for (const tabId of tabIds) {
+      const tab = tabs.find((t) => t.id === tabId)
+      if (!tab) continue
+      const updated = updateTabFields(tab, { savedFolderId: folderId, savedLocation: 'library' })
+      updates[tabId] = updated
+      await putTab(updated)
+      if (tabStorageRef.current) {
+        const cardIds = tabCards.filter((tc) => tc.tabId === tabId).map((tc) => tc.cardId)
+        tabStorageRef.current.upsertSavedTab({
+          id: updated.id,
+          user_id: userId,
+          name: updated.name,
+          saved_location: 'library',
+          saved_folder_id: folderId ?? null,
+          card_ids: cardIds,
+          created_at: new Date(updated.createdAt).toISOString(),
+          updated_at: new Date(updated.updatedAt).toISOString(),
+        }).catch((err) => console.error('[useTabs] bulkMoveTabs upsert:', err))
+      }
+    }
+    setTabs((prev) => prev.map((t) => updates[t.id] ?? t))
+  }, [tabs, tabCards, userId])
 
   const flipCard = useCallback((cardId) => {
     setFlippedCardIds((prev) => toggleFlip(prev, cardId))
@@ -674,6 +1004,7 @@ export function useTabs({ userId } = {}) {
     renameTab,
     saveTabToShelf,
     moveTabToLibrary,
+    deleteSavedTab,
     addCard,
     addPortalCard,
     addTabCard,
@@ -688,7 +1019,16 @@ export function useTabs({ userId } = {}) {
     unhide,
     saveToShelf,
     moveToLibrary,
+    renameCard,
+    moveCardToFolder,
+    moveCardToShelf,
     createFolder,
+    renameFolder,
+    deleteFolder,
+    moveFolder,
+    bulkMoveCards,
+    bulkDeleteCards,
+    bulkMoveTabs,
     runDockPrompt,
     promptLoading,
     promptError,

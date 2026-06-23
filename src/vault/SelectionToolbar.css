@@ -1,0 +1,44 @@
+.vault-selection-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--olive-surface, #1e1e1e);
+  border-top: 1px solid var(--olive-border, #333);
+}
+
+.vault-selection-toolbar__count {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--olive-muted, #9ca3af);
+}
+
+.vault-selection-toolbar__btn {
+  background: none;
+  border: 1px solid var(--olive-border, #333);
+  color: var(--olive-text, #e5e7eb);
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.vault-selection-toolbar__btn:hover:not(:disabled) {
+  background: var(--olive-hover, rgba(255, 255, 255, 0.06));
+}
+
+.vault-selection-toolbar__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.vault-selection-toolbar__btn--danger {
+  border-color: var(--olive-danger, #f87171);
+  color: var(--olive-danger, #f87171);
+}
+
+.vault-selection-toolbar__btn--done {
+  border-color: var(--olive-accent, #6366f1);
+  color: var(--olive-accent, #6366f1);
+}

@@ -12,6 +12,17 @@ const syncMocks = vi.hoisted(() => ({
   createCardSyncScheduler: vi.fn(),
 }))
 
+const folderSyncMocks = vi.hoisted(() => ({
+  syncFolders: vi.fn().mockResolvedValue(undefined),
+  deleteFolderRemote: vi.fn().mockResolvedValue(undefined),
+}))
+
+const tabStorageMocks = vi.hoisted(() => ({
+  fetchSavedTabsForUser: vi.fn().mockResolvedValue([]),
+  upsertSavedTab: vi.fn().mockResolvedValue(undefined),
+  deleteSavedTab: vi.fn().mockResolvedValue(undefined),
+}))
+
 const invokeMock = vi.hoisted(() => vi.fn())
 const deleteRemoteMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const getSessionMock = vi.hoisted(() => vi.fn().mockResolvedValue({ data: { session: null } }))
@@ -29,6 +40,16 @@ vi.mock('../sync/cardSync', () => ({
   createCardSyncScheduler: syncMocks.createCardSyncScheduler,
   syncDirtyCardsForUser: vi.fn(),
 }))
+vi.mock('../sync/folderSync', () => ({
+  syncFolders: folderSyncMocks.syncFolders,
+  deleteFolderRemote: folderSyncMocks.deleteFolderRemote,
+}))
+vi.mock('../sync/folderSupabaseStorage', () => ({
+  makeFolderSupabaseStorage: vi.fn(() => ({})),
+}))
+vi.mock('./tabSupabaseStorage', () => ({
+  makeTabSupabaseStorage: vi.fn(() => tabStorageMocks),
+}))
 
 describe('useTabs', () => {
   beforeEach(async () => {
@@ -40,6 +61,11 @@ describe('useTabs', () => {
     await db.index_entries.clear()
     await db.dock_cards.clear()
     localStorage.clear()
+    folderSyncMocks.syncFolders.mockClear()
+    folderSyncMocks.deleteFolderRemote.mockClear()
+    tabStorageMocks.fetchSavedTabsForUser.mockClear()
+    tabStorageMocks.upsertSavedTab.mockClear()
+    tabStorageMocks.deleteSavedTab.mockClear()
   })
 
   afterEach(() => {
@@ -1667,6 +1693,346 @@ describe('useTabs', () => {
       })
 
       expect(invokeMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('tab sync wiring', () => {
+    beforeEach(() => {
+      syncMocks.scheduleSync.mockClear()
+      syncMocks.runNow.mockClear()
+      syncMocks.createCardSyncScheduler.mockClear()
+      syncMocks.createCardSyncScheduler.mockReturnValue({
+        scheduleSync: syncMocks.scheduleSync,
+        runNow: syncMocks.runNow,
+      })
+    })
+
+    it('saveTabToShelf calls upsertSavedTab with saved_location shelf', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('tab-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      tabStorageMocks.upsertSavedTab.mockClear()
+      await act(async () => { await result.current.saveTabToShelf('tab-uuid') })
+
+      expect(tabStorageMocks.upsertSavedTab).toHaveBeenCalledOnce()
+      const row = tabStorageMocks.upsertSavedTab.mock.calls[0][0]
+      expect(row.id).toBe('tab-uuid')
+      expect(row.saved_location).toBe('shelf')
+      expect(row.user_id).toBe('user-1')
+    })
+
+    it('moveTabToLibrary calls upsertSavedTab with saved_location library', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('tab-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      tabStorageMocks.upsertSavedTab.mockClear()
+      await act(async () => { await result.current.moveTabToLibrary('tab-uuid', 'folder-1') })
+
+      expect(tabStorageMocks.upsertSavedTab).toHaveBeenCalledOnce()
+      const row = tabStorageMocks.upsertSavedTab.mock.calls[0][0]
+      expect(row.saved_location).toBe('library')
+      expect(row.saved_folder_id).toBe('folder-1')
+    })
+
+    it('renameTab calls upsertSavedTab when tab is saved', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('tab-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.saveTabToShelf('tab-uuid') })
+
+      tabStorageMocks.upsertSavedTab.mockClear()
+      await act(async () => { await result.current.renameTab('tab-uuid', 'Renamed') })
+
+      expect(tabStorageMocks.upsertSavedTab).toHaveBeenCalledOnce()
+      expect(tabStorageMocks.upsertSavedTab.mock.calls[0][0].name).toBe('Renamed')
+    })
+
+    it('renameTab does not call upsertSavedTab when tab is unsaved', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('tab-uuid')
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      tabStorageMocks.upsertSavedTab.mockClear()
+      await act(async () => { await result.current.renameTab('tab-uuid', 'Renamed') })
+
+      expect(tabStorageMocks.upsertSavedTab).not.toHaveBeenCalled()
+    })
+
+    it('deleteSavedTab clears savedLocation and calls deleteSavedTab on storage', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('tab-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.saveTabToShelf('tab-uuid') })
+      expect(result.current.tabs.find((t) => t.id === 'tab-uuid')?.savedLocation).toBe('shelf')
+
+      tabStorageMocks.deleteSavedTab.mockClear()
+      await act(async () => { await result.current.deleteSavedTab('tab-uuid') })
+
+      expect(result.current.tabs.find((t) => t.id === 'tab-uuid')?.savedLocation).toBe('none')
+      expect(tabStorageMocks.deleteSavedTab).toHaveBeenCalledWith('tab-uuid')
+    })
+
+    it('saveTabToShelf does not call upsertSavedTab when userId is absent', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('tab-uuid')
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.saveTabToShelf('tab-uuid') })
+
+      expect(tabStorageMocks.upsertSavedTab).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('new card operations', () => {
+    it('renameCard updates the card title in state and storage', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'Old title', body: '' }) })
+
+      await act(async () => { await result.current.renameCard('card-uuid', 'New title') })
+
+      expect(result.current.cardsById['card-uuid'].title).toBe('New title')
+      const stored = await getAllCards()
+      expect(stored.find((c) => c.id === 'card-uuid')?.title).toBe('New title')
+    })
+
+    it('moveCardToFolder updates folderId in state and storage', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+      await act(async () => { await result.current.moveCardToFolder('card-uuid', 'folder-1') })
+
+      expect(result.current.cardsById['card-uuid'].folderId).toBe('folder-1')
+      const stored = await getAllCards()
+      expect(stored.find((c) => c.id === 'card-uuid')?.folderId).toBe('folder-1')
+    })
+
+    it('moveCardToShelf sets location to shelf and clears folderId', async () => {
+      await db.cards.put({
+        id: 'lib-card', type: 'text', title: 'Library', body: '', location: 'library',
+        folderId: 'folder-1', createdAt: 1_000, updatedAt: 1_000, dirty: false,
+      })
+      await db.tabs.put({
+        id: 'pre-tab', name: 'Main', kind: 'blank', order: 0,
+        savedLocation: 'none', savedFolderId: null,
+        createdAt: 1_000, updatedAt: 1_000,
+      })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.moveCardToShelf('lib-card') })
+
+      expect(result.current.cardsById['lib-card'].location).toBe('shelf')
+      expect(result.current.cardsById['lib-card'].folderId).toBeNull()
+    })
+  })
+
+  describe('folder operations', () => {
+    it('renameFolder updates folder name in state and storage', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('folder-uuid')
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.createFolder({ name: 'Old name' }) })
+
+      await act(async () => { await result.current.renameFolder('folder-uuid', 'New name') })
+
+      expect(result.current.folders.find((f) => f.id === 'folder-uuid')?.name).toBe('New name')
+      const stored = await getAllFolders()
+      expect(stored.find((f) => f.id === 'folder-uuid')?.name).toBe('New name')
+    })
+
+    it('createFolder calls syncFolders when userId is provided', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('folder-uuid')
+      syncMocks.createCardSyncScheduler.mockReturnValue({
+        scheduleSync: syncMocks.scheduleSync,
+        runNow: syncMocks.runNow,
+      })
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      folderSyncMocks.syncFolders.mockClear()
+      await act(async () => { await result.current.createFolder({ name: 'Work' }) })
+
+      expect(folderSyncMocks.syncFolders).toHaveBeenCalled()
+    })
+
+    it('deleteFolder reassign mode re-parents child folders and cards to the parent folder', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('parent-folder')
+        .mockReturnValueOnce('child-folder')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.createFolder({ name: 'Parent' }) })
+      await act(async () => {
+        await result.current.createFolder({ name: 'Child', parentId: 'parent-folder' })
+      })
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+      await act(async () => { await result.current.moveCardToFolder('card-uuid', 'child-folder') })
+
+      // Now delete 'child-folder' in reassign mode
+      await act(async () => { await result.current.deleteFolder('child-folder', 'reassign') })
+
+      // child-folder should be gone
+      expect(result.current.folders.find((f) => f.id === 'child-folder')).toBeUndefined()
+      // card should have been re-parented to parent-folder
+      expect(result.current.cardsById['card-uuid'].folderId).toBe('parent-folder')
+    })
+
+    it('deleteFolder delete-contents mode deletes all descendant folders and their cards', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('parent-folder')
+        .mockReturnValueOnce('child-folder')
+        .mockReturnValueOnce('card-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.createFolder({ name: 'Parent' }) })
+      await act(async () => {
+        await result.current.createFolder({ name: 'Child', parentId: 'parent-folder' })
+      })
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+      await act(async () => { await result.current.moveCardToFolder('card-uuid', 'child-folder') })
+
+      await act(async () => { await result.current.deleteFolder('parent-folder', 'delete-contents') })
+
+      expect(result.current.folders).toHaveLength(0)
+      expect(result.current.cardsById['card-uuid']).toBeUndefined()
+      const stored = await getAllCards()
+      expect(stored.find((c) => c.id === 'card-uuid')).toBeUndefined()
+    })
+
+    it('moveFolder re-parents the folder', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('folder-a')
+        .mockReturnValueOnce('folder-b')
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.createFolder({ name: 'A' }) })
+      await act(async () => { await result.current.createFolder({ name: 'B' }) })
+
+      await act(async () => { await result.current.moveFolder('folder-a', 'folder-b') })
+
+      expect(result.current.folders.find((f) => f.id === 'folder-a')?.parentId).toBe('folder-b')
+    })
+
+    it('moveFolder is a no-op when moving a folder into its own descendant', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('parent-folder')
+        .mockReturnValueOnce('child-folder')
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.createFolder({ name: 'Parent' }) })
+      await act(async () => {
+        await result.current.createFolder({ name: 'Child', parentId: 'parent-folder' })
+      })
+
+      // Moving parent into child would create a cycle
+      await act(async () => { await result.current.moveFolder('parent-folder', 'child-folder') })
+
+      expect(result.current.folders.find((f) => f.id === 'parent-folder')?.parentId).toBeNull()
+    })
+  })
+
+  describe('bulk operations', () => {
+    it('bulkMoveCards updates folderId for all specified cards', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-a')
+        .mockReturnValueOnce('card-b')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+      await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+
+      await act(async () => {
+        await result.current.bulkMoveCards(['card-a', 'card-b'], 'folder-1')
+      })
+
+      expect(result.current.cardsById['card-a'].folderId).toBe('folder-1')
+      expect(result.current.cardsById['card-b'].folderId).toBe('folder-1')
+    })
+
+    it('bulkDeleteCards removes all specified cards from state and storage', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('card-a')
+        .mockReturnValueOnce('card-b')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+      await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+
+      await act(async () => { await result.current.bulkDeleteCards(['card-a', 'card-b']) })
+
+      expect(result.current.cardsById['card-a']).toBeUndefined()
+      expect(result.current.cardsById['card-b']).toBeUndefined()
+      expect(result.current.entries).toHaveLength(0)
+      const stored = await getAllCards()
+      expect(stored.find((c) => c.id === 'card-a')).toBeUndefined()
+    })
+
+    it('bulkMoveTabs updates savedFolderId for all specified tabs', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('tab-uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      syncMocks.createCardSyncScheduler.mockReturnValue({
+        scheduleSync: syncMocks.scheduleSync,
+        runNow: syncMocks.runNow,
+      })
+
+      const { result } = renderHook(() => useTabs({ userId: 'user-1' }))
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      await act(async () => { await result.current.saveTabToShelf('tab-uuid') })
+
+      tabStorageMocks.upsertSavedTab.mockClear()
+      await act(async () => { await result.current.bulkMoveTabs(['tab-uuid'], 'folder-1') })
+
+      expect(result.current.tabs.find((t) => t.id === 'tab-uuid')?.savedFolderId).toBe('folder-1')
+      expect(result.current.tabs.find((t) => t.id === 'tab-uuid')?.savedLocation).toBe('library')
+      expect(tabStorageMocks.upsertSavedTab).toHaveBeenCalledOnce()
     })
   })
 })

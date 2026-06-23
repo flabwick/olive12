@@ -1,3 +1,54 @@
+/* ── vault-panel (new BEM classes) ── */
+.vault-panel {
+  position: absolute;
+  bottom: 100%;
+  left: var(--col-pad);
+  right: var(--col-pad);
+  max-width: var(--col-max);
+  min-height: 120px;
+  max-height: min(480px, 70vh);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--olive-parchment, #ede0ca);
+  border: 2px solid var(--olive-border-dark, #2c1810);
+  border-bottom: none;
+  border-radius: 0.625rem 0.625rem 0 0;
+  /* Clip the box-shadow at the bottom edge so it doesn't bleed over the dock */
+  clip-path: inset(-200px -10px 0 -10px);
+  box-shadow:
+    4px 4px 0 #b09070,
+    0 -8px 28px rgba(44, 24, 16, 0.14);
+  animation: vault-panel-up 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes vault-panel-up {
+  from { opacity: 0; transform: translateY(0.625rem); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.vault-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 3rem;
+  padding: 4px 0;
+}
+
+@media (max-width: 640px) {
+  .vault-panel {
+    max-height: 80dvh;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .vault-panel {
+    background: #1c1a14;
+    border-color: #3a3830;
+    box-shadow: 4px 4px 0 #0a0a08, 0 -8px 28px rgba(0,0,0,0.4);
+  }
+}
+
 /* ── Panel: absolute, anchored above the dock ── */
 .folder-panel {
   position: absolute;

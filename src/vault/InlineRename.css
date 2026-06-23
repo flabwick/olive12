@@ -1,0 +1,11 @@
+.vault-inline-rename {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--olive-accent, #6b7280);
+  outline: none;
+  font: inherit;
+  color: inherit;
+  padding: 0 2px;
+  min-width: 0;
+}

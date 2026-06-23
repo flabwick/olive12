@@ -46,3 +46,43 @@ export const TabEditor = {
     onSettings: () => {},
   },
 }
+
+export const VaultCardSelected = {
+  args: {
+    dockState: DOCK_STATE.BASE,
+    selectedVaultItem: {
+      item: { id: 'c1', title: 'Meeting notes', body: 'Agenda items', location: 'shelf' },
+      type: 'card',
+    },
+    onClearVaultItem: () => {},
+    onVaultAddToTab: () => {},
+    onVaultMoveToLibrary: () => {},
+    onVaultRenameCard: () => {},
+  },
+}
+
+export const VaultFolderSelected = {
+  args: {
+    dockState: DOCK_STATE.BASE,
+    selectedVaultItem: {
+      item: { id: 'f1', name: 'Work', parentId: null },
+      type: 'folder',
+    },
+    onClearVaultItem: () => {},
+    onVaultRenameFolder: () => {},
+    onVaultDeleteFolderRequest: () => {},
+  },
+}
+
+export const VaultTabSelected = {
+  args: {
+    dockState: DOCK_STATE.BASE,
+    selectedVaultItem: {
+      item: { id: 't1', name: 'Research', savedLocation: 'shelf' },
+      type: 'tab',
+    },
+    onClearVaultItem: () => {},
+    onVaultSwitchToTab: () => {},
+    onVaultDeleteTab: () => {},
+  },
+}

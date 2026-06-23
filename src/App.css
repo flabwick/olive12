@@ -39,11 +39,11 @@
   margin-inline: calc(-1 * var(--col-pad));
 }
 
-/* When the folder panel is open it floats above the content (absolute positioning),
+/* When the vault panel is open it floats above the content (absolute positioning),
    so no extra scroll range is added automatically. Extend the bottom of the feed by
    the panel's max-height so any card can be scrolled into the visible area above it. */
-.app-shell:has(.folder-panel) .app-shell__content {
-  padding-bottom: calc(50vh + 1rem);
+.app-shell:has(.vault-panel) .app-shell__content {
+  padding-bottom: calc(min(480px, 70vh) + 1rem);
 }
 
 /* Dock area: constrained to the same column envelope as content, centered.

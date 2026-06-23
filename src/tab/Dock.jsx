@@ -70,20 +70,333 @@ function CheckboxIcon() {
   )
 }
 
-function DockBtn({ active, label, title, onMouseDown, onClick, children, ariaExpanded }) {
+function CardBadgeIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <rect x="1" y="2" width="10" height="8" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="3" y1="5" x2="9" y2="5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <line x1="3" y1="7.5" x2="7" y2="7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function TabBadgeIcon() {
+  return (
+    <svg width="13" height="11" viewBox="0 0 13 11" fill="none" aria-hidden="true">
+      <path d="M1 10V3.5h3L5.5 1.5h6V10H1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function ShelfIcon() {
+  return (
+    <svg width="14" height="11" viewBox="0 0 14 11" fill="none" aria-hidden="true">
+      <path d="M1 10.5h12V7H1v3.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M1 7l2.5-6h7L13 7" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function LibraryIcon() {
+  return (
+    <svg width="14" height="12" viewBox="0 0 14 12" fill="none" aria-hidden="true">
+      <rect x="1" y="2.5" width="3" height="8.5" rx="0.5" stroke="currentColor" strokeWidth="1.4" />
+      <rect x="5" y="4" width="3" height="7" rx="0.5" stroke="currentColor" strokeWidth="1.4" />
+      <rect x="9.5" y="1" width="3.5" height="10" rx="0.5" stroke="currentColor" strokeWidth="1.4" />
+      <line x1="1" y1="11.5" x2="13" y2="11.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function DockPinIcon() {
+  return (
+    <svg width="13" height="12" viewBox="0 0 13 12" fill="none" aria-hidden="true">
+      <path d="M6.5 1v5M4.5 4.5l2 2 2-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="1" y="8" width="11" height="3.5" rx="0.75" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="12" height="13" viewBox="0 0 12 13" fill="none" aria-hidden="true">
+      <path d="M1 3h10M4 3V2h4v1M2 3l.75 8h6.5L10 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function PencilIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path d="M8.5 1.5l2 2-7 7H1.5v-2l7-7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function FolderArrowIcon() {
+  return (
+    <svg width="15" height="13" viewBox="0 0 15 13" fill="none" aria-hidden="true">
+      <path
+        d="M1.5 11V3.5C1.5 2.948 1.948 2.5 2.5 2.5H6L7.5 4H12.5C13.052 4 13.5 4.448 13.5 5V11C13.5 11.552 13.052 12 12.5 12H2.5C1.948 12 1.5 11.552 1.5 11Z"
+        stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"
+      />
+      <path
+        d="M5 8h4.5M8.5 6.5L10 8L8.5 9.5"
+        stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function BrainIcon() {
+  return (
+    <svg width="14" height="11" viewBox="0 0 16 13" fill="none" aria-hidden="true">
+      <circle cx="2.5" cy="3" r="1.5" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="2.5" cy="10" r="1.5" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="8" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="13.5" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M4 3.5l2.5 2M4 9.5l2.5-2M9.5 6.5h2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconWithPlus({ Icon }) {
+  return (
+    <span className="dock__icon-plus">
+      <Icon />
+      <span className="dock__icon-plus__mark" aria-hidden="true">+</span>
+    </span>
+  )
+}
+
+function DockBtn({ active, danger, label, title, onMouseDown, onClick, children, ariaExpanded }) {
+  const cls = [
+    'dock__btn',
+    active && 'dock__btn--active',
+    danger && 'dock__btn--danger',
+  ].filter(Boolean).join(' ')
   return (
     <button
       type="button"
-      className={`dock__btn${active ? ' dock__btn--active' : ''}`}
+      className={cls}
       aria-label={label}
       aria-pressed={active !== undefined ? active : undefined}
       aria-expanded={ariaExpanded}
-      title={title}
+      title={title ?? label}
       onMouseDown={onMouseDown}
       onClick={onClick}
     >
       {children}
     </button>
+  )
+}
+
+const VAULT_TAB_ICONS = { shelf: ShelfIcon, library: LibraryIcon, brain: BrainIcon }
+
+function VaultBrowseBar({ activeTab, onTabChange, onNewCard, onNewFolder, onClose }) {
+  return (
+    <>
+      <div className="dock__vault-tab-group" role="group" aria-label="Vault section">
+        {['shelf', 'library', 'brain'].map((tab) => {
+          const Icon = VAULT_TAB_ICONS[tab]
+          const label = tab.charAt(0).toUpperCase() + tab.slice(1)
+          return (
+            <button
+              key={tab}
+              type="button"
+              className={`dock__vault-tab${activeTab === tab ? ' dock__vault-tab--active' : ''}`}
+              aria-label={label}
+              aria-pressed={activeTab === tab}
+              onClick={() => onTabChange?.(tab)}
+            >
+              <Icon />
+            </button>
+          )
+        })}
+      </div>
+      <div className="dock__vault-actions" role="toolbar" aria-label="Vault actions">
+        <DockBtn label="New card" onClick={onNewCard}>
+          <IconWithPlus Icon={CardBadgeIcon} />
+        </DockBtn>
+        {activeTab === 'library' && (
+          <DockBtn label="New folder" onClick={onNewFolder}>
+            <IconWithPlus Icon={FolderIcon} />
+          </DockBtn>
+        )}
+      </div>
+      <div className="dock__vault-dismiss">
+        <DockBtn label="Close vault" onClick={onClose}>✕</DockBtn>
+      </div>
+    </>
+  )
+}
+
+function FolderPickBar({ selectedVaultItem, onPickRoot, onCancel }) {
+  const { item } = selectedVaultItem
+  const name = item.title ?? item.name ?? '(untitled)'
+  return (
+    <>
+      <div className="dock__vault-actions" role="toolbar" aria-label="Move to folder">
+        <span className="dock__vault-item-icon"><FolderArrowIcon /></span>
+        <span className="dock__vault-name" title={name}>{name}</span>
+        <span className="dock__sep" aria-hidden="true" />
+        <DockBtn label="Move to root" onClick={onPickRoot}>Root</DockBtn>
+      </div>
+      <div className="dock__vault-dismiss">
+        <DockBtn label="Cancel move" onClick={onCancel}>‹</DockBtn>
+      </div>
+    </>
+  )
+}
+
+function VaultSelectionBar({
+  selectedVaultItem,
+  onClear,
+  onVaultAddToTab,
+  onVaultAddToDock,
+  onVaultMoveToLibrary,
+  onVaultMoveToShelf,
+  onVaultRenameCard,
+  onVaultSwitchToTab,
+  onVaultDeleteTab,
+  onVaultRenameFolder,
+  onVaultDeleteCard,
+  onVaultDeleteFolderRequest,
+  onVaultPickFolder,
+}) {
+  const [mode, setMode] = useState('normal')
+  const [renameDraft, setRenameDraft] = useState('')
+  const { item, type } = selectedVaultItem
+  const name = item.title ?? item.name ?? '(untitled)'
+
+  function startRename() {
+    setRenameDraft(name)
+    setMode('renaming')
+  }
+
+  function commitRename() {
+    const trimmed = renameDraft.trim()
+    if (trimmed && trimmed !== name) {
+      if (type === 'card') onVaultRenameCard?.(item.id, trimmed)
+      else if (type === 'folder') onVaultRenameFolder?.(item.id, trimmed)
+    }
+    setMode('normal')
+  }
+
+  const TypeIcon = type === 'folder' ? FolderIcon : type === 'tab' ? TabBadgeIcon : CardBadgeIcon
+
+  if (mode === 'renaming') {
+    return (
+      <>
+        <div className="dock__vault-actions" role="toolbar" aria-label="Rename">
+          <span className="dock__vault-item-icon"><PencilIcon /></span>
+          <input
+            autoFocus
+            className="dock__vault-rename-input"
+            value={renameDraft}
+            onChange={(e) => setRenameDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); commitRename() }
+              if (e.key === 'Escape') setMode('normal')
+            }}
+            placeholder={name}
+            aria-label="New name"
+          />
+          <DockBtn label="Confirm rename" onClick={commitRename}>✓</DockBtn>
+        </div>
+        <div className="dock__vault-dismiss">
+          <DockBtn label="Cancel rename" onClick={() => setMode('normal')}>✕</DockBtn>
+        </div>
+      </>
+    )
+  }
+
+  if (mode === 'confirm-delete-tab') {
+    return (
+      <>
+        <div className="dock__vault-actions" role="toolbar" aria-label="Confirm remove tab">
+          <span className="dock__vault-item-icon"><TabBadgeIcon /></span>
+          <span className="dock__vault-name" title={name}>{name}</span>
+          <span className="dock__sep" aria-hidden="true" />
+          <span className="dock__vault-confirm-label">Remove?</span>
+          <DockBtn label="Confirm remove tab" danger onClick={() => { onVaultDeleteTab?.(item.id); onClear() }}>
+            <TrashIcon />
+          </DockBtn>
+        </div>
+        <div className="dock__vault-dismiss">
+          <DockBtn label="Cancel" onClick={() => setMode('normal')}>‹</DockBtn>
+        </div>
+      </>
+    )
+  }
+
+  if (mode === 'confirm-delete-card') {
+    return (
+      <>
+        <div className="dock__vault-actions" role="toolbar" aria-label="Confirm delete card">
+          <span className="dock__vault-item-icon"><CardBadgeIcon /></span>
+          <span className="dock__vault-name" title={name}>{name}</span>
+          <span className="dock__sep" aria-hidden="true" />
+          <span className="dock__vault-confirm-label">Delete permanently?</span>
+          <DockBtn label="Confirm delete card" danger onClick={() => { onVaultDeleteCard?.(item.id); onClear() }}>
+            <TrashIcon />
+          </DockBtn>
+        </div>
+        <div className="dock__vault-dismiss">
+          <DockBtn label="Cancel" onClick={() => setMode('normal')}>‹</DockBtn>
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <div className="dock__vault-actions" role="toolbar" aria-label="Vault item actions">
+        <span className="dock__vault-item-icon"><TypeIcon /></span>
+        <span className="dock__vault-name" title={name}>{name}</span>
+        <span className="dock__sep" aria-hidden="true" />
+        {type === 'card' && (
+          <DockBtn label="Add to tab" onClick={() => { onVaultAddToTab?.(item.id); onClear() }}>↗</DockBtn>
+        )}
+        {type === 'card' && (
+          <DockBtn label="Open in dock" onClick={() => { onVaultAddToDock?.(item.id) }}><DockPinIcon /></DockBtn>
+        )}
+        {type === 'card' && item.location === 'shelf' && (
+          <DockBtn label="Move to library" onClick={() => { onVaultMoveToLibrary?.(item.id, null); onClear() }}>
+            <IconWithPlus Icon={LibraryIcon} />
+          </DockBtn>
+        )}
+        {type === 'card' && item.location === 'library' && (
+          <DockBtn label="Move to shelf" onClick={() => { onVaultMoveToShelf?.(item.id); onClear() }}>
+            <IconWithPlus Icon={ShelfIcon} />
+          </DockBtn>
+        )}
+        {type === 'card' && (
+          <DockBtn label="Rename card" onClick={startRename}><PencilIcon /></DockBtn>
+        )}
+        {type === 'card' && (
+          <DockBtn label="Delete card" danger onClick={() => setMode('confirm-delete-card')}><TrashIcon /></DockBtn>
+        )}
+        {(type === 'card' || type === 'tab') && (
+          <DockBtn label="Move to folder" onClick={() => onVaultPickFolder?.()}><FolderArrowIcon /></DockBtn>
+        )}
+        {type === 'tab' && (
+          <DockBtn label="Switch to tab" onClick={() => { onVaultSwitchToTab?.(item.id); onClear() }}>→</DockBtn>
+        )}
+        {type === 'tab' && (
+          <DockBtn label="Remove tab" onClick={() => setMode('confirm-delete-tab')}><TrashIcon /></DockBtn>
+        )}
+        {type === 'folder' && (
+          <DockBtn label="Rename folder" onClick={startRename}><PencilIcon /></DockBtn>
+        )}
+        {type === 'folder' && (
+          <DockBtn label="Delete folder" danger onClick={() => onVaultDeleteFolderRequest?.(item.id)}><TrashIcon /></DockBtn>
+        )}
+      </div>
+      <div className="dock__vault-dismiss">
+        <DockBtn label="Back to vault" title="Back to vault" onClick={onClear}>‹</DockBtn>
+      </div>
+    </>
   )
 }
 
@@ -208,6 +521,27 @@ export function Dock({
   onEmbedOpen,
   lightningActive = false,
   onLightningToggle,
+  vaultOpen = false,
+  vaultTab = 'shelf',
+  onVaultTabChange,
+  onVaultNewCard,
+  onVaultNewFolder,
+  selectedVaultItem = null,
+  onClearVaultItem,
+  onVaultAddToTab,
+  onVaultAddToDock,
+  onVaultMoveToLibrary,
+  onVaultMoveToShelf,
+  onVaultRenameCard,
+  onVaultSwitchToTab,
+  onVaultDeleteTab,
+  onVaultRenameFolder,
+  onVaultDeleteCard,
+  onVaultDeleteFolderRequest,
+  onVaultMoveToFolder,
+  pickingFolder = false,
+  onVaultPickFolder,
+  onVaultPickFolderCancel,
 }) {
   const { activeEditor } = useRichTextEditorContext()
 
@@ -219,6 +553,54 @@ export function Dock({
           lightningActive={lightningActive}
           onLightningToggle={onLightningToggle}
           onEmbedOpen={onEmbedOpen}
+        />
+      </div>
+    )
+  }
+
+  if (vaultOpen && !selectedVaultItem && dockState === DOCK_STATE.BASE) {
+    return (
+      <div className="dock dock--vault">
+        <VaultBrowseBar
+          activeTab={vaultTab}
+          onTabChange={onVaultTabChange}
+          onNewCard={onVaultNewCard}
+          onNewFolder={onVaultNewFolder}
+          onClose={onFolderOpen}
+        />
+      </div>
+    )
+  }
+
+  if (pickingFolder && selectedVaultItem && dockState === DOCK_STATE.BASE) {
+    return (
+      <div className="dock dock--vault">
+        <FolderPickBar
+          selectedVaultItem={selectedVaultItem}
+          onPickRoot={() => onVaultMoveToFolder?.(null)}
+          onCancel={onVaultPickFolderCancel}
+        />
+      </div>
+    )
+  }
+
+  if (selectedVaultItem && dockState === DOCK_STATE.BASE) {
+    return (
+      <div className="dock dock--vault">
+        <VaultSelectionBar
+          selectedVaultItem={selectedVaultItem}
+          onClear={onClearVaultItem}
+          onVaultAddToTab={onVaultAddToTab}
+          onVaultAddToDock={onVaultAddToDock}
+          onVaultMoveToLibrary={onVaultMoveToLibrary}
+          onVaultMoveToShelf={onVaultMoveToShelf}
+          onVaultRenameCard={onVaultRenameCard}
+          onVaultSwitchToTab={onVaultSwitchToTab}
+          onVaultDeleteTab={onVaultDeleteTab}
+          onVaultRenameFolder={onVaultRenameFolder}
+          onVaultDeleteCard={onVaultDeleteCard}
+          onVaultDeleteFolderRequest={onVaultDeleteFolderRequest}
+          onVaultPickFolder={onVaultPickFolder}
         />
       </div>
     )

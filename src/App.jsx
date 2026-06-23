@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AuthForm } from './auth/AuthForm'
+import { collectDescendantIds } from './folder/createFolder'
+import { DeleteFolderModal } from './vault/DeleteFolderModal'
 import { useRichTextEditorContext, RichTextEditorProvider } from './card/RichTextEditorContext'
 import { EmbedActionsProvider, EmbedEntriesProvider } from './card/EmbedEntriesContext'
 import { createCard } from './card/createCard'
@@ -50,7 +52,17 @@ function AppShell({ userId }) {
     unhide,
     saveToShelf,
     moveToLibrary,
+    renameCard,
+    moveCardToFolder,
+    moveCardToShelf,
     createFolder,
+    renameFolder,
+    deleteFolder,
+    moveFolder,
+    deleteSavedTab,
+    bulkMoveCards,
+    bulkDeleteCards,
+    bulkMoveTabs,
     runDockPrompt,
     promptLoading,
     promptError,
@@ -81,8 +93,11 @@ function AppShell({ userId }) {
   const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false)
   const [indexDebugOpen, setIndexDebugOpen] = useState(false)
   const [lightningActive, setLightningActive] = useState(false)
-  const [vaultInitialTab, setVaultInitialTab] = useState('shelf')
+  const [vaultTab, setVaultTab] = useState('shelf')
   const [highlightedCardId, setHighlightedCardId] = useState(null)
+  const [selectedVaultItem, setSelectedVaultItem] = useState(null)
+  const [pickingFolder, setPickingFolder] = useState(false)
+  const [deleteFolderModal, setDeleteFolderModal] = useState(null)
 
   function handleOpenAsPortal(cardId) {
     addPortalCard(cardId)
@@ -97,7 +112,7 @@ function AppShell({ userId }) {
   function handleLocate(targetCardId) {
     const card = cardsById[targetCardId]
     if (!card) return
-    setVaultInitialTab(card.location === 'library' ? 'library' : 'shelf')
+    setVaultTab(card.location === 'library' ? 'library' : 'shelf')
     setHighlightedCardId(targetCardId)
     setFolderPanelOpen(true)
   }
@@ -108,7 +123,128 @@ function AppShell({ userId }) {
 
   function handleFolderOpen() {
     closeDockCard()
-    setFolderPanelOpen((v) => !v)
+    setFolderPanelOpen((v) => {
+      if (v) {
+        setSelectedVaultItem(null)
+        setPickingFolder(false)
+      }
+      return !v
+    })
+  }
+
+  function handleSelectVaultItem(item, type) {
+    setSelectedVaultItem({ item, type })
+  }
+
+  function handleClearVaultItem() {
+    setSelectedVaultItem(null)
+  }
+
+  function handleVaultSwitchToTab(tabId) {
+    switchTab(tabId)
+    setFolderPanelOpen(false)
+    setSelectedVaultItem(null)
+  }
+
+  function handleVaultTabChange(tab) {
+    setVaultTab(tab)
+    setSelectedVaultItem(null)
+  }
+
+  async function handleVaultNewCard() {
+    const card = { ...createCard({ title: '', body: '' }), location: 'shelf' }
+    await putCard(card)
+    addToCardsById(card)
+  }
+
+  function handleVaultNewFolder() {
+    createFolder()
+  }
+
+  function handleVaultPickFolder() {
+    setPickingFolder(true)
+    setFolderPanelOpen(true)
+    setVaultTab('library')
+  }
+
+  function handlePickFolderCancel() {
+    setPickingFolder(false)
+  }
+
+  function handleVaultRenameCard(cardId, title) {
+    renameCard(cardId, title)
+    if (selectedVaultItem?.item?.id === cardId) {
+      setSelectedVaultItem((prev) => ({ ...prev, item: { ...prev.item, title } }))
+    }
+  }
+
+  function handleVaultRenameFolder(folderId, name) {
+    renameFolder(folderId, name)
+    if (selectedVaultItem?.item?.id === folderId) {
+      setSelectedVaultItem((prev) => ({ ...prev, item: { ...prev.item, name } }))
+    }
+  }
+
+  function handleVaultDeleteCard(cardId) {
+    removeCard(cardId)
+    setSelectedVaultItem(null)
+  }
+
+  function handleVaultDeleteFolderRequest(folderId) {
+    const folder = folders.find((f) => f.id === folderId)
+    if (!folder) return
+    const descendantIds = collectDescendantIds(folders, folderId)
+    const allFolderIds = new Set([folderId, ...descendantIds])
+    const cardCount = libraryEntries.filter((c) => allFolderIds.has(c.folderId)).length
+    const folderCount = descendantIds.length
+    if (cardCount + folderCount === 0) {
+      deleteFolder(folderId, 'delete-contents')
+      setSelectedVaultItem(null)
+    } else {
+      setDeleteFolderModal({ folderId, name: folder.name, cardCount, folderCount })
+    }
+  }
+
+  function handleConfirmDeleteFolder() {
+    if (!deleteFolderModal) return
+    deleteFolder(deleteFolderModal.folderId, 'delete-contents')
+    setDeleteFolderModal(null)
+    setSelectedVaultItem(null)
+  }
+
+  function handleVaultMoveToFolder(folderId) {
+    if (!selectedVaultItem) return
+    const { item, type } = selectedVaultItem
+    if (type === 'card') {
+      if (item.location === 'library') {
+        moveCardToFolder(item.id, folderId)
+      } else {
+        moveToLibrary(item.id, folderId)
+      }
+    } else if (type === 'tab') {
+      moveTabToLibrary(item.id, folderId)
+    }
+    setPickingFolder(false)
+    setSelectedVaultItem(null)
+  }
+
+  function handleVaultOpenInDock(cardId) {
+    addToDock(cardId)
+    setFolderPanelOpen(false)
+    setSelectedVaultItem(null)
+    openDockCard(cardId)
+  }
+
+  function handleOpenDockCard(cardId) {
+    setFolderPanelOpen(false)
+    setSelectedVaultItem(null)
+    openDockCard(cardId)
+  }
+
+  function handleAddDockCard() {
+    setFolderPanelOpen(false)
+    setSelectedVaultItem(null)
+    createAndPinCard(addToCardsById)
   }
 
   async function handlePromptSubmit(text) {
@@ -203,13 +339,23 @@ function AppShell({ userId }) {
             onMoveToLibrary={moveToLibrary}
             onMoveTabToLibrary={handleMoveTabToLibrary}
             onCreateFolder={createFolder}
-            onClose={() => setFolderPanelOpen(false)}
+            onClose={() => { setFolderPanelOpen(false); setSelectedVaultItem(null) }}
             onOpenAsPortal={handleOpenAsPortal}
             onOpenTab={handleOpenSavedTab}
-            initialTab={vaultInitialTab}
+            activeTab={vaultTab}
+            onTabChange={handleVaultTabChange}
             highlightedCardId={highlightedCardId}
+            activeVaultItemId={selectedVaultItem?.item?.id ?? null}
+            onSelectVaultItem={handleSelectVaultItem}
+            pickFolderMode={pickingFolder}
+            onFolderPicked={(folder) => handleVaultMoveToFolder(folder.id)}
             brainFeedItems={brainFeedItems}
             onReindex={reindexCard}
+            moveCardToFolder={moveCardToFolder}
+            moveFolder={moveFolder}
+            bulkMoveCards={bulkMoveCards}
+            bulkDeleteCards={bulkDeleteCards}
+            bulkMoveTabs={bulkMoveTabs}
           />
         )}
         {promptOpen && (
@@ -237,18 +383,48 @@ function AppShell({ userId }) {
             onMoveToTab={() => moveDockCardToTab(activeDockCardId, addTabCard)}
           />
         )}
+        {deleteFolderModal && (
+          <DeleteFolderModal
+            name={deleteFolderModal.name}
+            cardCount={deleteFolderModal.cardCount}
+            folderCount={deleteFolderModal.folderCount}
+            onConfirm={handleConfirmDeleteFolder}
+            onCancel={() => setDeleteFolderModal(null)}
+          />
+        )}
         <IndexDebugPanel open={indexDebugOpen} onClose={() => setIndexDebugOpen(false)} />
         <Dock
           dockState={dockState}
           dockCardEntries={dockCardEntries}
           activeDockCardId={activeDockCardId}
-          onAddDockCard={() => createAndPinCard(addToCardsById)}
-          onOpenDockCard={openDockCard}
+          onAddDockCard={handleAddDockCard}
+          onOpenDockCard={handleOpenDockCard}
           onFolderOpen={handleFolderOpen}
           onSettings={handleSettings}
           onEmbedOpen={handleEmbedOpen}
           lightningActive={lightningActive}
           onLightningToggle={() => setLightningActive((v) => !v)}
+          vaultOpen={folderPanelOpen}
+          vaultTab={vaultTab}
+          onVaultTabChange={handleVaultTabChange}
+          onVaultNewCard={handleVaultNewCard}
+          onVaultNewFolder={handleVaultNewFolder}
+          selectedVaultItem={selectedVaultItem}
+          onClearVaultItem={handleClearVaultItem}
+          onVaultAddToTab={addPortalCard}
+          onVaultAddToDock={handleVaultOpenInDock}
+          onVaultMoveToLibrary={moveToLibrary}
+          onVaultMoveToShelf={moveCardToShelf}
+          onVaultRenameCard={handleVaultRenameCard}
+          onVaultSwitchToTab={handleVaultSwitchToTab}
+          onVaultDeleteTab={deleteSavedTab}
+          onVaultRenameFolder={handleVaultRenameFolder}
+          onVaultDeleteCard={handleVaultDeleteCard}
+          onVaultDeleteFolderRequest={handleVaultDeleteFolderRequest}
+          onVaultMoveToFolder={handleVaultMoveToFolder}
+          pickingFolder={pickingFolder}
+          onVaultPickFolder={handleVaultPickFolder}
+          onVaultPickFolderCancel={handlePickFolderCancel}
         />
       </div>
       {tabSwitcherOpen && (

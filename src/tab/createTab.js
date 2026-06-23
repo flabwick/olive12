@@ -62,7 +62,8 @@ export function createTabCard({ tabId, cardId, position }) {
 }
 
 export function nextPosition(tabCards) {
-  return tabCards.length
+  if (tabCards.length === 0) return 0
+  return Math.max(...tabCards.map((tc) => tc.position)) + 1
 }
 
 export function reorderTabCard(tabCards, cardId, toPosition) {

@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildFolderTree, createFolder, flattenFolderTree } from './createFolder'
+import {
+  buildFolderTree,
+  collectDescendantIds,
+  createFolder,
+  flattenFolderTree,
+  isFolderDescendant,
+} from './createFolder'
 
 describe('createFolder', () => {
   beforeEach(() => {
@@ -94,5 +100,66 @@ describe('flattenFolderTree', () => {
     const workIndex = flat.findIndex((item) => item.folder.id === 'f1')
     const projectsIndex = flat.findIndex((item) => item.folder.id === 'f3')
     expect(projectsIndex).toBe(workIndex + 1)
+  })
+})
+
+describe('collectDescendantIds', () => {
+  const folders = [
+    { id: 'f1', name: 'Root', parentId: null },
+    { id: 'f2', name: 'Child', parentId: 'f1' },
+    { id: 'f3', name: 'Grandchild', parentId: 'f2' },
+    { id: 'f4', name: 'Sibling', parentId: 'f1' },
+    { id: 'f5', name: 'Other root', parentId: null },
+  ]
+
+  it('returns empty array for a leaf folder', () => {
+    expect(collectDescendantIds(folders, 'f3')).toEqual([])
+  })
+
+  it('returns direct children for a folder with only immediate children', () => {
+    const ids = collectDescendantIds(folders, 'f2')
+    expect(ids).toEqual(['f3'])
+  })
+
+  it('returns all transitive descendants', () => {
+    const ids = collectDescendantIds(folders, 'f1')
+    expect(ids).toContain('f2')
+    expect(ids).toContain('f3')
+    expect(ids).toContain('f4')
+    expect(ids).not.toContain('f5')
+    expect(ids).not.toContain('f1')
+  })
+
+  it('returns empty array for non-existent folderId', () => {
+    expect(collectDescendantIds(folders, 'nope')).toEqual([])
+  })
+})
+
+describe('isFolderDescendant', () => {
+  const folders = [
+    { id: 'f1', name: 'Root', parentId: null },
+    { id: 'f2', name: 'Child', parentId: 'f1' },
+    { id: 'f3', name: 'Grandchild', parentId: 'f2' },
+    { id: 'f4', name: 'Other root', parentId: null },
+  ]
+
+  it('returns true when targetId is a direct child', () => {
+    expect(isFolderDescendant(folders, 'f1', 'f2')).toBe(true)
+  })
+
+  it('returns true when targetId is a grandchild', () => {
+    expect(isFolderDescendant(folders, 'f1', 'f3')).toBe(true)
+  })
+
+  it('returns false when targetId is not a descendant', () => {
+    expect(isFolderDescendant(folders, 'f1', 'f4')).toBe(false)
+  })
+
+  it('returns false when folderId === targetId (not its own descendant)', () => {
+    expect(isFolderDescendant(folders, 'f1', 'f1')).toBe(false)
+  })
+
+  it('returns false when folderId is actually a descendant of targetId', () => {
+    expect(isFolderDescendant(folders, 'f3', 'f1')).toBe(false)
   })
 })

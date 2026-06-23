@@ -148,6 +148,54 @@ describe('syncDirtyCardsForUser', () => {
     expect(storage.fetchRemoteCardById).not.toHaveBeenCalled()
     expect(storage.upsertRemoteCard).not.toHaveBeenCalled()
   })
+
+  it('localToRemote includes folder_id and config in upserted row', async () => {
+    const card = createCard({ title: 'Portal card', body: '' })
+    const cardWithFolder = { ...card, folderId: 'folder-abc', config: { url: 'https://example.com' } }
+    await db.cards.put({ ...cardWithFolder, dirty: true })
+
+    const storage = makeFakeStorage()
+    await syncDirtyCardsForUser(userId, storage)
+
+    expect(storage.upsertRemoteCard).toHaveBeenCalledOnce()
+    const upserted = storage.upsertRemoteCard.mock.calls[0][0]
+    expect(upserted.folder_id).toBe('folder-abc')
+    expect(upserted.config).toEqual({ url: 'https://example.com' })
+  })
+
+  it('localToRemote sends null for missing folderId and config', async () => {
+    const card = createCard({ title: 'Plain card', body: 'text' })
+    await db.cards.put({ ...card, dirty: true })
+
+    const storage = makeFakeStorage()
+    await syncDirtyCardsForUser(userId, storage)
+
+    const upserted = storage.upsertRemoteCard.mock.calls[0][0]
+    expect(upserted.folder_id).toBeNull()
+    expect(upserted.config).toEqual({})
+  })
+
+  it('remoteToLocal maps folder_id and config onto local card on pull', async () => {
+    const card = createCard({ title: 'Old', body: 'old' })
+    await putCard(card)
+
+    const newerRemote = makeRemoteRow(card, userId, {
+      title: 'Remote',
+      body: { kind: 'plain', text: 'remote body' },
+      folder_id: 'folder-xyz',
+      config: { url: 'https://olive.app' },
+      updated_at: new Date(BASE_TS + 10000).toISOString(),
+    })
+    const storage = makeFakeStorage({
+      fetchRemoteCardById: vi.fn().mockResolvedValue(newerRemote),
+    })
+
+    await syncDirtyCardsForUser(userId, storage)
+
+    const stored = await db.cards.get(card.id)
+    expect(stored.folderId).toBe('folder-xyz')
+    expect(stored.config).toEqual({ url: 'https://olive.app' })
+  })
 })
 
 describe('pullRemoteCardsForUser', () => {
@@ -270,6 +318,31 @@ describe('pullRemoteCardsForUser', () => {
     const storage = makeFakeStorage()
     const newIds = await pullRemoteCardsForUser(userId, storage)
     expect(newIds).toEqual([])
+  })
+
+  it('remoteToLocal maps folder_id and config on pull', async () => {
+    const remoteRow = {
+      id: 'remote-card-id',
+      user_id: userId,
+      type: 'portal',
+      title: 'Portal',
+      body: { kind: 'plain', text: '' },
+      folder_id: 'folder-abc',
+      config: { url: 'https://example.com' },
+      location: 'library',
+      content_hash: null,
+      created_at: new Date(BASE_TS).toISOString(),
+      updated_at: new Date(BASE_TS).toISOString(),
+    }
+    const storage = makeFakeStorage({
+      fetchRemoteCardsForUser: vi.fn().mockResolvedValue([remoteRow]),
+    })
+
+    await pullRemoteCardsForUser(userId, storage)
+
+    const stored = await db.cards.get('remote-card-id')
+    expect(stored.folderId).toBe('folder-abc')
+    expect(stored.config).toEqual({ url: 'https://example.com' })
   })
 })
 
