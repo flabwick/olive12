@@ -76,6 +76,10 @@
   font-weight: 500;
 }
 
+.vault-folder-node__row--editing {
+  cursor: default;
+}
+
 .vault-folder-node__children {
   display: flex;
   flex-direction: column;

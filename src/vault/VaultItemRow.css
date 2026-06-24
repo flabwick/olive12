@@ -57,6 +57,10 @@
   color: var(--olive-amber, #c8a87a);
 }
 
+.vault-item-row--editing {
+  cursor: default;
+}
+
 .vault-item-row__name {
   font-size: 13px;
   line-height: 1;

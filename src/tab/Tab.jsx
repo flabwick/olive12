@@ -51,6 +51,7 @@ export function Tab({
         if (entry.card.type === 'portal') {
           const targetId = entry.card.config?.target_card_id
           const target = targetId ? cardsById[targetId] : null
+          const portalFlipped = isFlipped ? isFlipped(entry.card.id) : false
           return (
             <li key={entry.card.id} className="tab__item">
               <PortalCard
@@ -58,6 +59,8 @@ export function Tab({
                 cardsById={cardsById}
                 {...sharedProps}
                 {...indexProps}
+                flipped={portalFlipped}
+                onFlip={flipCard ? () => flipCard(entry.card.id) : undefined}
                 onUpdate={target && onUpdate ? (fields) => onUpdate(target.id, fields) : undefined}
                 onLocate={target && onLocate ? () => onLocate(target.id) : undefined}
               />
@@ -65,6 +68,7 @@ export function Tab({
           )
         }
 
+        const cardFlipped = isFlipped ? isFlipped(entry.card.id) : false
         return (
           <li key={entry.card.id} className="tab__item">
             <Card
@@ -74,6 +78,8 @@ export function Tab({
               cardId={entry.card.id}
               createdAt={entry.card.createdAt}
               updatedAt={entry.card.updatedAt}
+              flipped={cardFlipped}
+              onFlip={flipCard ? () => flipCard(entry.card.id) : undefined}
               {...sharedProps}
               {...indexProps}
               onUpdate={onUpdate ? (fields) => onUpdate(entry.card.id, fields) : undefined}

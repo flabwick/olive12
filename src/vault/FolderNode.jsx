@@ -1,3 +1,4 @@
+import { InlineRename } from './InlineRename'
 import './FolderNode.css'
 
 function CaretIcon() {
@@ -23,26 +24,40 @@ export function FolderNode({
   onClick,
   depth = 0,
   active = false,
+  editing = false,
+  checkConflict,
+  onRenameCommit,
+  onRenameCancel,
   children,
 }) {
   return (
     <div className={`vault-folder-node${isOpen ? ' vault-folder-node--open' : ''}`} style={{ '--depth': depth }}>
       <div
-        className={`vault-folder-node__row${active ? ' vault-folder-node__row--active' : ''}`}
-        onClick={() => onClick?.(folder)}
+        className={`vault-folder-node__row${active ? ' vault-folder-node__row--active' : ''}${editing ? ' vault-folder-node__row--editing' : ''}`}
+        onClick={editing ? undefined : () => onClick?.(folder)}
       >
         <button
           className={`vault-folder-node__caret${isOpen ? ' vault-folder-node__caret--open' : ''}`}
           onClick={(e) => { e.stopPropagation(); onToggle?.() }}
           aria-label={isOpen ? 'Collapse folder' : 'Expand folder'}
           aria-expanded={isOpen}
+          tabIndex={editing ? -1 : 0}
         >
           <CaretIcon />
         </button>
         <span className="vault-folder-node__icon" aria-hidden="true">
           <FolderIcon />
         </span>
-        <span className="vault-folder-node__name">{folder.name}</span>
+        {editing ? (
+          <InlineRename
+            value={folder.name}
+            checkConflict={checkConflict}
+            onCommit={onRenameCommit}
+            onCancel={onRenameCancel}
+          />
+        ) : (
+          <span className="vault-folder-node__name">{folder.name}</span>
+        )}
       </div>
       {isOpen && children && (
         <div className="vault-folder-node__children">{children}</div>

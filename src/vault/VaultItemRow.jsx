@@ -1,3 +1,4 @@
+import { InlineRename } from './InlineRename'
 import './VaultItemRow.css'
 
 function CardFileIcon() {
@@ -29,6 +30,10 @@ export function VaultItemRow({
   active = false,
   selected = false,
   selectMode = false,
+  editing = false,
+  checkConflict,
+  onRenameCommit,
+  onRenameCancel,
   onSelect,
   onClick,
 }) {
@@ -37,12 +42,14 @@ export function VaultItemRow({
     highlighted && 'vault-item-row--highlighted',
     active && 'vault-item-row--active',
     selected && 'vault-item-row--selected',
+    editing && 'vault-item-row--editing',
     `vault-item-row--${type}`,
   ]
     .filter(Boolean)
     .join(' ')
 
   function handleClick() {
+    if (editing) return
     if (selectMode) onSelect?.()
     else onClick?.()
   }
@@ -51,7 +58,7 @@ export function VaultItemRow({
 
   return (
     <div className={cls} style={{ '--depth': depth }} onClick={handleClick}>
-      {selectMode ? (
+      {selectMode && !editing ? (
         <input
           type="checkbox"
           className="vault-item-row__checkbox"
@@ -66,7 +73,16 @@ export function VaultItemRow({
       <span className="vault-item-row__icon" aria-hidden="true">
         <Icon />
       </span>
-      <span className="vault-item-row__name">{title}</span>
+      {editing ? (
+        <InlineRename
+          value={title}
+          checkConflict={checkConflict}
+          onCommit={onRenameCommit}
+          onCancel={onRenameCancel}
+        />
+      ) : (
+        <span className="vault-item-row__name">{title}</span>
+      )}
     </div>
   )
 }

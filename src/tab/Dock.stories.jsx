@@ -57,7 +57,7 @@ export const VaultCardSelected = {
     onClearVaultItem: () => {},
     onVaultAddToTab: () => {},
     onVaultMoveToLibrary: () => {},
-    onVaultRenameCard: () => {},
+    onVaultStartInlineRename: () => {},
   },
 }
 
@@ -69,7 +69,7 @@ export const VaultFolderSelected = {
       type: 'folder',
     },
     onClearVaultItem: () => {},
-    onVaultRenameFolder: () => {},
+    onVaultStartInlineRename: () => {},
     onVaultDeleteFolderRequest: () => {},
   },
 }

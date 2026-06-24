@@ -344,33 +344,20 @@ describe('Dock — vault selection state', () => {
     expect(onClearVaultItem).toHaveBeenCalledOnce()
   })
 
-  it('switches to rename mode when Rename card is clicked', async () => {
+  it('calls onVaultStartInlineRename and clears selection when Rename card is clicked', async () => {
+    const onVaultStartInlineRename = vi.fn()
+    const onClearVaultItem = vi.fn()
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
-        onClearVaultItem={vi.fn()}
+        onVaultStartInlineRename={onVaultStartInlineRename}
+        onClearVaultItem={onClearVaultItem}
       />,
     )
     await userEvent.click(screen.getByRole('button', { name: 'Rename card' }))
-    expect(screen.getByRole('textbox', { name: 'New name' })).toBeInTheDocument()
-  })
-
-  it('calls onVaultRenameCard when rename is committed with Enter', async () => {
-    const onVaultRenameCard = vi.fn()
-    wrap(
-      <Dock
-        dockState={DOCK_STATE.BASE}
-        selectedVaultItem={{ item: shelfCard, type: 'card' }}
-        onVaultRenameCard={onVaultRenameCard}
-        onClearVaultItem={vi.fn()}
-      />,
-    )
-    await userEvent.click(screen.getByRole('button', { name: 'Rename card' }))
-    const input = screen.getByRole('textbox', { name: 'New name' })
-    await userEvent.clear(input)
-    await userEvent.type(input, 'Updated title{Enter}')
-    expect(onVaultRenameCard).toHaveBeenCalledWith('c1', 'Updated title')
+    expect(onVaultStartInlineRename).toHaveBeenCalledWith(shelfCard.id, 'card')
+    expect(onClearVaultItem).toHaveBeenCalledOnce()
   })
 
   it('shows Switch to tab and Remove tab for saved tabs', () => {

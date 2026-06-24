@@ -256,60 +256,18 @@ function VaultSelectionBar({
   onVaultAddToDock,
   onVaultMoveToLibrary,
   onVaultMoveToShelf,
-  onVaultRenameCard,
   onVaultSwitchToTab,
   onVaultDeleteTab,
-  onVaultRenameFolder,
   onVaultDeleteCard,
   onVaultDeleteFolderRequest,
   onVaultPickFolder,
+  onVaultStartInlineRename,
 }) {
   const [mode, setMode] = useState('normal')
-  const [renameDraft, setRenameDraft] = useState('')
   const { item, type } = selectedVaultItem
   const name = item.title ?? item.name ?? '(untitled)'
 
-  function startRename() {
-    setRenameDraft(name)
-    setMode('renaming')
-  }
-
-  function commitRename() {
-    const trimmed = renameDraft.trim()
-    if (trimmed && trimmed !== name) {
-      if (type === 'card') onVaultRenameCard?.(item.id, trimmed)
-      else if (type === 'folder') onVaultRenameFolder?.(item.id, trimmed)
-    }
-    setMode('normal')
-  }
-
   const TypeIcon = type === 'folder' ? FolderIcon : type === 'tab' ? TabBadgeIcon : CardBadgeIcon
-
-  if (mode === 'renaming') {
-    return (
-      <>
-        <div className="dock__vault-actions" role="toolbar" aria-label="Rename">
-          <span className="dock__vault-item-icon"><PencilIcon /></span>
-          <input
-            autoFocus
-            className="dock__vault-rename-input"
-            value={renameDraft}
-            onChange={(e) => setRenameDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); commitRename() }
-              if (e.key === 'Escape') setMode('normal')
-            }}
-            placeholder={name}
-            aria-label="New name"
-          />
-          <DockBtn label="Confirm rename" onClick={commitRename}>✓</DockBtn>
-        </div>
-        <div className="dock__vault-dismiss">
-          <DockBtn label="Cancel rename" onClick={() => setMode('normal')}>✕</DockBtn>
-        </div>
-      </>
-    )
-  }
 
   if (mode === 'confirm-delete-tab') {
     return (
@@ -372,7 +330,7 @@ function VaultSelectionBar({
           </DockBtn>
         )}
         {type === 'card' && (
-          <DockBtn label="Rename card" onClick={startRename}><PencilIcon /></DockBtn>
+          <DockBtn label="Rename card" onClick={() => { onVaultStartInlineRename?.(item.id, 'card'); onClear() }}><PencilIcon /></DockBtn>
         )}
         {type === 'card' && (
           <DockBtn label="Delete card" danger onClick={() => setMode('confirm-delete-card')}><TrashIcon /></DockBtn>
@@ -387,7 +345,7 @@ function VaultSelectionBar({
           <DockBtn label="Remove tab" onClick={() => setMode('confirm-delete-tab')}><TrashIcon /></DockBtn>
         )}
         {type === 'folder' && (
-          <DockBtn label="Rename folder" onClick={startRename}><PencilIcon /></DockBtn>
+          <DockBtn label="Rename folder" onClick={() => { onVaultStartInlineRename?.(item.id, 'folder'); onClear() }}><PencilIcon /></DockBtn>
         )}
         {type === 'folder' && (
           <DockBtn label="Delete folder" danger onClick={() => onVaultDeleteFolderRequest?.(item.id)}><TrashIcon /></DockBtn>
@@ -532,13 +490,12 @@ export function Dock({
   onVaultAddToDock,
   onVaultMoveToLibrary,
   onVaultMoveToShelf,
-  onVaultRenameCard,
   onVaultSwitchToTab,
   onVaultDeleteTab,
-  onVaultRenameFolder,
   onVaultDeleteCard,
   onVaultDeleteFolderRequest,
   onVaultMoveToFolder,
+  onVaultStartInlineRename,
   pickingFolder = false,
   onVaultPickFolder,
   onVaultPickFolderCancel,
@@ -594,13 +551,12 @@ export function Dock({
           onVaultAddToDock={onVaultAddToDock}
           onVaultMoveToLibrary={onVaultMoveToLibrary}
           onVaultMoveToShelf={onVaultMoveToShelf}
-          onVaultRenameCard={onVaultRenameCard}
           onVaultSwitchToTab={onVaultSwitchToTab}
           onVaultDeleteTab={onVaultDeleteTab}
-          onVaultRenameFolder={onVaultRenameFolder}
           onVaultDeleteCard={onVaultDeleteCard}
           onVaultDeleteFolderRequest={onVaultDeleteFolderRequest}
           onVaultPickFolder={onVaultPickFolder}
+          onVaultStartInlineRename={onVaultStartInlineRename}
         />
       </div>
     )

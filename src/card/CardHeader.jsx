@@ -80,6 +80,15 @@ function CloseIcon() {
   )
 }
 
+function FlipIcon() {
+  return (
+    <svg viewBox="0 0 12 10" width="12" height="10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 3H10M8 1l2 2-2 2" />
+      <path d="M10 7H2M4 5l-2 2 2 2" />
+    </svg>
+  )
+}
+
 export function CardHeader({
   title,
   editing = false,
@@ -94,11 +103,12 @@ export function CardHeader({
   onSaveToShelf,
   onToggleFold,
   onToggleHide,
+  onFlip,
   onSendToDock,
   onSendToTab,
   onClose,
 }) {
-  const hasControls = onSaveToShelf || onToggleHide || onSendToDock || onSendToTab || onClose
+  const hasControls = onSaveToShelf || onToggleHide || onFlip || onSendToDock || onSendToTab || onClose
 
   return (
     <div className="card-header">
@@ -190,6 +200,16 @@ export function CardHeader({
               aria-label="Move to tab"
             >
               <SendToTabIcon />
+            </button>
+          )}
+          {onFlip && (
+            <button
+              type="button"
+              className="card-header__control"
+              onClick={onFlip}
+              aria-label="Flip card"
+            >
+              <FlipIcon />
             </button>
           )}
           {onClose && (

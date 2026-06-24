@@ -8,4 +8,16 @@
   color: inherit;
   padding: 0 2px;
   min-width: 0;
+  transition: border-color 0.1s;
+}
+
+.vault-inline-rename--conflict {
+  border-bottom-color: #e53e3e;
+  color: #e53e3e;
+  animation: inline-rename-flash 0.3s ease;
+}
+
+@keyframes inline-rename-flash {
+  0%   { background: rgba(229, 62, 62, 0.18); }
+  100% { background: transparent; }
 }

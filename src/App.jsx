@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { AuthForm } from './auth/AuthForm'
 import { collectDescendantIds } from './folder/createFolder'
 import { DeleteFolderModal } from './vault/DeleteFolderModal'
+import { DuplicateConflictModal } from './vault/DuplicateConflictModal'
+import { findDuplicateCard, findDuplicateFolder } from './vault/duplicateLogic'
 import { useRichTextEditorContext, RichTextEditorProvider } from './card/RichTextEditorContext'
 import { EmbedActionsProvider, EmbedEntriesProvider } from './card/EmbedEntriesContext'
 import { createCard } from './card/createCard'
@@ -98,6 +100,9 @@ function AppShell({ userId }) {
   const [selectedVaultItem, setSelectedVaultItem] = useState(null)
   const [pickingFolder, setPickingFolder] = useState(false)
   const [deleteFolderModal, setDeleteFolderModal] = useState(null)
+  const [renamingItemId, setRenamingItemId] = useState(null)
+  const [newItemPendingId, setNewItemPendingId] = useState(null)
+  const [moveConflict, setMoveConflict] = useState(null)
 
   function handleOpenAsPortal(cardId) {
     addPortalCard(cardId)
@@ -157,8 +162,12 @@ function AppShell({ userId }) {
     addToCardsById(card)
   }
 
-  function handleVaultNewFolder() {
-    createFolder()
+  async function handleVaultNewFolder() {
+    setFolderPanelOpen(true)
+    setVaultTab('library')
+    const folder = await createFolder()
+    setRenamingItemId(folder.id)
+    setNewItemPendingId(folder.id)
   }
 
   function handleVaultPickFolder() {
@@ -183,6 +192,32 @@ function AppShell({ userId }) {
     if (selectedVaultItem?.item?.id === folderId) {
       setSelectedVaultItem((prev) => ({ ...prev, item: { ...prev.item, name } }))
     }
+  }
+
+  function handleVaultStartInlineRename(itemId, itemType) {
+    setRenamingItemId(itemId)
+    setFolderPanelOpen(true)
+    if (itemType === 'folder') setVaultTab('library')
+  }
+
+  function handleInlineRenameCommit(itemId, itemType, newName, opts = {}) {
+    if (itemType === 'folder') {
+      if (opts.replaceId) deleteFolder(opts.replaceId, 'delete-contents')
+      renameFolder(itemId, newName)
+    } else if (itemType === 'card') {
+      if (opts.replaceId) removeCard(opts.replaceId)
+      renameCard(itemId, newName)
+    }
+    setRenamingItemId(null)
+    setNewItemPendingId(null)
+  }
+
+  function handleInlineRenameCancel(itemId) {
+    if (itemId === newItemPendingId) {
+      deleteFolder(itemId, 'delete-contents')
+    }
+    setRenamingItemId(null)
+    setNewItemPendingId(null)
   }
 
   function handleVaultDeleteCard(cardId) {
@@ -216,6 +251,12 @@ function AppShell({ userId }) {
     if (!selectedVaultItem) return
     const { item, type } = selectedVaultItem
     if (type === 'card') {
+      const allCards = [...shelfEntries, ...libraryEntries]
+      const conflict = findDuplicateCard(allCards, item.title, folderId, item.id)
+      if (conflict) {
+        setMoveConflict({ itemId: item.id, itemLocation: item.location, destFolderId: folderId, conflictId: conflict.id, conflictName: item.title })
+        return
+      }
       if (item.location === 'library') {
         moveCardToFolder(item.id, folderId)
       } else {
@@ -226,6 +267,38 @@ function AppShell({ userId }) {
     }
     setPickingFolder(false)
     setSelectedVaultItem(null)
+  }
+
+  function handleMoveConflictReplace() {
+    if (!moveConflict) return
+    const { itemId, itemLocation, destFolderId, conflictId } = moveConflict
+    removeCard(conflictId)
+    if (itemLocation === 'library') {
+      moveCardToFolder(itemId, destFolderId)
+    } else {
+      moveToLibrary(itemId, destFolderId)
+    }
+    setPickingFolder(false)
+    setSelectedVaultItem(null)
+    setMoveConflict(null)
+  }
+
+  function handleMoveConflictKeepBoth() {
+    if (!moveConflict) return
+    const { itemId, itemLocation, destFolderId } = moveConflict
+    if (itemLocation === 'library') {
+      moveCardToFolder(itemId, destFolderId)
+    } else {
+      moveToLibrary(itemId, destFolderId)
+    }
+    setPickingFolder(false)
+    setSelectedVaultItem(null)
+    setMoveConflict(null)
+  }
+
+  function handleMoveConflictCancel() {
+    setPickingFolder(false)
+    setMoveConflict(null)
   }
 
   function handleVaultOpenInDock(cardId) {
@@ -356,6 +429,9 @@ function AppShell({ userId }) {
             bulkMoveCards={bulkMoveCards}
             bulkDeleteCards={bulkDeleteCards}
             bulkMoveTabs={bulkMoveTabs}
+            renamingItemId={renamingItemId}
+            onInlineRenameCommit={handleInlineRenameCommit}
+            onInlineRenameCancel={handleInlineRenameCancel}
           />
         )}
         {promptOpen && (
@@ -392,6 +468,15 @@ function AppShell({ userId }) {
             onCancel={() => setDeleteFolderModal(null)}
           />
         )}
+        {moveConflict && (
+          <DuplicateConflictModal
+            itemType="card"
+            conflictName={moveConflict.conflictName}
+            onReplace={handleMoveConflictReplace}
+            onKeepBoth={handleMoveConflictKeepBoth}
+            onCancel={handleMoveConflictCancel}
+          />
+        )}
         <IndexDebugPanel open={indexDebugOpen} onClose={() => setIndexDebugOpen(false)} />
         <Dock
           dockState={dockState}
@@ -415,10 +500,9 @@ function AppShell({ userId }) {
           onVaultAddToDock={handleVaultOpenInDock}
           onVaultMoveToLibrary={moveToLibrary}
           onVaultMoveToShelf={moveCardToShelf}
-          onVaultRenameCard={handleVaultRenameCard}
+          onVaultStartInlineRename={handleVaultStartInlineRename}
           onVaultSwitchToTab={handleVaultSwitchToTab}
           onVaultDeleteTab={deleteSavedTab}
-          onVaultRenameFolder={handleVaultRenameFolder}
           onVaultDeleteCard={handleVaultDeleteCard}
           onVaultDeleteFolderRequest={handleVaultDeleteFolderRequest}
           onVaultMoveToFolder={handleVaultMoveToFolder}

@@ -15,7 +15,7 @@ describe('InlineRename', () => {
     const input = screen.getByRole('textbox', { name: 'Rename' })
     await userEvent.clear(input)
     await userEvent.type(input, 'New name{Enter}')
-    expect(onCommit).toHaveBeenCalledWith('New name')
+    expect(onCommit).toHaveBeenCalledWith('New name', false)
   })
 
   it('calls onCancel when Escape is pressed', async () => {
@@ -34,7 +34,7 @@ describe('InlineRename', () => {
       </div>,
     )
     await userEvent.click(screen.getByRole('button', { name: 'Other' }))
-    expect(onCommit).toHaveBeenCalledWith('Title')
+    expect(onCommit).toHaveBeenCalledWith('Title', false)
   })
 
   it('calls onCancel on blur when input is empty', async () => {

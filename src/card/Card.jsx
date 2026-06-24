@@ -136,6 +136,7 @@ export function Card({
         onSaveToShelf={onSaveToShelf}
         onToggleFold={onToggleFold}
         onToggleHide={onToggleHide}
+        onFlip={onFlip ? () => flushAndThen(onFlip) : undefined}
         onSendToDock={onSendToDock ? () => flushAndThen(onSendToDock) : undefined}
         onSendToTab={onSendToTab ? () => flushAndThen(onSendToTab) : undefined}
         onClose={onClose}
