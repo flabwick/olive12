@@ -12,7 +12,7 @@ Supabase card sync: pure conflict-resolution logic, Supabase storage adapter, sy
 | Card `folderId` | No — local only |
 | Tabs (saved to shelf/library) | Yes — `user_tabs` via `tabSupabaseStorage` when authenticated |
 | Tab_card order, `foldState`, `hiddenState` | No — Dexie only |
-| Folders | No — Dexie only |
+| Folders | No — adapter exists (`folderSync.js`) but not yet wired to scheduler |
 | Index entries (`index_entries`) | Yes — via `indexCard.js` → Dexie + Supabase upsert on library promotion or flip ensure; not through the debounced card scheduler |
 
 ## File map
@@ -28,6 +28,10 @@ src/
     cardSupabaseStorage.test.js     # [TEST] 9 tests
     cardSync.js                     # Orchestration: syncDirty, pullRemote, scheduler
     cardSync.test.js                # [TEST] 14 tests
+    folderSupabaseStorage.js        # Supabase adapter factory for folders
+    folderSupabaseStorage.test.js   # [TEST]
+    folderSync.js                   # Orchestration: syncFolders (pull + push dirty), deleteFolderRemote
+    folderSync.test.js              # [TEST]
   brain/
     indexCard.js                    # wiki-index invoke, finishIndexResult, Dexie + Supabase persist
     indexCard.test.js
@@ -55,6 +59,32 @@ supabase/
     20260620120000_create_user_tabs.sql       # user_tabs table + RLS
 ```
 
+## Folder sync (adapter + orchestration — not yet wired)
+
+`folderSupabaseStorage.js` — factory function, client injected.
+
+```js
+export function makeFolderSupabaseStorage(client) {
+  // returns { fetchRemoteFoldersForUser, upsertRemoteFolder, deleteRemoteFolder }
+}
+```
+
+| Method | Behaviour |
+|---|---|
+| `fetchRemoteFoldersForUser(userId)` | `SELECT *` WHERE `user_id = userId` |
+| `upsertRemoteFolder(row)` | UPSERT on conflict `(id)` |
+| `deleteRemoteFolder(folderId)` | `DELETE` WHERE `id = folderId` |
+
+`folderSync.js` — orchestration.
+
+**`syncFolders(userId, storage)`** — pull + push:
+1. Pull: fetch all remote folders for user; for each, skip if local record is `dirty`; skip if local `updatedAt >= remoteUpdatedAt`; otherwise write to Dexie with `dirty: false`. Ignores `PGRST205` (table not found).
+2. Push: get all dirty folders via `getDirtyFolders()`; for each, upsert to remote then call `markFolderClean`. Per-folder error catch.
+
+**`deleteFolderRemote(folderId, userId, storage)`** — calls `storage.deleteRemoteFolder(folderId)`. Called from `useTabs.deleteFolder` when authenticated.
+
+`useTabs` imports both `makeFolderSupabaseStorage` and `syncFolders`/`deleteFolderRemote` but does not yet call `syncFolders` from the scheduler. `deleteFolderRemote` **is** called on folder delete when authenticated.
+
 ## Saved tab sync (`user_tabs`)
 
 When a tab has `savedLocation !== 'none'` and the user is authenticated, `useTabs` debounces upserts to Supabase `user_tabs` (id, name, saved_location, saved_folder_id, card_ids). Tab_card order and fold state remain local-only.
@@ -77,7 +107,7 @@ Placeholder values prevent the import from throwing in test environments. Tests 
 |---|---|---|
 | `id` | uuid | Matches local `card.id` |
 | `user_id` | uuid | Supabase auth user id; enforced by RLS |
-| `type` | text | `'text'` or `'portal'` |
+| `type` | text | `'text'`, `'portal'`, or `'file'` |
 | `subtype` | text | `null` |
 | `title` | text | Empty string for portal cards |
 | `body` | jsonb | `{ kind: 'plain', text: '...' }` |
@@ -192,6 +222,8 @@ Sign-up shows a "Check your email" confirmation; sign-in logs in immediately on 
 | `cardSyncLogic.test.js` | `computeContentHash` (deterministic, body-only, config included), `classifyCardSync` (all 5 states, timestamp edges), `resolveCardConflict` (all 5 → correct action/winner) |
 | `cardSupabaseStorage.test.js` | `fetchRemoteCardsForUser`, `upsertRemoteCard`, `fetchRemoteCardById`, `deleteRemoteCard` via fake client chains |
 | `cardSync.test.js` | `syncDirtyCardsForUser` (push local-only, push local-newer, pull remote-newer, NOOP in-sync, error leaves dirty, skips clean); `pullRemoteCardsForUser` (writes new remote, overwrites clean local when newer, skips dirty local, skips when local newer, empty → []); scheduler (debounce, runNow pull+sync, runNow cancels pending debounce) |
+| `folderSupabaseStorage.test.js` | `fetchRemoteFoldersForUser`, `upsertRemoteFolder`, `deleteRemoteFolder` via fake client chains |
+| `folderSync.test.js` | `syncFolders` pull (writes new remote, skips dirty local, skips when local newer, overwrites when remote newer); push (upserts dirty, marks clean, per-folder error isolation); `deleteFolderRemote` calls deleteRemoteFolder |
 | `assembleContext.test.js` | Empty, maps to {id,title,body}, excludes hidden, includes folded, preserves order, all-hidden |
 | `buildPrompt.test.js` | Two-element array, system plain-text instruction, user message contains prompt, card titles/bodies, placeholder when no cards, untitled → "Card N", dividers between multiple cards |
 | `useTabs.test.js` (sync subset) | Scheduler created with userId, not without; runNow on initial reconcile; scheduleSync on mutations; orphan card detection; removeCard with userId calls deleteRemoteCard; runDockPrompt (invoke args, card created, returns true/false, hidden cards excluded) |
@@ -200,10 +232,9 @@ Sign-up shows a "Check your email" confirmation; sign-in logs in immediately on 
 ## Not built yet
 
 - Conflict UI (currently `REMOTE_NEWER` always wins)
-- Tab_card or folder sync to Supabase (saved tab metadata syncs via `user_tabs`)
+- Tab_card or folder sync scheduler wiring (`folderSync.js` and `folderSupabaseStorage.js` exist and are tested; `deleteFolderRemote` is wired, but `syncFolders` is not yet called from `useTabs`)
 - Optimistic rollback on sync failure
 - Real-time Supabase subscriptions
-- Streaming dock-prompt responses
 - Job queue, credits, cost estimation
 - Model picker or per-user model preference
-- `folderId` sync
+- `folderId` sync for cards

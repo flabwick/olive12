@@ -1,4 +1,5 @@
 import { Card } from './Card'
+import { FileCard } from './FileCard'
 import './PortalCard.css'
 import { resolvePortalTarget } from './portalLogic'
 
@@ -22,6 +23,41 @@ export function PortalCard({
   indexLoading = false,
 }) {
   const target = resolvePortalTarget({ config }, cardsById)
+
+  const locateBtn = target && onLocate ? (
+    <button
+      type="button"
+      className="portal-card__locate"
+      aria-label="Show in vault"
+      onClick={onLocate}
+    >
+      <svg viewBox="0 0 10 8" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M1 4l3 3 5-6" />
+      </svg>
+    </button>
+  ) : null
+
+  if (target?.type === 'file') {
+    return (
+      <div className="portal-card">
+        <FileCard
+          title={target.title}
+          fileName={target.fileName}
+          fileType={target.fileType}
+          fileSize={target.fileSize}
+          cardId={target.id}
+          location={location}
+          foldState={foldState}
+          hiddenState={hiddenState}
+          onToggleFold={onToggleFold}
+          onToggleHide={onToggleHide}
+          onClose={onClose}
+          onUpdate={onUpdate}
+        />
+        {locateBtn}
+      </div>
+    )
+  }
 
   return (
     <div className="portal-card">
@@ -47,18 +83,7 @@ export function PortalCard({
         onUpdate={target ? onUpdate : undefined}
         onClose={onClose}
       />
-      {target && onLocate && (
-        <button
-          type="button"
-          className="portal-card__locate"
-          aria-label="Show in vault"
-          onClick={onLocate}
-        >
-          <svg viewBox="0 0 10 8" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M1 4l3 3 5-6" />
-          </svg>
-        </button>
-      )}
+      {locateBtn}
     </div>
   )
 }

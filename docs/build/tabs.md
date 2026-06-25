@@ -38,18 +38,35 @@ src/
     FolderPanel.css
     FolderPanel.test.jsx      # [TEST]
   vault/
-    ShelfRow.jsx              # Compact row for shelf card entries in FolderPanel
-    ShelfRow.css
-    ShelfRow.test.jsx         # [TEST]
-    ShelfRow.stories.jsx      # [STORY]
-    VaultTabRow.jsx           # Compact row for saved tab entries in FolderPanel
-    VaultTabRow.css
-    VaultTabRow.test.jsx      # [TEST]
-    VaultTabRow.stories.jsx   # [STORY]
-    FolderTree.jsx            # Recursive folder tree for Library view
-    FolderTree.css
-    FolderTree.test.jsx       # [TEST]
-    FolderTree.stories.jsx    # [STORY]
+    ShelfView.jsx             # Shelf pane: cards + tabs list with selection support
+    ShelfView.css
+    ShelfView.test.jsx        # [TEST]
+    ShelfView.stories.jsx     # [STORY]
+    LibraryView.jsx           # Library pane: folder tree + items with selection support
+    LibraryView.css
+    LibraryView.test.jsx      # [TEST]
+    LibraryView.stories.jsx   # [STORY]
+    VaultItemRow.jsx          # Compact row for any vault item (card/tab/file)
+    VaultItemRow.css
+    VaultItemRow.test.jsx     # [TEST]
+    VaultItemRow.stories.jsx  # [STORY]
+    FolderNode.jsx            # Recursive folder node: collapsible, inline rename
+    FolderNode.css
+    FolderNode.test.jsx       # [TEST]
+    InlineRename.jsx          # Inline text input for renaming with conflict detection
+    InlineRename.css
+    InlineRename.test.jsx     # [TEST]
+    SelectionToolbar.jsx      # Multi-select toolbar: count, move, delete, done
+    SelectionToolbar.css
+    SelectionToolbar.test.jsx # [TEST]
+    DuplicateConflictModal.jsx # Modal: duplicate name on rename
+    DuplicateConflictModal.css
+    DuplicateConflictModal.test.jsx # [TEST]
+    DeleteFolderModal.jsx     # Modal: confirm delete non-empty folder
+    DeleteFolderModal.css
+    DeleteFolderModal.test.jsx # [TEST]
+    duplicateLogic.js         # Pure: findDuplicateCard, findDuplicateFolder
+    duplicateLogic.test.js    # [TEST]
   tab/
     createTab.js              # Tab + tab_card factories; pure helpers for both
     createTab.test.js         # [TEST]
@@ -75,15 +92,15 @@ src/
     TabSwitcher.css
     TabSwitcher.test.jsx      # [TEST]
     TabSwitcher.stories.jsx   # [STORY]
-    Tab.jsx                   # Dumb: entries → ordered, interactive cards (text + portal)
+    Tab.jsx                   # Dumb: entries → ordered, interactive cards (text + portal + file)
     Tab.css
     Tab.test.jsx              # [TEST]
     Tab.stories.jsx           # [STORY]
-    Dock.jsx                  # 2-state toolbar (BASE / FORMATTING)
+    Dock.jsx                  # 3-mode toolbar (BASE / VAULT / FORMATTING)
     Dock.css
     Dock.test.jsx             # [TEST]
     Dock.stories.jsx          # [STORY]
-    DockCardPanel.jsx         # Dumb: Card editor panel for the active dock card
+    DockCardPanel.jsx         # Dumb: Card (or FileCard) editor panel for the active dock card
     DockCardPanel.css
     DockCardPanel.test.jsx    # [TEST]
     DockCardPanel.stories.jsx # [STORY]
@@ -92,6 +109,11 @@ src/
     TransientCard.test.jsx    # [TEST]
     TransientCard.stories.jsx # [STORY]
     index.js                  # Barrel exports
+  sync/
+    folderSupabaseStorage.js  # Supabase adapter for folders (upsert/delete)
+    folderSupabaseStorage.test.js # [TEST]
+    folderSync.js             # Orchestration: syncFolders, deleteFolderRemote
+    folderSync.test.js        # [TEST]
   brain/
     createIndexEntry.js
     finishIndexResult.js
@@ -105,6 +127,8 @@ src/
   card/
     flipLogic.js
     CardBack.jsx
+    FileCard.jsx              # File card display component
+    createFileCard.js         # File card factory + helpers
     RichTextEditorContext.jsx
     RichTextEditor.jsx
     EmbeddedCardNode.js
@@ -312,6 +336,16 @@ Both `DOCK_EDITOR` and `TAB_EDITOR` render the same formatting toolbar. The dist
 | `flipCard` | function | `(cardId)` — toggles flip state (session-only) |
 | `isFlippedCard` | function | `(cardId) → boolean` |
 | `reindexCard` | function | `(cardId, cardOverride?)` — manually invokes `wiki-index` and persists the result |
+| `renameCard` | function | `(cardId, title)` — updates card title, persists, schedules sync |
+| `moveCardToFolder` | function | `(cardId, folderId)` — moves card to a library folder, persists, schedules sync |
+| `moveCardToShelf` | function | `(cardId)` — moves card to shelf (`location: 'shelf'`, `folderId: null`), persists |
+| `renameFolder` | function | `(folderId, name)` — updates folder name, persists (dirty), schedules folder sync |
+| `deleteFolder` | function | `(folderId, mode)` — `'delete-contents'`: deletes all descendant folders + cards; `'unparent-children'`: moves children up. Remote deletes if authenticated. |
+| `moveFolder` | function | `(folderId, newParentId)` — moves folder to new parent, persists, schedules folder sync |
+| `deleteSavedTab` | function | `(tabId)` — removes saved tab (`savedLocation: 'none'`), persists, removes from remote if authenticated |
+| `bulkMoveCards` | function | `(cardIds, folderId)` — batch card move to folder, persists, schedules sync |
+| `bulkDeleteCards` | function | `(cardIds)` — batch card delete, removes from Dexie and Supabase |
+| `bulkMoveTabs` | function | `(tabIds, folderId)` — batch tab move to library folder, persists |
 
 ### `saveToShelf` behaviour
 
@@ -355,6 +389,14 @@ Before creating a portal card, checks the active tab for any entry whose card id
 - `embedOpen` — whether `EmbedSourcePanel` is visible (opened from Dock's `[[]]` button)
 - `tabSwitcherOpen` — whether `TabSwitcher` overlay is visible
 - `indexDebugOpen` — toggled via Settings button in Dock
+- `vaultTab` (`'shelf' | 'library' | 'brain'`) — which vault pane is active
+- `selectedVaultItem` (`{ item, type } | null`) — which vault item is selected in the Dock
+- `pickingFolder` (boolean) — whether in folder-pick mode
+- `moveTarget` (`{ id, name } | null`) — currently selected destination folder in pick mode
+- `renamingItemId` (`string | null`) — id of item currently being renamed inline
+- `newItemPendingId` (`string | null`) — id of a newly created folder awaiting name input (deleted on cancel)
+- `moveConflict` — pending conflict state when a card/tab being moved has a name clash at the destination
+- `deleteFolderModal` — state (`{ folderId, name, cardCount, folderCount }`) for non-empty folder delete confirmation
 
 **EmbedActionsProvider** wraps AppShell content providing `onSaveToShelf`, `onMoveToDock`, `onMoveToTab`, `onUpdate` to `EmbeddedCardView` nodes.
 
@@ -387,7 +429,7 @@ RichTextEditorProvider
 | `handleOpenAsPortal(cardId)` | Vault "Open in tab" button | `addPortalCard(cardId)`, close panel |
 | `handleOpenSavedTab(tabId)` | Vault "Switch to tab" button | `switchTab(tabId)`, close panel |
 | `handleMoveTabToLibrary(tabId)` | Vault "Move to Library" on tab | `moveTabToLibrary(tabId, null)` |
-| `handleLocate(targetCardId)` | PortalCard "Show in vault" button | Sets `vaultInitialTab`, sets `highlightedCardId`, opens panel |
+| `handleLocate(targetCardId)` | PortalCard "Show in vault" button | Sets `vaultTab`, sets `highlightedCardId`, opens panel |
 | `handleFolderOpen()` | Dock "Library" button | Closes any open dock card, toggles `folderPanelOpen` |
 | `handleEmbedOpen()` | Dock `[[]]` button | Stores `activeEditor` ref, toggles `embedOpen` |
 | `handleEmbedSelect(cardId)` | EmbedSourcePanel card click | Inserts `embeddedCard` node into stored editor, closes panel |
@@ -395,6 +437,19 @@ RichTextEditorProvider
 | `handleSettings()` | Dock "Settings" button | Closes folder panel, toggles `indexDebugOpen` |
 | `handleTabOverview()` | TabHeader "Tab overview" button | Opens `TabSwitcher` |
 | `handlePromptSubmit(text)` | DockPrompt Submit | Calls `runDockPrompt`; closes panel on success |
+| `handleVaultPickFolder()` | Dock "Move" button on selected item | Enters pick mode, opens panel, clears `moveTarget` |
+| `handlePickFolderCancel()` | Dock back button in pick mode | Exits pick mode, clears `moveTarget` |
+| `handleFolderPickToggle(folder)` | Folder clicked in pick mode | Toggles `moveTarget` (select/deselect) |
+| `handleConfirmMove()` | Dock "Move here" button | Executes move (shelf or library/folder); calls `handleVaultMoveToFolder` or `moveCardToShelf` |
+| `handleVaultMoveToFolder(folderId)` | Internal | Moves selected card/tab/folder with conflict detection; sets `moveConflict` state if dupe found |
+| `handleVaultStartInlineRename(itemId, type)` | Dock "Rename" button | Sets `renamingItemId`; clears selected vault item |
+| `handleInlineRenameCommit(itemId, itemType, newName, opts?)` | InlineRename commit | Calls `renameCard` / `renameFolder`; handles `opts.replaceId` (Replace) or `opts.keepBoth` |
+| `handleInlineRenameCancel(itemId)` | InlineRename cancel | Clears `renamingItemId`; if `newItemPendingId` matches, deletes the folder |
+| `handleVaultDeleteFolderRequest(folderId)` | Dock "Delete" on folder | Empty folder → delete immediately; non-empty → shows `DeleteFolderModal` |
+| `handleUploadCard(file)` | File input change | `createFileCard(file)`, sets `location: 'library'`, puts in Dexie + `cardsById` |
+| `handleMoveConflictReplace()` | DuplicateConflictModal Replace | Executes move, deletes conflict target; clears `moveConflict` |
+| `handleMoveConflictKeepBoth()` | DuplicateConflictModal Keep both | Executes move as-is; clears `moveConflict` |
+| `handleMoveConflictCancel()` | DuplicateConflictModal Cancel | Clears `moveConflict` |
 
 ## Display components
 
@@ -418,40 +473,60 @@ RichTextEditorProvider
 
 `Tab({ entries, folders, cardsById, onReorder, onUpdate, onRemove, onFold, onUnfold, onHide, onUnhide, onSaveToShelf, onMoveToLibrary, onLocate, onMoveToDock, flipCard, isFlipped })` — presentational.
 
-**Callbacks from Tab to Card:**
-- Text cards: `onSaveToShelf`, `onSendToDock` (bound to `onMoveToDock`). No `onFlip`, no `onMoveUp`, no `onMoveDown`.
-- Portal cards: no `onSaveToShelf` — portal cards cannot be saved.
+**Card type branching:**
+- `card.type === 'portal'` → renders `PortalCard`. Binds `onUpdate` to the **target card's id**. No `onSaveToShelf` on portal cards.
+- `card.type === 'file'` → renders `FileCard` with `onSendToDock` and `onSaveToShelf`.
+- Otherwise → renders `Card` with `onSaveToShelf`, `onSendToDock`, `onFlip`.
+
+**Callbacks per type:**
+- Text cards: `onSaveToShelf`, `onSendToDock` (bound to `onMoveToDock`), `onFlip` (when `flipCard` provided).
+- File cards: `onSaveToShelf`, `onSendToDock`. No flip.
+- Portal cards: no `onSaveToShelf`. `onFlip` wired.
 - All cards: `onToggleFold`, `onToggleHide`, `onClose`, `onUpdate`.
 
-Note: `flipCard` and `isFlipped` are accepted as props by `Tab` (and passed from `AppShell`) but are not wired to any card rendering in the current implementation. Card flip from the tab layer is not functional.
-
-Portal card branching: for each entry with `card.type === 'portal'`, renders `PortalCard` instead of `Card`. Binds `onUpdate` to the **target card's id**.
+Note: `flipCard` and `isFlipped` are accepted as props and are wired to `Card` and `PortalCard` rendering; flip from the tab layer is functional. File cards do not participate in flip.
 
 ### Dock
 
-`Dock({ dockState, dockCardEntries, activeDockCardId, onAddDockCard, onOpenDockCard, onFolderOpen, onSettings, onEmbedOpen, lightningActive, onLightningToggle })` — bottom toolbar.
+`Dock({ dockState, dockCardEntries, activeDockCardId, onAddDockCard, onOpenDockCard, onFolderOpen, onSettings, onEmbedOpen, onUploadFile, lightningActive, onLightningToggle, vaultOpen, vaultTab, onVaultTabChange, onVaultNewCard, onVaultNewFolder, selectedVaultItem, onClearVaultItem, onVaultAddToDock, onVaultSwitchToTab, onVaultDeleteTab, onVaultDeleteCard, onVaultDeleteFolderRequest, onVaultStartInlineRename, pickingFolder, onVaultPickFolder, onVaultPickFolderCancel, moveTarget, onConfirmMove })` — bottom toolbar.
 
-**BASE state** (`role="toolbar" aria-label="Tab actions"`):
-- Left: dock card pills (one per pinned card, `.dock__pill--active` when active) + `+` button (`aria-label="Pin new card"`)
-- Divider
-- Right: "Library" button (folder icon), "Settings" button (menu icon)
+Three display modes:
 
-**DOCK_EDITOR or TAB_EDITOR state** (`role="toolbar" aria-label="Formatting options"`):
+**1. DOCK_EDITOR or TAB_EDITOR** (`role="toolbar" aria-label="Formatting options"`):
 - `FormattingToolbar` (scrollable): Exit editor (`‹`), separator, AI prompt (lightning), Embed card (`[[]]`), separator, Undo, Redo, separator, Heading (expandable H1/H2/H3), Bold, Italic, Highlight, Code block, Bullet list, Ordered list, Indent, Outdent, Checkbox list, Strikethrough.
-- No "Move card to tab", no "Pin to dock", no "Settings" buttons in the formatting toolbar.
 - Exit editor (`‹`) calls `activeEditor?.commands.blur()`.
 - AI prompt button toggles `lightningActive` via `onLightningToggle`.
 - Embed card (`[[]]`) calls `onEmbedOpen`.
+- Both editor states render the same `FormattingToolbar` component.
 
-Both editor states render the same `FormattingToolbar` component.
+**2. BASE** (default, `role="toolbar" aria-label="Tab actions"`):
+- Left: dock card pills (`.dock__pill--active` when active) + `+` button (`aria-label="Pin new card"`)
+- Divider
+- Right: Upload file button (hidden `<input type="file">` + UploadIcon; only when `onUploadFile` provided), Library button (FolderIcon), Settings button (MenuIcon)
+
+**3. VAULT** (`vaultOpen && dockState === BASE`, no explicit role; inner toolbar has `aria-label="Vault actions"`):
+Three sections:
+- **Left:** Three tab selectors — Shelf (ShelfIcon), Library (LibraryIcon), Brain (BrainIcon). `aria-pressed` reflects active tab.
+- **Center (context-dependent):**
+  - *Pick mode* (`pickingFolder && vaultItem`): destination label (`→ Shelf` / `→ FolderName` / `→ Library`) + **Move here** button (`dock__btn--primary` — amber/golden fill)
+  - *Confirm delete* (`confirmDelete && vaultItem`, card/tab only): "Delete?" label + TrashIcon confirm button
+  - *Item selected* (`vaultItem`, no picking/confirm): Open (DockPinIcon, card only), Switch→ (tab only), Rename (PencilIcon, card/folder only), Move (FolderArrowIcon), Delete (TrashIcon → triggers confirm or `onVaultDeleteFolderRequest` for folders)
+  - *Browse mode* (no selection): Upload button + New card (ShelfView) or New folder (LibraryView); Brain tab shows only Upload
+- **Right:** Back (`‹`) when item selected or picking; Close vault (`✕`) otherwise
+
+**DockBtn component** (internal): props `active`, `danger`, `primary`, `label`, `title`, `onMouseDown`, `onClick`, `ariaExpanded`.
+- `dock__btn--active` — terracotta fill (used for vault tab selectors when active)
+- `dock__btn--danger` — terracotta fill, for rare danger confirmations
+- `dock__btn--primary` — amber/golden fill, auto-width with horizontal padding; used for "Move here" CTA
 
 ### DockCardPanel
 
 `DockCardPanel({ card, cardId, onClose, onUpdate, onMoveToTab })` — panel rendered above the Dock when a dock card is active.
 
 - `role="complementary" aria-label="Dock card"`.
-- Renders a `Card` with `editorSurface="dock"`.
-- `Card` is given: `onToggleFold` (local state), `onClose`, `onUpdate`, `onSendToTab` (`onMoveToTab`).
+- When `card.type === 'file'`: renders `FileCard`.
+- Otherwise: renders `Card` with `editorSurface="dock"`.
+- Both get: `onToggleFold` (local state), `onClose`, `onUpdate`, `onSendToTab` (`onMoveToTab`).
 - No `onFlip`, no `onSaveToShelf`, no `onSendToDock` on the dock card.
 - `onClose` removes the card from the dock entirely (`removeFromDock` in AppShell).
 - `onMoveToTab` calls `moveDockCardToTab(cardId, addTabCard)` — moves card to active tab, removes from dock.
@@ -504,7 +579,6 @@ Slide-up panel with three tabs: **Shelf**, **Library**, **Brain**. X button call
 
 - Drag-and-drop tab reorder (TabSwitcher tiles)
 - Drag-and-drop card reorder within a tab
-- Flip wiring from Tab layer (Tab accepts `flipCard`/`isFlipped` props but they are not wired to Card rendering)
 - Bulk-reveal hidden cards
 - Search, tagging, filters
 - Conflict UI (remote always wins on timestamp difference)
@@ -514,3 +588,5 @@ Slide-up panel with three tabs: **Shelf**, **Library**, **Brain**. X button call
 - `onBrainAccept` re-index workflow
 - Index debug off by default in production builds
 - Smart tabs (`kind: 'smart'`)
+- File card actual blob storage (only metadata stored; no upload target or download)
+- Folder sync scheduler wiring (`folderSync.js` and `folderSupabaseStorage.js` exist and are tested, but `syncFolders` is not yet called from the `useTabs` scheduler)

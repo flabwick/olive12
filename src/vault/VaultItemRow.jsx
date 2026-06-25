@@ -20,7 +20,19 @@ function TabFileIcon() {
   )
 }
 
-const TYPE_ICONS = { card: CardFileIcon, tab: TabFileIcon }
+function FileAttachIcon() {
+  return (
+    <svg width="11" height="14" viewBox="0 0 11 14" fill="none" aria-hidden="true">
+      <path
+        d="M2 1h6l3 3v8.5a.5.5 0 01-.5.5H2a.5.5 0 01-.5-.5V1.5A.5.5 0 012 1z"
+        stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"
+      />
+      <path d="M8 1v3h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+const TYPE_ICONS = { card: CardFileIcon, tab: TabFileIcon, file: FileAttachIcon }
 
 export function VaultItemRow({
   type,

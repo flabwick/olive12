@@ -225,7 +225,7 @@ describe('Dock — vault browse state', () => {
     expect(screen.getByRole('button', { name: 'Pin new card' })).toBeInTheDocument()
   })
 
-  it('shows vault selection bar instead of browse bar when selectedVaultItem is set', () => {
+  it('shows Vault actions toolbar when selectedVaultItem is set', () => {
     const card = { id: 'c1', title: 'Notes', body: '', location: 'shelf' }
     wrap(
       <Dock
@@ -235,102 +235,53 @@ describe('Dock — vault browse state', () => {
         onClearVaultItem={vi.fn()}
       />,
     )
-    expect(screen.queryByRole('toolbar', { name: 'Vault actions' })).not.toBeInTheDocument()
-    expect(screen.getByRole('toolbar', { name: 'Vault item actions' })).toBeInTheDocument()
+    expect(screen.getByRole('toolbar', { name: 'Vault actions' })).toBeInTheDocument()
   })
 })
 
 describe('Dock — vault selection state', () => {
   const shelfCard = { id: 'c1', title: 'Meeting notes', body: '', location: 'shelf' }
 
-  it('renders VaultSelectionBar when selectedVaultItem is set in BASE state', () => {
+  it('renders selection actions when selectedVaultItem is set and vault is open', () => {
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
         onClearVaultItem={vi.fn()}
       />,
     )
-    expect(screen.getByRole('toolbar', { name: 'Vault item actions' })).toBeInTheDocument()
-    expect(screen.getByText('Meeting notes')).toBeInTheDocument()
+    expect(screen.getByRole('toolbar', { name: 'Vault actions' })).toBeInTheDocument()
   })
 
-  it('shows Add to tab button for a card', () => {
+  it('shows Open button for a card', () => {
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
         onClearVaultItem={vi.fn()}
       />,
     )
-    expect(screen.getByRole('button', { name: 'Add to tab' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
   })
 
-  it('shows Open in dock button for a card', () => {
-    wrap(
-      <Dock
-        dockState={DOCK_STATE.BASE}
-        selectedVaultItem={{ item: shelfCard, type: 'card' }}
-        onClearVaultItem={vi.fn()}
-      />,
-    )
-    expect(screen.getByRole('button', { name: 'Open in dock' })).toBeInTheDocument()
-  })
-
-  it('calls onVaultAddToDock when Open in dock is clicked', async () => {
+  it('calls onVaultAddToDock when Open is clicked', async () => {
     const onVaultAddToDock = vi.fn()
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
         onVaultAddToDock={onVaultAddToDock}
         onClearVaultItem={vi.fn()}
       />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Open in dock' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Open' }))
     expect(onVaultAddToDock).toHaveBeenCalledWith('c1')
   })
 
-  it('shows Move to library for a shelf card', () => {
-    wrap(
-      <Dock
-        dockState={DOCK_STATE.BASE}
-        selectedVaultItem={{ item: shelfCard, type: 'card' }}
-        onClearVaultItem={vi.fn()}
-      />,
-    )
-    expect(screen.getByRole('button', { name: 'Move to library' })).toBeInTheDocument()
-  })
-
-  it('shows Move to shelf for a library card', () => {
-    const libraryCard = { id: 'c2', title: 'Doc', body: '', location: 'library' }
-    wrap(
-      <Dock
-        dockState={DOCK_STATE.BASE}
-        selectedVaultItem={{ item: libraryCard, type: 'card' }}
-        onClearVaultItem={vi.fn()}
-      />,
-    )
-    expect(screen.getByRole('button', { name: 'Move to shelf' })).toBeInTheDocument()
-  })
-
-  it('calls onVaultAddToTab and onClearVaultItem when Add to tab is clicked', async () => {
-    const onVaultAddToTab = vi.fn()
-    const onClearVaultItem = vi.fn()
-    wrap(
-      <Dock
-        dockState={DOCK_STATE.BASE}
-        selectedVaultItem={{ item: shelfCard, type: 'card' }}
-        onVaultAddToTab={onVaultAddToTab}
-        onClearVaultItem={onClearVaultItem}
-      />,
-    )
-    await userEvent.click(screen.getByRole('button', { name: 'Add to tab' }))
-    expect(onVaultAddToTab).toHaveBeenCalledWith('c1')
-    expect(onClearVaultItem).toHaveBeenCalledOnce()
-  })
-
-  it('calls onClearVaultItem when back button is clicked', async () => {
+  it('calls onClearVaultItem when Back is clicked', async () => {
     const onClearVaultItem = vi.fn()
     wrap(
       <Dock
@@ -340,186 +291,183 @@ describe('Dock — vault selection state', () => {
         onClearVaultItem={onClearVaultItem}
       />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Back to vault' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(onClearVaultItem).toHaveBeenCalledOnce()
   })
 
-  it('calls onVaultStartInlineRename and clears selection when Rename card is clicked', async () => {
+  it('calls onVaultStartInlineRename and clears selection when Rename is clicked', async () => {
     const onVaultStartInlineRename = vi.fn()
     const onClearVaultItem = vi.fn()
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
         onVaultStartInlineRename={onVaultStartInlineRename}
         onClearVaultItem={onClearVaultItem}
       />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Rename card' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Rename' }))
     expect(onVaultStartInlineRename).toHaveBeenCalledWith(shelfCard.id, 'card')
     expect(onClearVaultItem).toHaveBeenCalledOnce()
   })
 
-  it('shows Switch to tab and Remove tab for saved tabs', () => {
+  it('shows Switch to tab and Delete for saved tabs', () => {
     const tab = { id: 't1', name: 'Research', savedLocation: 'shelf' }
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: tab, type: 'tab' }}
         onClearVaultItem={vi.fn()}
       />,
     )
     expect(screen.getByRole('button', { name: 'Switch to tab' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Remove tab' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
-  it('shows confirm button after Remove tab click', async () => {
+  it('shows confirm delete button after Delete click for a tab', async () => {
     const tab = { id: 't1', name: 'Research', savedLocation: 'shelf' }
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: tab, type: 'tab' }}
         onClearVaultItem={vi.fn()}
       />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Remove tab' }))
-    expect(screen.getByRole('button', { name: 'Confirm remove tab' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.getByRole('button', { name: 'Confirm delete' })).toBeInTheDocument()
   })
 
-  it('shows Move to folder button for a card', () => {
+  it('shows Move button for a card', () => {
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
         onClearVaultItem={vi.fn()}
       />,
     )
-    expect(screen.getByRole('button', { name: 'Move to folder' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Move' })).toBeInTheDocument()
   })
 
-  it('shows Move to folder button for a tab', () => {
+  it('shows Move button for a tab', () => {
     const tab = { id: 't1', name: 'Research', savedLocation: 'shelf' }
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: tab, type: 'tab' }}
         onClearVaultItem={vi.fn()}
       />,
     )
-    expect(screen.getByRole('button', { name: 'Move to folder' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Move' })).toBeInTheDocument()
   })
 
-  it('does not show Move to folder button for a folder', () => {
+  it('shows Move button for a folder', () => {
     const folder = { id: 'f1', name: 'Work', parentId: null }
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: folder, type: 'folder' }}
         onClearVaultItem={vi.fn()}
       />,
     )
-    expect(screen.queryByRole('button', { name: 'Move to folder' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Move' })).toBeInTheDocument()
   })
 
   it('shows Delete card button for a card', () => {
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
         onClearVaultItem={vi.fn()}
       />,
     )
-    expect(screen.getByRole('button', { name: 'Delete card' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
-  it('shows confirm-delete-card toolbar after Delete card is clicked', async () => {
+  it('shows Confirm delete button after Delete is clicked for a card', async () => {
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
         onClearVaultItem={vi.fn()}
       />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Delete card' }))
-    expect(screen.getByRole('toolbar', { name: 'Confirm delete card' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Confirm delete card' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.getByRole('button', { name: 'Confirm delete' })).toBeInTheDocument()
   })
 
-  it('calls onVaultDeleteCard and onClearVaultItem when confirm delete card is clicked', async () => {
+  it('calls onVaultDeleteCard and onClearVaultItem when Confirm delete is clicked', async () => {
     const onVaultDeleteCard = vi.fn()
     const onClearVaultItem = vi.fn()
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
         onVaultDeleteCard={onVaultDeleteCard}
         onClearVaultItem={onClearVaultItem}
       />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Delete card' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Confirm delete card' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm delete' }))
     expect(onVaultDeleteCard).toHaveBeenCalledWith('c1')
     expect(onClearVaultItem).toHaveBeenCalledOnce()
   })
 
-  it('returns to normal mode when Cancel is clicked in confirm-delete-card', async () => {
-    wrap(
-      <Dock
-        dockState={DOCK_STATE.BASE}
-        selectedVaultItem={{ item: shelfCard, type: 'card' }}
-        onClearVaultItem={vi.fn()}
-      />,
-    )
-    await userEvent.click(screen.getByRole('button', { name: 'Delete card' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(screen.getByRole('toolbar', { name: 'Vault item actions' })).toBeInTheDocument()
-  })
-
-  it('shows Delete folder button for a folder', () => {
+  it('shows Delete button for a folder', () => {
     const folder = { id: 'f1', name: 'Work', parentId: null }
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: folder, type: 'folder' }}
         onClearVaultItem={vi.fn()}
       />,
     )
-    expect(screen.getByRole('button', { name: 'Delete folder' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
-  it('calls onVaultDeleteFolderRequest immediately when Delete folder is clicked', async () => {
+  it('calls onVaultDeleteFolderRequest immediately when Delete is clicked for a folder', async () => {
     const onVaultDeleteFolderRequest = vi.fn()
     const folder = { id: 'f1', name: 'Work', parentId: null }
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: folder, type: 'folder' }}
         onClearVaultItem={vi.fn()}
         onVaultDeleteFolderRequest={onVaultDeleteFolderRequest}
       />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Delete folder' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
     expect(onVaultDeleteFolderRequest).toHaveBeenCalledWith('f1')
   })
 
-  it('calls onVaultPickFolder when Move to folder button is clicked', async () => {
+  it('calls onVaultPickFolder when Move button is clicked', async () => {
     const onVaultPickFolder = vi.fn()
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
         onClearVaultItem={vi.fn()}
         onVaultPickFolder={onVaultPickFolder}
       />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Move to folder' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Move' }))
     expect(onVaultPickFolder).toHaveBeenCalledOnce()
   })
 
-  it('does not render vault bar when selectedVaultItem is null', () => {
+  it('does not render vault bar when selectedVaultItem is null and vault is closed', () => {
     wrap(<Dock dockState={DOCK_STATE.BASE} selectedVaultItem={null} />)
-    expect(screen.queryByRole('toolbar', { name: 'Vault item actions' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('toolbar', { name: 'Vault actions' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Pin new card' })).toBeInTheDocument()
   })
 
@@ -531,7 +479,7 @@ describe('Dock — vault selection state', () => {
         onClearVaultItem={vi.fn()}
       />,
     )
-    expect(screen.queryByRole('toolbar', { name: 'Vault item actions' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('toolbar', { name: 'Vault actions' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Bold' })).toBeInTheDocument()
   })
 })
@@ -539,70 +487,94 @@ describe('Dock — vault selection state', () => {
 describe('Dock — folder pick mode', () => {
   const shelfCard = { id: 'c1', title: 'Meeting notes', body: '', location: 'shelf' }
 
-  it('shows folder pick bar when pickingFolder is true with a selected item', () => {
+  it('shows Move here button in folder pick mode', () => {
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
+        vaultTab="library"
         pickingFolder
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
         onClearVaultItem={vi.fn()}
       />,
     )
-    expect(screen.getByRole('toolbar', { name: 'Move to folder' })).toBeInTheDocument()
-    expect(screen.queryByRole('toolbar', { name: 'Vault item actions' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Move here' })).toBeInTheDocument()
   })
 
-  it('shows the selected item name in folder pick bar', () => {
+  it('shows Library as destination when on library tab with no move target', () => {
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
+        vaultTab="library"
         pickingFolder
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
         onClearVaultItem={vi.fn()}
       />,
     )
-    expect(screen.getByText('Meeting notes')).toBeInTheDocument()
+    expect(screen.getByText(/→ Library/)).toBeInTheDocument()
   })
 
-  it('shows Move to root button in folder pick bar', () => {
+  it('shows Shelf as destination when on shelf tab', () => {
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
+        vaultTab="shelf"
         pickingFolder
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
         onClearVaultItem={vi.fn()}
       />,
     )
-    expect(screen.getByRole('button', { name: 'Move to root' })).toBeInTheDocument()
+    expect(screen.getByText(/→ Shelf/)).toBeInTheDocument()
   })
 
-  it('calls onVaultMoveToFolder with null when Move to root is clicked', async () => {
-    const onVaultMoveToFolder = vi.fn()
+  it('shows folder name as destination when moveTarget is set', () => {
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
+        vaultTab="library"
+        pickingFolder
+        selectedVaultItem={{ item: shelfCard, type: 'card' }}
+        moveTarget={{ id: 'f1', name: 'Work' }}
+        onClearVaultItem={vi.fn()}
+      />,
+    )
+    expect(screen.getByText(/→ Work/)).toBeInTheDocument()
+  })
+
+  it('calls onConfirmMove when Move here is clicked', async () => {
+    const onConfirmMove = vi.fn()
+    wrap(
+      <Dock
+        dockState={DOCK_STATE.BASE}
+        vaultOpen
+        vaultTab="library"
         pickingFolder
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
         onClearVaultItem={vi.fn()}
-        onVaultMoveToFolder={onVaultMoveToFolder}
+        onConfirmMove={onConfirmMove}
       />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Move to root' }))
-    expect(onVaultMoveToFolder).toHaveBeenCalledWith(null)
+    await userEvent.click(screen.getByRole('button', { name: 'Move here' }))
+    expect(onConfirmMove).toHaveBeenCalledOnce()
   })
 
-  it('calls onVaultPickFolderCancel when Cancel move is clicked', async () => {
+  it('calls onVaultPickFolderCancel when Back is clicked in folder pick mode', async () => {
     const onVaultPickFolderCancel = vi.fn()
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
+        vaultOpen
+        vaultTab="library"
         pickingFolder
         selectedVaultItem={{ item: shelfCard, type: 'card' }}
         onClearVaultItem={vi.fn()}
         onVaultPickFolderCancel={onVaultPickFolderCancel}
       />,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel move' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(onVaultPickFolderCancel).toHaveBeenCalledOnce()
   })
 })

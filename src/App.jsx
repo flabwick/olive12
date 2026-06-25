@@ -7,6 +7,7 @@ import { findDuplicateCard, findDuplicateFolder } from './vault/duplicateLogic'
 import { useRichTextEditorContext, RichTextEditorProvider } from './card/RichTextEditorContext'
 import { EmbedActionsProvider, EmbedEntriesProvider } from './card/EmbedEntriesContext'
 import { createCard } from './card/createCard'
+import { createFileCard } from './card/createFileCard'
 import { putCard } from './card/cardStorage'
 import { EmbedSourcePanel } from './card/EmbedSourcePanel'
 import { IndexDebugPanel } from './debug/IndexDebugPanel'
@@ -103,6 +104,7 @@ function AppShell({ userId }) {
   const [renamingItemId, setRenamingItemId] = useState(null)
   const [newItemPendingId, setNewItemPendingId] = useState(null)
   const [moveConflict, setMoveConflict] = useState(null)
+  const [moveTarget, setMoveTarget] = useState(null)
 
   function handleOpenAsPortal(cardId) {
     addPortalCard(cardId)
@@ -153,11 +155,21 @@ function AppShell({ userId }) {
 
   function handleVaultTabChange(tab) {
     setVaultTab(tab)
-    setSelectedVaultItem(null)
+    if (pickingFolder) {
+      setMoveTarget(null)
+    } else {
+      setSelectedVaultItem(null)
+    }
   }
 
   async function handleVaultNewCard() {
     const card = { ...createCard({ title: '', body: '' }), location: 'shelf' }
+    await putCard(card)
+    addToCardsById(card)
+  }
+
+  async function handleUploadCard(file) {
+    const card = { ...createFileCard(file), location: 'library' }
     await putCard(card)
     addToCardsById(card)
   }
@@ -173,11 +185,31 @@ function AppShell({ userId }) {
   function handleVaultPickFolder() {
     setPickingFolder(true)
     setFolderPanelOpen(true)
-    setVaultTab('library')
+    setMoveTarget(null)
   }
 
   function handlePickFolderCancel() {
     setPickingFolder(false)
+    setMoveTarget(null)
+  }
+
+  function handleFolderPickToggle(folder) {
+    setMoveTarget((prev) => (prev?.id === folder.id ? null : { id: folder.id, name: folder.name }))
+  }
+
+  function handleConfirmMove() {
+    if (!selectedVaultItem) return
+    const { item, type } = selectedVaultItem
+    if (vaultTab === 'shelf' && type === 'card') {
+      moveCardToShelf(item.id)
+      setPickingFolder(false)
+      setSelectedVaultItem(null)
+      setMoveTarget(null)
+    } else {
+      const folderId = vaultTab !== 'shelf' ? (moveTarget?.id ?? null) : null
+      handleVaultMoveToFolder(folderId)
+      setMoveTarget(null)
+    }
   }
 
   function handleVaultRenameCard(cardId, title) {
@@ -264,6 +296,8 @@ function AppShell({ userId }) {
       }
     } else if (type === 'tab') {
       moveTabToLibrary(item.id, folderId)
+    } else if (type === 'folder') {
+      moveFolder(item.id, folderId)
     }
     setPickingFolder(false)
     setSelectedVaultItem(null)
@@ -281,6 +315,7 @@ function AppShell({ userId }) {
     setPickingFolder(false)
     setSelectedVaultItem(null)
     setMoveConflict(null)
+    setMoveTarget(null)
   }
 
   function handleMoveConflictKeepBoth() {
@@ -294,11 +329,13 @@ function AppShell({ userId }) {
     setPickingFolder(false)
     setSelectedVaultItem(null)
     setMoveConflict(null)
+    setMoveTarget(null)
   }
 
   function handleMoveConflictCancel() {
     setPickingFolder(false)
     setMoveConflict(null)
+    setMoveTarget(null)
   }
 
   function handleVaultOpenInDock(cardId) {
@@ -418,10 +455,10 @@ function AppShell({ userId }) {
             activeTab={vaultTab}
             onTabChange={handleVaultTabChange}
             highlightedCardId={highlightedCardId}
-            activeVaultItemId={selectedVaultItem?.item?.id ?? null}
+            activeVaultItemId={pickingFolder ? (moveTarget?.id ?? null) : (selectedVaultItem?.item?.id ?? null)}
             onSelectVaultItem={handleSelectVaultItem}
             pickFolderMode={pickingFolder}
-            onFolderPicked={(folder) => handleVaultMoveToFolder(folder.id)}
+            onFolderPicked={handleFolderPickToggle}
             brainFeedItems={brainFeedItems}
             onReindex={reindexCard}
             moveCardToFolder={moveCardToFolder}
@@ -496,19 +533,18 @@ function AppShell({ userId }) {
           onVaultNewFolder={handleVaultNewFolder}
           selectedVaultItem={selectedVaultItem}
           onClearVaultItem={handleClearVaultItem}
-          onVaultAddToTab={addPortalCard}
           onVaultAddToDock={handleVaultOpenInDock}
-          onVaultMoveToLibrary={moveToLibrary}
-          onVaultMoveToShelf={moveCardToShelf}
+          onUploadFile={handleUploadCard}
           onVaultStartInlineRename={handleVaultStartInlineRename}
           onVaultSwitchToTab={handleVaultSwitchToTab}
           onVaultDeleteTab={deleteSavedTab}
           onVaultDeleteCard={handleVaultDeleteCard}
           onVaultDeleteFolderRequest={handleVaultDeleteFolderRequest}
-          onVaultMoveToFolder={handleVaultMoveToFolder}
           pickingFolder={pickingFolder}
           onVaultPickFolder={handleVaultPickFolder}
           onVaultPickFolderCancel={handlePickFolderCancel}
+          moveTarget={moveTarget}
+          onConfirmMove={handleConfirmMove}
         />
       </div>
       {tabSwitcherOpen && (

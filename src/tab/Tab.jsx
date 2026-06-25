@@ -1,4 +1,5 @@
 import { Card } from '../card/Card'
+import { FileCard } from '../card/FileCard'
 import { PortalCard } from '../card/PortalCard'
 import './Tab.css'
 
@@ -63,6 +64,25 @@ export function Tab({
                 onFlip={flipCard ? () => flipCard(entry.card.id) : undefined}
                 onUpdate={target && onUpdate ? (fields) => onUpdate(target.id, fields) : undefined}
                 onLocate={target && onLocate ? () => onLocate(target.id) : undefined}
+              />
+            </li>
+          )
+        }
+
+        if (entry.card.type === 'file') {
+          return (
+            <li key={entry.card.id} className="tab__item">
+              <FileCard
+                title={entry.card.title}
+                fileName={entry.card.fileName}
+                fileType={entry.card.fileType}
+                fileSize={entry.card.fileSize}
+                cardId={entry.card.id}
+                {...sharedProps}
+                {...indexProps}
+                onUpdate={onUpdate ? (fields) => onUpdate(entry.card.id, fields) : undefined}
+                onSaveToShelf={onSaveToShelf ? () => onSaveToShelf(entry.card.id) : undefined}
+                onSendToDock={onMoveToDock ? () => onMoveToDock(entry.card.id) : undefined}
               />
             </li>
           )

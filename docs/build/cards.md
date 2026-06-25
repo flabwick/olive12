@@ -1,6 +1,6 @@
 # Cards — implementation
 
-Text and portal card data shapes, pure logic, storage, React hook, and display components.
+Text, portal, and file card data shapes, pure logic, storage, React hook, and display components.
 
 ## File map
 
@@ -9,6 +9,8 @@ src/
   card/
     createCard.js               # Card factory + updateCardFields (pure, no React)
     createCard.test.js          # [TEST]
+    createFileCard.js           # File card factory + fileTypeLabel + formatFileSize (pure, no React)
+    createFileCard.test.js      # [TEST]
     cardStorage.js              # Dexie-backed per-record operations (pure, no React)
     cardStorage.test.js         # [TEST]
     useCards.js                 # Thin React hook over cardStorage (used by CardShell only)
@@ -23,7 +25,11 @@ src/
     Card.css
     Card.test.jsx               # [TEST]
     Card.stories.jsx            # [STORY]
-    PortalCard.jsx              # Thin wrapper around Card; resolves portal target, adds locate button
+    FileCard.jsx                # Stateful: inline title editing, read-only file body; composes CardHeader
+    FileCard.css
+    FileCard.test.jsx           # [TEST]
+    FileCard.stories.jsx        # [STORY]
+    PortalCard.jsx              # Thin wrapper around Card (or FileCard); resolves portal target
     PortalCard.css
     PortalCard.test.jsx         # [TEST]
     PortalCard.stories.jsx      # [STORY]
@@ -44,12 +50,12 @@ src/
     richTextLogic.js            # Pure: markdownToHtml, htmlToMarkdown, isEmptyMarkdown (embed-aware)
     richTextLogic.test.js       # [TEST]
     RichTextEditorContext.jsx   # React context: tracks active editor, cardId, editorSurface
-    RichTextEditor.jsx          # Tiptap editor wrapper: Tiptap extensions, streaming sync
+    RichTextEditor.jsx          # Tiptap editor wrapper: extensions, streaming sync
     RichTextEditor.css
     RichTextEditor.test.jsx     # [TEST]
     RichTextEditor.stories.jsx  # [STORY]
     EmbeddedCardNode.js         # Tiptap Node extension for [[cardId]] — renders EmbeddedCardView
-    EmbeddedCardView.jsx        # React NodeView for embedded cards: full CardHeader + editable body + resize
+    EmbeddedCardView.jsx        # React NodeView: full CardHeader + editable body + resize
     EmbeddedCardView.css
     EmbedEntriesContext.jsx     # React context: vault card entries + action callbacks for embedded views
     EmbedSourcePanel.jsx        # Dumb: searchable card picker for [[cardId]] embed insertion
@@ -67,31 +73,58 @@ src/
 
 ## Data model
 
+### Text and portal cards
+
 `createCard({ title = '', body = '', type = 'text', config = null })` returns:
 
 | Field | Type | Notes |
 |---|---|---|
 | `id` | string | `crypto.randomUUID()` |
 | `type` | string | `'text'` or `'portal'` |
-| `title` | string | Empty string for portal cards (content comes from target) |
-| `body` | string | Plain text markdown; empty string for portal cards |
+| `title` | string | Empty string for portal cards |
+| `body` | string | Markdown; empty string for portal cards |
 | `config` | object \| null | `null` for text cards; `{ target_card_id: string \| null }` for portal cards |
 | `location` | string | `'none' \| 'shelf' \| 'library'`; default `'none'` |
 | `folderId` | string \| null | Library folder id; `null` for root-level or unplaced |
-| `back` | string | Freeform notes on the card back face; default `''` |
+| `back` | string | Freeform notes on card back face; default `''` |
 | `createdAt` | number | `Date.now()` at creation |
 | `updatedAt` | number | Updated by `updateCardFields` |
 
-`updateCardFields(card, { title, body, back, location, folderId, config })` — returns a new card with updated fields and a refreshed `updatedAt`. Unspecified fields keep their existing values.
+`updateCardFields(card, { title, body, back, location, folderId, config })` — returns a new card with updated fields and refreshed `updatedAt`. Unspecified fields keep their existing values.
+
+### File cards
+
+`createFileCard(file)` — `file` is a `File` object (from a file input). Returns:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | `crypto.randomUUID()` |
+| `type` | string | `'file'` |
+| `title` | string | `file.name` |
+| `fileName` | string | `file.name` |
+| `fileType` | string | `file.type` or `''` if empty |
+| `fileSize` | number | `file.size` (bytes) |
+| `body` | string | Always `''` |
+| `back` | string | Always `''` |
+| `config` | null | Always `null` |
+| `location` | string | `'none'` (callers set `'library'` after creation for uploads) |
+| `folderId` | string \| null | `null` at creation |
+| `createdAt` | number | `Date.now()` |
+| `updatedAt` | number | Same as `createdAt` at creation |
+
+**`fileTypeLabel(fileType, fileName) → string`** — maps MIME types to short labels (PDF, PNG, JPG, XLSX, etc.). Falls back to the file extension uppercased. Returns `'FILE'` if neither is available.
+
+**`formatFileSize(bytes) → string`** — formats bytes as `B`, `KB`, or `MB` with one decimal place.
+
+**`type` semantics (all three types):**
+- `'text'` — standard editable card.
+- `'portal'` — proxy card reading `title`/`body` from a target card.
+- `'file'` — metadata-only card representing an uploaded file. `body` and `back` are always empty; title is editable.
 
 **`location` semantics:**
 - `'none'` — card lives in its tab; not committed to the vault.
 - `'shelf'` — saved to Shelf (chronological staging area).
 - `'library'` — promoted to Library (organised, folder-based).
-
-**`type` semantics:**
-- `'text'` — standard editable card with `title` and `body`.
-- `'portal'` — proxy card that reads `title`/`body` from a target card. Own `title`/`body` are empty strings. `config.target_card_id` holds the target card's id (or `null` if not yet linked).
 
 ## Portal logic — portalLogic.js
 
@@ -121,7 +154,7 @@ Looks up the target card from a `cardsById` map. Returns `null` if:
 | `getDirtyCards()` | Returns all records where `dirty === true` |
 | `markCardClean(cardId, mergedCard)` | Upserts `mergedCard` with `dirty: false`; called only by the sync layer |
 
-Both text and portal cards go through `putCard` and are flagged dirty for sync.
+All three card types go through `putCard` and are flagged dirty for sync.
 
 ## CardHeader component
 
@@ -141,23 +174,14 @@ Props:
 | `folded` | boolean | Controls caret rotation and fold button aria-label |
 | `hidden` | boolean | Controls eye icon variant |
 | `location` | string | Used to determine whether the save button shows active/inactive state |
-| `onSaveToShelf` | function \| undefined | If provided, renders save bookmark icon. Shows `SaveIcon` when `location === 'none'`, `CheckIcon` (disabled) when already saved |
-| `onToggleFold` | function \| undefined | If provided, renders the fold caret button (left of title) |
+| `onSaveToShelf` | function \| undefined | If provided, renders save bookmark icon. `SaveIcon` when `location === 'none'`; `CheckIcon` (disabled) when already saved |
+| `onToggleFold` | function \| undefined | If provided, renders the fold caret button |
 | `onToggleHide` | function \| undefined | If provided, renders the eye button |
-| `onSendToDock` | function \| undefined | If provided, renders the send-to-dock arrow button (down-arrow to baseline) |
-| `onSendToTab` | function \| undefined | If provided, renders the send-to-tab arrow button (up-arrow from baseline) |
+| `onSendToDock` | function \| undefined | If provided, renders the send-to-dock arrow button |
+| `onSendToTab` | function \| undefined | If provided, renders the send-to-tab arrow button |
 | `onClose` | function \| undefined | If provided, renders the X close button |
 
-**Removed from CardHeader:** `onMoveUp`, `onMoveDown`, `onFlip`, `flipped`, `folders`. Move-up/move-down and flip are no longer part of the header controls.
-
-**Controls rendered (all in `.card-header__controls` right group):**
-- `onSaveToShelf`: bookmark icon (`aria-label="Save card"`) when `location === 'none'`; checkmark icon disabled (`aria-label="Saved"`) when location is `'shelf'` or `'library'`
-- `onToggleHide`: eye icon (`aria-label="Dim card"` / `"Show card"`)
-- `onSendToDock`: down-arrow icon (`aria-label="Move to dock"`)
-- `onSendToTab`: up-arrow icon (`aria-label="Move to tab"`)
-- `onClose`: X icon (`aria-label="Remove card"`)
-
-The controls group only renders if at least one of those callbacks is provided.
+**Removed from CardHeader:** `onMoveUp`, `onMoveDown`, `onFlip`, `flipped`, `folders`. Flip is absent from the front face — `CardBack` has the flip-to-front button.
 
 ## Card component
 
@@ -165,19 +189,31 @@ Stateful: manages `editing`, draft title/body/back. Composes `CardHeader` and `R
 
 Key props: `cardId`, `title`, `body`, `back`, `flipped`, `foldState`, `hiddenState`, `location`, `onToggleFold`, `onToggleHide`, `onSendToDock`, `onSendToTab`, `onUpdate`, `onClose`, `onSaveToShelf`, `onFlip`, `indexEntry`, `indexLoading`, `editorSurface`.
 
-**No `onMoveUp`, `onMoveDown`, `onFlip` passed to `CardHeader`.** Flip state is driven externally (from `useTabs`) and `flipped` toggles between body and `CardBack`. The flip button has been removed from `CardHeader`; the back face has its own "Flip to front" button in `CardBack`.
+**`editorSurface`** — `'tab'` (default) or `'dock'`. Forwarded to `RichTextEditor`, which registers it in `RichTextEditorContext` so the dock state machine can distinguish surfaces.
 
-**`editorSurface`** — `'tab'` (default) or `'dock'`. Forwarded to `RichTextEditor`, which forwards it to `RichTextEditorContext.registerEditor(cardId, editorSurface, editor)`. The dock state machine uses this to distinguish a dock-surface edit from a tab-surface edit.
-
-**Title editing:** Click title `h3` (when `onUpdate` provided and not flipped) → enters edit mode with title input focused. Also enters edit mode when clicking body. Commit on focus leaving the card entirely (`onBlur` that checks `relatedTarget`). Escape cancels.
+**Title editing:** Click title `h3` (when `onUpdate` provided and not flipped) → enters edit mode. Commit on blur (checked against `relatedTarget`). Escape cancels.
 
 **Body editing:** Click body area → enters edit mode. `RichTextEditor` becomes editable. Commit on blur.
 
-**Back editing (when flipped):** Click inside the back face → enters edit mode on the back field. Commit on blur.
+**Back editing (when flipped):** Click inside back face → enters edit mode on the back field. Commit on blur.
 
-**`flushAndThen(action)`** — used by `onSendToDock`/`onSendToTab` to commit any pending edit before the card is moved.
+**`flushAndThen(action)`** — commits any pending edit before `onSendToDock`/`onSendToTab` moves the card.
 
-**`useBodyResize`** hook — drag handle at the bottom of the body area for manual height control.
+**`useBodyResize`** hook — drag handle at the bottom of the body area.
+
+## FileCard component
+
+Stateful: manages inline title editing only. Body is read-only.
+
+Props: `title`, `fileName`, `fileType`, `fileSize`, `cardId`, `location`, `foldState`, `hiddenState`, `onToggleFold`, `onToggleHide`, `onClose`, `onUpdate`, `onSaveToShelf`, `onSendToDock`, `onSendToTab`.
+
+- Composes `CardHeader` (editable title via `onTitleClick`).
+- Body area: `FileDocIcon` + file name + type badge (from `fileTypeLabel`) + size (from `formatFileSize`). Body hidden when `foldState` is true.
+- Title editing: click title → edit mode; commit on blur/Enter; Escape cancels.
+- `onUpdate` provided → title is clickable. `onUpdate` absent → read-only.
+- `hiddenState` adds `.file-card--hidden`.
+
+**FileCard stories (8):** `PDF`, `Image`, `Spreadsheet`, `TextFile`, `UnknownType`, `Folded`, `Hidden`, `ReadOnly`.
 
 ## Rich text system
 
@@ -187,8 +223,8 @@ Pure serialization — no React, no storage.
 
 | Function | Behaviour |
 |---|---|
-| `markdownToHtml(md)` | Parses markdown to HTML. A marked inline extension converts `[[cardId]]` tokens to `<span data-card-id="cardId">[[cardId]]</span>` before parsing. Returns `''` for blank input. |
-| `htmlToMarkdown(html)` | Converts HTML to markdown via Turndown. A custom rule converts `<span data-card-id="...">` back to `[[cardId]]`. GFM strikethrough rule registered. |
+| `markdownToHtml(md)` | Parses markdown to HTML. A marked inline extension converts `[[cardId]]` tokens to `<span data-card-id="cardId">[[cardId]]</span>`. Returns `''` for blank input. |
+| `htmlToMarkdown(html)` | Converts HTML to markdown via Turndown. Custom rule converts `<span data-card-id="...">` back to `[[cardId]]`. GFM strikethrough rule registered. |
 | `isEmptyMarkdown(md)` | Returns `true` for blank/null/undefined content. |
 
 ### RichTextEditorContext
@@ -214,7 +250,6 @@ Pure serialization — no React, no storage.
 - On blur: calls `clearEditor(cardId)`.
 - `onChange(markdown)` fires on every Tiptap update via `htmlToMarkdown(editor.getHTML())`.
 - Syncs external `value` changes when the editor is not focused (streaming support for dock-prompt).
-- No separate embed bar in the editor itself — embed insertion is triggered from the Dock's `[[]]` button (`onEmbedOpen` in AppShell).
 
 ### EmbeddedCardNode and EmbeddedCardView
 
@@ -223,16 +258,16 @@ Pure serialization — no React, no storage.
 - `group: 'inline'`, `inline: true`, `atom: true`.
 - `addAttributes`: `cardId` — parsed from `data-card-id`, rendered back to `data-card-id`.
 - `parseHTML`: matches `span[data-card-id]`.
-- `renderHTML`: outputs `<span data-card-id="..." class="embedded-card-node">[[cardId]]</span>` (used only for HTML export / Turndown serialization).
-- `addNodeView()`: renders `EmbeddedCardView` React component via `ReactNodeViewRenderer`. `stopEvent: () => true` for non-drag events prevents ProseMirror from claiming mouse interactions inside the node view.
+- `renderHTML`: outputs `<span data-card-id="..." class="embedded-card-node">[[cardId]]</span>`.
+- `addNodeView()`: renders `EmbeddedCardView` React component via `ReactNodeViewRenderer`. `stopEvent: () => true` for non-drag events.
 
-`EmbeddedCardView` (`src/card/EmbeddedCardView.jsx`) is the actual React display for embedded cards inside the editor.
+`EmbeddedCardView` (`src/card/EmbeddedCardView.jsx`) — React display for embedded cards inside the editor.
 
-- Reads card data from `useEmbedEntries()` (vault card entries via context).
+- Reads card data from `useEmbedEntries()`.
 - Reads action callbacks from `useEmbedActions()`: `onSaveToShelf`, `onMoveToDock`, `onUpdate`.
-- Full `CardHeader` with: fold toggle, save button, send-to-dock button, close (deletes node).
-- Body: rendered as HTML from `markdownToHtml(card.body)`. Click to enter edit mode (plain `textarea` — not Tiptap, to avoid nested editors).
-- Title: click to enter edit mode (text input). Commit on blur/Enter; Escape cancels.
+- Full `CardHeader` with fold, save, send-to-dock, and close (deletes node) buttons.
+- Body: rendered as HTML from `markdownToHtml(card.body)`. Click to enter edit mode (plain `textarea`).
+- Title: click to enter edit mode. Commit on blur/Enter; Escape cancels.
 - Drag-to-resize handle (via `useBodyResize`).
 - Falls back to `[[cardId]]` badge when card is not found in entries.
 
@@ -240,36 +275,32 @@ Pure serialization — no React, no storage.
 
 Two separate contexts in `src/card/EmbedEntriesContext.jsx`:
 
-**`EmbedEntriesProvider({ entries, children })` / `useEmbedEntries()`** — provides the flat list of all cards (`Object.values(cardsById)`) to embedded card views.
-
-`AppShell` wraps with `<EmbedEntriesProvider entries={Object.values(cardsById)}>`.
+**`EmbedEntriesProvider({ entries, children })` / `useEmbedEntries()`** — provides all cards as a flat list to embedded card views.
 
 **`EmbedActionsProvider({ onSaveToShelf, onMoveToDock, onMoveToTab, onUpdate, children })` / `useEmbedActions()`** — provides action callbacks to `EmbeddedCardView` without prop drilling.
 
-`AppShell` wraps with `<EmbedActionsProvider onSaveToShelf={saveToShelf} onMoveToDock={addToDock} onMoveToTab={addTabCard} onUpdate={updateCard}>`.
-
 ### EmbedSourcePanel
 
-`EmbedSourcePanel({ entries, onSelect, onClose, onCreateNew })` — dumb searchable picker rendered by `AppShell` when `embedOpen` is true.
+`EmbedSourcePanel({ entries, onSelect, onClose, onCreateNew })` — dumb searchable picker.
 
 - `role="dialog" aria-label="Insert embed"`.
-- Search input filters `entries` by card title (case-insensitive substring).
-- Clicking a card button calls `onSelect(card.id)`.
-- Cancel button calls `onClose`.
-- `onCreateNew` — if provided, creates a new empty card and inserts it immediately.
-- Empty state: "No cards found."
+- Filters `entries` by card title (case-insensitive substring).
+- `onSelect(card.id)` on card click.
+- `onCreateNew` — creates a new empty card and inserts it immediately.
 
 ## CardBack component
 
-Back face rendered when a card is flipped. Props include `cardId`, `back`, `location`, `createdAt`, `updatedAt`, `indexEntry`, `indexLoading`, `onUpdateBack`, `onFlip`, `editing`, `onBackChange`.
+Back face rendered when a card is flipped.
+
+Props: `cardId`, `back`, `location`, `createdAt`, `updatedAt`, `indexEntry`, `indexLoading`, `onUpdateBack`, `onFlip`, `editing`, `onBackChange`.
 
 | Section | When shown |
 |---|---|
 | Flip-to-front button | Always — calls `onFlip` |
-| Notes | Always — editable textarea when `editing` is true (Card drives edit mode) |
+| Notes | Always — editable textarea when `editing` is true |
 | Metadata | Created / updated timestamps |
 | Index | Only when `location === 'library'` — title, summary, tags from `indexEntry`; spinner when `indexLoading` |
-| Index debug | Collapsible `<details>` with pipeline state (see [debug.md](./debug.md)) |
+| Index debug | Collapsible `<details>` with pipeline state |
 
 ## flipLogic.js
 
@@ -278,52 +309,53 @@ Pure helpers. No React, no side effects.
 | Function | Behaviour |
 |---|---|
 | `canFlip(card)` | `true` when `type === 'text'` and `back` is non-empty after trim |
-| `toggleFlip(flippedSet, cardId)` | Returns a **new** `Set` with `cardId` added if absent, removed if present. Does not mutate the input. |
+| `toggleFlip(flippedSet, cardId)` | Returns a new `Set` with `cardId` added if absent, removed if present. Does not mutate input. |
 | `isFlipped(flippedSet, cardId)` | Returns `boolean` — whether `cardId` is in `flippedSet`. |
 
-Flip state lives in `useTabs` as `flippedCardIds` (a `Set<string>`). `flipCard(cardId)` uses `toggleFlip` to produce a new set; `isFlippedCard(cardId)` uses `isFlipped` to read it. The flip button in the header has been removed — flipping now happens only from the CardBack "Flip to front" button or from Tab-level gestures.
+Flip state lives in `useTabs` as `flippedCardIds`. The flip button has been removed from `CardHeader` — flipping happens only from `CardBack`'s "Flip to front" button or from `Tab`-level `flipCard` prop.
 
 ## PortalCard component
 
-`PortalCard` is a thin wrapper around `Card`. It resolves the portal target and delegates all rendering to `Card`.
+Thin wrapper around `Card` (or `FileCard` when target is a file card). Resolves the portal target and delegates all rendering.
 
 Props: `config`, `cardsById`, `foldState`, `hiddenState`, `location`, `flipped`, `indexEntry`, `indexLoading`, `onToggleFold`, `onToggleHide`, `onFlip`, `onMoveUp`, `onMoveDown`, `onClose`, `onUpdate`, `onLocate`.
 
-**No `onSaveToShelf`** — portal cards cannot be saved to shelf directly (only the underlying target can).
+**No `onSaveToShelf`** — portal cards cannot be saved directly.
 
-Note: `onMoveUp` and `onMoveDown` are still accepted by `PortalCard` and forwarded to `Card`, but `Card` does not use them (they were removed from `CardHeader`). `onFlip` is forwarded to `CardBack` for the "Flip to front" button.
+**Resolution:** When the target is a file card, renders `FileCard` with the target's file props. When the target is a text/portal card, renders `Card` with the target's `title` and `body`. When target is absent, renders `Card` with `title="Portal — no target"`.
 
-**Resolution:** `resolvePortalTarget` is called with `{ config }` and `cardsById`. When the target exists, `Card` receives the target's `title` and `body`. When the target is absent, `Card` renders `title="Portal — no target"` and `body="No card linked."`.
-
-**Editing:** `onUpdate` is forwarded to `Card` only when the target exists. Edits go through the caller-bound target card id.
-
-**Locate button:** When both `target` and `onLocate` are provided, a small circular button (`aria-label="Show in vault"`) is rendered as an absolute overlay. Clicking it calls `onLocate()`. Hidden when target is null.
+**Locate button:** When both `target` and `onLocate` are provided, renders a small circular `aria-label="Show in vault"` overlay button.
 
 ## Tests
 
 | File | What it covers |
 |---|---|
 | `createCard.test.js` | Default fields; custom title/body; unique ids; `updateCardFields` partial/full update; portal card creation |
+| `createFileCard.test.js` | Default fields from File object; `type: 'file'`; `fileTypeLabel` (MIME match, extension fallback, FILE default); `formatFileSize` (B/KB/MB, null/zero/negative) |
 | `cardStorage.test.js` | Empty load; `putCard` round-trip; `dirty: true`; upsert; `deleteCard`; `location` round-trip; `getDirtyCards`; `markCardClean`; portal card config round-trip |
 | `useCards.test.js` | Load on mount, add + persist, remount reload |
 | `portalLogic.test.js` | `isPortalCard` true/false/null/undefined; `resolvePortalTarget` found/null-targetId/not-in-map/null-config/null-portalCard/empty-cardsById |
-| `CardHeader.test.jsx` | Renders title; no buttons without callbacks; fold/hide/save/sendToDock/sendToTab/close callbacks; aria-labels; title focusable when onTitleClick provided; save icon states (none/shelf/library); confirms no move-up/move-down/flip buttons |
-| `Card.test.jsx` | Renders title/body; fold hides body and resize handle; hidden applies `.card--hidden`; resize handle present/absent; inline editing (click title, click body, commit on blur, cancel on Escape, no save if unchanged); flip: CardBack renders when flipped=true, flip header button absent, card--flipped class, back edit commits/cancels; location: Save card button / no-op for shelf/library |
-| `PortalCard.test.jsx` | Renders target title/body; placeholder when target null; placeholder when cardsById missing target; fold hides body; hiddenState; onClose; onUpdate called with edited fields; null target not editable; Show in vault button present/absent/calls onLocate |
+| `CardHeader.test.jsx` | Renders title; no buttons without callbacks; fold/hide/save/sendToDock/sendToTab/close callbacks; aria-labels; title focusable when onTitleClick provided; save icon states; confirms no move-up/move-down/flip buttons |
+| `Card.test.jsx` | Renders title/body; fold hides body and resize handle; hidden applies `.card--hidden`; inline editing (click title, click body, commit on blur, cancel on Escape); flip: CardBack renders when flipped, card--flipped class, back edit; location: Save card button |
+| `FileCard.test.jsx` | Renders title, fileName, type badge, size; fold hides body; hidden class; title editing (click, commit, cancel); read-only when onUpdate absent; onSaveToShelf / onSendToDock / onClose callbacks |
+| `PortalCard.test.jsx` | Renders target title/body; FileCard rendered for file target; placeholder when target null; fold hides body; hiddenState; onClose; onUpdate routes to target id; null target not editable; Show in vault button present/absent/calls onLocate |
 | `flipLogic.test.js` | `canFlip` for text/portal/empty back; `toggleFlip` adds/removes/non-mutating; `isFlipped` true/false/empty |
 | `CardBack.test.jsx` | Notes render; index section library-only; loading state; debug details |
 | `richTextLogic.test.js` | `markdownToHtml` bold/italic/heading/list/empty/embed token; `htmlToMarkdown` strong/em/h1/del/span[data-card-id]; embed roundtrip; `isEmptyMarkdown` variants |
-| `RichTextEditor.test.jsx` | Renders without crashing; markdown value renders; bold markdown; aria-label; onChange prop; embedded-card-node renders for [[cardId]] value |
-| `EmbedSourcePanel.test.jsx` | Search input; renders entry buttons; filter by title; no-match state; onSelect called with cardId; onClose called; dialog label; empty state |
+| `RichTextEditor.test.jsx` | Renders without crashing; markdown value renders; bold markdown; aria-label; onChange; embedded-card-node renders for [[cardId]] value |
+| `EmbedSourcePanel.test.jsx` | Search input; entry buttons; filter by title; no-match state; onSelect; onClose; dialog label; empty state |
 | `useBodyResize.test.js` | Resize behavior via pointer events |
-| `linkLogic.test.js` | `extractLinks`: portal, null config, embed `[[id]]` syntax. `diffLinks`: empty/add/remove/partition. `isOrphan`: empty/source/target/unrelated. |
-| `linkStorage.test.js` | Round-trip; multiple sources; upsert dedup; `getLinksForTarget`; `deleteLinksForSource` isolation; `rebuildLinksForCard` replace and clear. |
+| `linkLogic.test.js` | `extractLinks`; `diffLinks`; `isOrphan` |
+| `linkStorage.test.js` | Round-trip; multiple sources; upsert dedup; `getLinksForTarget`; `deleteLinksForSource`; `rebuildLinksForCard` |
 
 ## Not built yet
 
 - Process and container card types
 - Per-card colour or tags on front face
-- Card deletion sync to Supabase for embedded/portal link cleanup (target-side links from other cards not removed)
+- File card actual content storage or blob linking (only metadata is stored; no upload target)
+- File card preview (image thumbnails, PDF inline viewer)
+- File card download action
+- Card deletion sync to Supabase for embedded/portal link cleanup
 - `user_id` on local card records
 - Portal → portal chaining
 - `FolderPickerOverlay` / `LocationButton` wired to the new CardHeader (currently unused; shelf→library promotion happens via FolderPanel)

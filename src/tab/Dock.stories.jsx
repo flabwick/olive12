@@ -24,6 +24,7 @@ export const Base = {
     onOpenDockCard: () => {},
     onFolderOpen: () => {},
     onSettings: () => {},
+    onUploadFile: () => {},
   },
 }
 
@@ -47,42 +48,111 @@ export const TabEditor = {
   },
 }
 
+export const VaultBrowseShelf = {
+  args: {
+    dockState: DOCK_STATE.BASE,
+    vaultOpen: true,
+    vaultTab: 'shelf',
+    onVaultTabChange: () => {},
+    onVaultNewCard: () => {},
+    onFolderOpen: () => {},
+    onUploadFile: () => {},
+  },
+}
+
+export const VaultBrowseLibrary = {
+  args: {
+    dockState: DOCK_STATE.BASE,
+    vaultOpen: true,
+    vaultTab: 'library',
+    onVaultTabChange: () => {},
+    onVaultNewFolder: () => {},
+    onFolderOpen: () => {},
+    onUploadFile: () => {},
+  },
+}
+
 export const VaultCardSelected = {
   args: {
     dockState: DOCK_STATE.BASE,
+    vaultOpen: true,
+    vaultTab: 'shelf',
+    onVaultTabChange: () => {},
     selectedVaultItem: {
       item: { id: 'c1', title: 'Meeting notes', body: 'Agenda items', location: 'shelf' },
       type: 'card',
     },
     onClearVaultItem: () => {},
-    onVaultAddToTab: () => {},
-    onVaultMoveToLibrary: () => {},
+    onVaultAddToDock: () => {},
     onVaultStartInlineRename: () => {},
+    onVaultPickFolder: () => {},
+    onVaultDeleteCard: () => {},
   },
 }
 
 export const VaultFolderSelected = {
   args: {
     dockState: DOCK_STATE.BASE,
+    vaultOpen: true,
+    vaultTab: 'library',
+    onVaultTabChange: () => {},
     selectedVaultItem: {
       item: { id: 'f1', name: 'Work', parentId: null },
       type: 'folder',
     },
     onClearVaultItem: () => {},
     onVaultStartInlineRename: () => {},
+    onVaultPickFolder: () => {},
     onVaultDeleteFolderRequest: () => {},
+  },
+}
+
+export const VaultPickFolder = {
+  args: {
+    dockState: DOCK_STATE.BASE,
+    vaultOpen: true,
+    vaultTab: 'library',
+    onVaultTabChange: () => {},
+    selectedVaultItem: {
+      item: { id: 'c1', title: 'Meeting notes', body: '', location: 'shelf' },
+      type: 'card',
+    },
+    pickingFolder: true,
+    onVaultPickFolderCancel: () => {},
+    onConfirmMove: () => {},
+  },
+}
+
+export const VaultPickFolderWithTarget = {
+  args: {
+    dockState: DOCK_STATE.BASE,
+    vaultOpen: true,
+    vaultTab: 'library',
+    onVaultTabChange: () => {},
+    selectedVaultItem: {
+      item: { id: 'c1', title: 'Meeting notes', body: '', location: 'shelf' },
+      type: 'card',
+    },
+    pickingFolder: true,
+    moveTarget: { id: 'f1', name: 'Work' },
+    onVaultPickFolderCancel: () => {},
+    onConfirmMove: () => {},
   },
 }
 
 export const VaultTabSelected = {
   args: {
     dockState: DOCK_STATE.BASE,
+    vaultOpen: true,
+    vaultTab: 'shelf',
+    onVaultTabChange: () => {},
     selectedVaultItem: {
       item: { id: 't1', name: 'Research', savedLocation: 'shelf' },
       type: 'tab',
     },
     onClearVaultItem: () => {},
     onVaultSwitchToTab: () => {},
+    onVaultPickFolder: () => {},
     onVaultDeleteTab: () => {},
   },
 }

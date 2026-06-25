@@ -1,0 +1,80 @@
+.file-card {
+  background: var(--card-bg, #fdf6ed);
+  border: 1.5px solid var(--card-border, #d4c5a9);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.file-card--hidden {
+  opacity: 0.45;
+}
+
+.file-card__body {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem 1rem;
+}
+
+.file-card__doc-icon {
+  color: var(--olive-text-muted, #8a7060);
+  flex-shrink: 0;
+}
+
+.file-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.file-card__filename {
+  font-family: var(--mono, ui-monospace, 'Courier New', monospace);
+  font-size: 0.8rem;
+  color: var(--olive-text, #2c1810);
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.file-card__details {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.file-card__type-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  background: var(--olive-text, #2c1810);
+  color: var(--card-bg, #fdf6ed);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.2rem;
+  line-height: 1.6;
+}
+
+.file-card__size {
+  font-size: 0.7rem;
+  color: var(--olive-text-muted, #8a7060);
+}
+
+@media (prefers-color-scheme: dark) {
+  .file-card {
+    background: #1a1814;
+    border-color: #3a3530;
+  }
+
+  .file-card__filename {
+    color: #e4ddd0;
+  }
+
+  .file-card__type-badge {
+    background: #e4ddd0;
+    color: #1a1814;
+  }
+
+  .file-card__doc-icon {
+    color: #6a6058;
+  }
+}

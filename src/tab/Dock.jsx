@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRichTextEditorContext } from '../card/RichTextEditorContext'
 import { DOCK_STATE } from './dockStateMachine'
 import './Dock.css'
@@ -160,6 +160,27 @@ function BrainIcon() {
   )
 }
 
+function FolderPlusIcon() {
+  return (
+    <svg width="16" height="14" viewBox="0 0 16 14" fill="none" aria-hidden="true">
+      <path
+        d="M1 11V4.5A1 1 0 012 3.5H5.5L7 5H13.5A1 1 0 0114.5 6V11A1 1 0 0113.5 12H2A1 1 0 011 11Z"
+        stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"
+      />
+      <path d="M7.75 7.5v3M6.25 9h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function CardPlusIcon() {
+  return (
+    <svg width="13" height="14" viewBox="0 0 13 14" fill="none" aria-hidden="true">
+      <rect x="1" y="2" width="11" height="11" rx="1" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M6.5 5.5v5M4 8h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function IconWithPlus({ Icon }) {
   return (
     <span className="dock__icon-plus">
@@ -169,11 +190,12 @@ function IconWithPlus({ Icon }) {
   )
 }
 
-function DockBtn({ active, danger, label, title, onMouseDown, onClick, children, ariaExpanded }) {
+function DockBtn({ active, danger, primary, label, title, onMouseDown, onClick, children, ariaExpanded }) {
   const cls = [
     'dock__btn',
     active && 'dock__btn--active',
     danger && 'dock__btn--danger',
+    primary && 'dock__btn--primary',
   ].filter(Boolean).join(' ')
   return (
     <button
@@ -193,170 +215,6 @@ function DockBtn({ active, danger, label, title, onMouseDown, onClick, children,
 
 const VAULT_TAB_ICONS = { shelf: ShelfIcon, library: LibraryIcon, brain: BrainIcon }
 
-function VaultBrowseBar({ activeTab, onTabChange, onNewCard, onNewFolder, onClose }) {
-  return (
-    <>
-      <div className="dock__vault-tab-group" role="group" aria-label="Vault section">
-        {['shelf', 'library', 'brain'].map((tab) => {
-          const Icon = VAULT_TAB_ICONS[tab]
-          const label = tab.charAt(0).toUpperCase() + tab.slice(1)
-          return (
-            <button
-              key={tab}
-              type="button"
-              className={`dock__vault-tab${activeTab === tab ? ' dock__vault-tab--active' : ''}`}
-              aria-label={label}
-              aria-pressed={activeTab === tab}
-              onClick={() => onTabChange?.(tab)}
-            >
-              <Icon />
-            </button>
-          )
-        })}
-      </div>
-      <div className="dock__vault-actions" role="toolbar" aria-label="Vault actions">
-        <DockBtn label="New card" onClick={onNewCard}>
-          <IconWithPlus Icon={CardBadgeIcon} />
-        </DockBtn>
-        {activeTab === 'library' && (
-          <DockBtn label="New folder" onClick={onNewFolder}>
-            <IconWithPlus Icon={FolderIcon} />
-          </DockBtn>
-        )}
-      </div>
-      <div className="dock__vault-dismiss">
-        <DockBtn label="Close vault" onClick={onClose}>✕</DockBtn>
-      </div>
-    </>
-  )
-}
-
-function FolderPickBar({ selectedVaultItem, onPickRoot, onCancel }) {
-  const { item } = selectedVaultItem
-  const name = item.title ?? item.name ?? '(untitled)'
-  return (
-    <>
-      <div className="dock__vault-actions" role="toolbar" aria-label="Move to folder">
-        <span className="dock__vault-item-icon"><FolderArrowIcon /></span>
-        <span className="dock__vault-name" title={name}>{name}</span>
-        <span className="dock__sep" aria-hidden="true" />
-        <DockBtn label="Move to root" onClick={onPickRoot}>Root</DockBtn>
-      </div>
-      <div className="dock__vault-dismiss">
-        <DockBtn label="Cancel move" onClick={onCancel}>‹</DockBtn>
-      </div>
-    </>
-  )
-}
-
-function VaultSelectionBar({
-  selectedVaultItem,
-  onClear,
-  onVaultAddToTab,
-  onVaultAddToDock,
-  onVaultMoveToLibrary,
-  onVaultMoveToShelf,
-  onVaultSwitchToTab,
-  onVaultDeleteTab,
-  onVaultDeleteCard,
-  onVaultDeleteFolderRequest,
-  onVaultPickFolder,
-  onVaultStartInlineRename,
-}) {
-  const [mode, setMode] = useState('normal')
-  const { item, type } = selectedVaultItem
-  const name = item.title ?? item.name ?? '(untitled)'
-
-  const TypeIcon = type === 'folder' ? FolderIcon : type === 'tab' ? TabBadgeIcon : CardBadgeIcon
-
-  if (mode === 'confirm-delete-tab') {
-    return (
-      <>
-        <div className="dock__vault-actions" role="toolbar" aria-label="Confirm remove tab">
-          <span className="dock__vault-item-icon"><TabBadgeIcon /></span>
-          <span className="dock__vault-name" title={name}>{name}</span>
-          <span className="dock__sep" aria-hidden="true" />
-          <span className="dock__vault-confirm-label">Remove?</span>
-          <DockBtn label="Confirm remove tab" danger onClick={() => { onVaultDeleteTab?.(item.id); onClear() }}>
-            <TrashIcon />
-          </DockBtn>
-        </div>
-        <div className="dock__vault-dismiss">
-          <DockBtn label="Cancel" onClick={() => setMode('normal')}>‹</DockBtn>
-        </div>
-      </>
-    )
-  }
-
-  if (mode === 'confirm-delete-card') {
-    return (
-      <>
-        <div className="dock__vault-actions" role="toolbar" aria-label="Confirm delete card">
-          <span className="dock__vault-item-icon"><CardBadgeIcon /></span>
-          <span className="dock__vault-name" title={name}>{name}</span>
-          <span className="dock__sep" aria-hidden="true" />
-          <span className="dock__vault-confirm-label">Delete permanently?</span>
-          <DockBtn label="Confirm delete card" danger onClick={() => { onVaultDeleteCard?.(item.id); onClear() }}>
-            <TrashIcon />
-          </DockBtn>
-        </div>
-        <div className="dock__vault-dismiss">
-          <DockBtn label="Cancel" onClick={() => setMode('normal')}>‹</DockBtn>
-        </div>
-      </>
-    )
-  }
-
-  return (
-    <>
-      <div className="dock__vault-actions" role="toolbar" aria-label="Vault item actions">
-        <span className="dock__vault-item-icon"><TypeIcon /></span>
-        <span className="dock__vault-name" title={name}>{name}</span>
-        <span className="dock__sep" aria-hidden="true" />
-        {type === 'card' && (
-          <DockBtn label="Add to tab" onClick={() => { onVaultAddToTab?.(item.id); onClear() }}>↗</DockBtn>
-        )}
-        {type === 'card' && (
-          <DockBtn label="Open in dock" onClick={() => { onVaultAddToDock?.(item.id) }}><DockPinIcon /></DockBtn>
-        )}
-        {type === 'card' && item.location === 'shelf' && (
-          <DockBtn label="Move to library" onClick={() => { onVaultMoveToLibrary?.(item.id, null); onClear() }}>
-            <IconWithPlus Icon={LibraryIcon} />
-          </DockBtn>
-        )}
-        {type === 'card' && item.location === 'library' && (
-          <DockBtn label="Move to shelf" onClick={() => { onVaultMoveToShelf?.(item.id); onClear() }}>
-            <IconWithPlus Icon={ShelfIcon} />
-          </DockBtn>
-        )}
-        {type === 'card' && (
-          <DockBtn label="Rename card" onClick={() => { onVaultStartInlineRename?.(item.id, 'card'); onClear() }}><PencilIcon /></DockBtn>
-        )}
-        {type === 'card' && (
-          <DockBtn label="Delete card" danger onClick={() => setMode('confirm-delete-card')}><TrashIcon /></DockBtn>
-        )}
-        {(type === 'card' || type === 'tab') && (
-          <DockBtn label="Move to folder" onClick={() => onVaultPickFolder?.()}><FolderArrowIcon /></DockBtn>
-        )}
-        {type === 'tab' && (
-          <DockBtn label="Switch to tab" onClick={() => { onVaultSwitchToTab?.(item.id); onClear() }}>→</DockBtn>
-        )}
-        {type === 'tab' && (
-          <DockBtn label="Remove tab" onClick={() => setMode('confirm-delete-tab')}><TrashIcon /></DockBtn>
-        )}
-        {type === 'folder' && (
-          <DockBtn label="Rename folder" onClick={() => { onVaultStartInlineRename?.(item.id, 'folder'); onClear() }}><PencilIcon /></DockBtn>
-        )}
-        {type === 'folder' && (
-          <DockBtn label="Delete folder" danger onClick={() => onVaultDeleteFolderRequest?.(item.id)}><TrashIcon /></DockBtn>
-        )}
-      </div>
-      <div className="dock__vault-dismiss">
-        <DockBtn label="Back to vault" title="Back to vault" onClick={onClear}>‹</DockBtn>
-      </div>
-    </>
-  )
-}
 
 function FormattingToolbar({
   activeEditor,
@@ -468,6 +326,15 @@ function FormattingToolbar({
   )
 }
 
+function UploadIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M7 9V1M4 4l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2 11.5h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function Dock({
   dockState = DOCK_STATE.BASE,
   dockCardEntries = [],
@@ -477,6 +344,7 @@ export function Dock({
   onFolderOpen,
   onSettings,
   onEmbedOpen,
+  onUploadFile,
   lightningActive = false,
   onLightningToggle,
   vaultOpen = false,
@@ -486,21 +354,41 @@ export function Dock({
   onVaultNewFolder,
   selectedVaultItem = null,
   onClearVaultItem,
-  onVaultAddToTab,
   onVaultAddToDock,
-  onVaultMoveToLibrary,
-  onVaultMoveToShelf,
   onVaultSwitchToTab,
   onVaultDeleteTab,
   onVaultDeleteCard,
   onVaultDeleteFolderRequest,
-  onVaultMoveToFolder,
   onVaultStartInlineRename,
   pickingFolder = false,
   onVaultPickFolder,
   onVaultPickFolderCancel,
+  moveTarget = null,
+  onConfirmMove,
 }) {
+  const fileInputRef = useRef(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const { activeEditor } = useRichTextEditorContext()
+
+  useEffect(() => { setConfirmDelete(false) }, [selectedVaultItem])
+
+  function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (file) onUploadFile?.(file)
+    e.target.value = ''
+  }
+
+  function handleTabClick(tab) {
+    onVaultTabChange?.(tab)
+    if (!pickingFolder) onClearVaultItem?.()
+    setConfirmDelete(false)
+  }
+
+  function pickDestLabel() {
+    if (vaultTab === 'shelf') return 'Shelf'
+    if (moveTarget) return moveTarget.name
+    return 'Library'
+  }
 
   if (dockState === DOCK_STATE.DOCK_EDITOR || dockState === DOCK_STATE.TAB_EDITOR) {
     return (
@@ -515,49 +403,126 @@ export function Dock({
     )
   }
 
-  if (vaultOpen && !selectedVaultItem && dockState === DOCK_STATE.BASE) {
-    return (
-      <div className="dock dock--vault">
-        <VaultBrowseBar
-          activeTab={vaultTab}
-          onTabChange={onVaultTabChange}
-          onNewCard={onVaultNewCard}
-          onNewFolder={onVaultNewFolder}
-          onClose={onFolderOpen}
-        />
-      </div>
-    )
-  }
+  if (vaultOpen && dockState === DOCK_STATE.BASE) {
+    const vaultItem = selectedVaultItem
+    const item = vaultItem?.item
+    const type = vaultItem?.type
 
-  if (pickingFolder && selectedVaultItem && dockState === DOCK_STATE.BASE) {
     return (
       <div className="dock dock--vault">
-        <FolderPickBar
-          selectedVaultItem={selectedVaultItem}
-          onPickRoot={() => onVaultMoveToFolder?.(null)}
-          onCancel={onVaultPickFolderCancel}
-        />
-      </div>
-    )
-  }
+        {/* Tab selectors — always visible across all vault substates */}
+        <div className="dock__vault-tab-group" role="group" aria-label="Vault section">
+          {['shelf', 'library', 'brain'].map((tab) => {
+            const Icon = VAULT_TAB_ICONS[tab]
+            return (
+              <button
+                key={tab}
+                type="button"
+                className={`dock__vault-tab${vaultTab === tab ? ' dock__vault-tab--active' : ''}`}
+                aria-label={tab.charAt(0).toUpperCase() + tab.slice(1)}
+                aria-pressed={vaultTab === tab}
+                onClick={() => handleTabClick(tab)}
+              >
+                <Icon />
+              </button>
+            )
+          })}
+        </div>
 
-  if (selectedVaultItem && dockState === DOCK_STATE.BASE) {
-    return (
-      <div className="dock dock--vault">
-        <VaultSelectionBar
-          selectedVaultItem={selectedVaultItem}
-          onClear={onClearVaultItem}
-          onVaultAddToTab={onVaultAddToTab}
-          onVaultAddToDock={onVaultAddToDock}
-          onVaultMoveToLibrary={onVaultMoveToLibrary}
-          onVaultMoveToShelf={onVaultMoveToShelf}
-          onVaultSwitchToTab={onVaultSwitchToTab}
-          onVaultDeleteTab={onVaultDeleteTab}
-          onVaultDeleteCard={onVaultDeleteCard}
-          onVaultDeleteFolderRequest={onVaultDeleteFolderRequest}
-          onVaultPickFolder={onVaultPickFolder}
-          onVaultStartInlineRename={onVaultStartInlineRename}
-        />
+        {/* Context-dependent center */}
+        <div className="dock__vault-actions" role="toolbar" aria-label="Vault actions">
+          {pickingFolder && vaultItem ? (
+            // Folder pick mode
+            <>
+              <span className="dock__vault-name dock__vault-pick-dest">→ {pickDestLabel()}</span>
+              <DockBtn primary label="Move here" onClick={onConfirmMove}>Move here</DockBtn>
+            </>
+          ) : confirmDelete && vaultItem ? (
+            // Confirm delete
+            <>
+              <span className="dock__vault-confirm-label">Delete?</span>
+              <DockBtn label="Confirm delete" onClick={() => {
+                if (type === 'card') onVaultDeleteCard?.(item.id)
+                else if (type === 'tab') onVaultDeleteTab?.(item.id)
+                onClearVaultItem?.()
+                setConfirmDelete(false)
+              }}>
+                <TrashIcon />
+              </DockBtn>
+            </>
+          ) : vaultItem ? (
+            // Item selected — simplified actions
+            <>
+              {type === 'card' && (
+                <DockBtn label="Open" onClick={() => onVaultAddToDock?.(item.id)}>
+                  <DockPinIcon />
+                </DockBtn>
+              )}
+              {type === 'tab' && (
+                <DockBtn label="Switch to tab" onClick={() => { onVaultSwitchToTab?.(item.id); onClearVaultItem?.() }}>→</DockBtn>
+              )}
+              {(type === 'card' || type === 'folder') && (
+                <DockBtn label="Rename" onClick={() => { onVaultStartInlineRename?.(item.id, type); onClearVaultItem?.() }}>
+                  <PencilIcon />
+                </DockBtn>
+              )}
+              <DockBtn label="Move" onClick={() => onVaultPickFolder?.()}>
+                <FolderArrowIcon />
+              </DockBtn>
+              <DockBtn label="Delete" onClick={() => {
+                if (type === 'folder') onVaultDeleteFolderRequest?.(item.id)
+                else setConfirmDelete(true)
+              }}>
+                <TrashIcon />
+              </DockBtn>
+            </>
+          ) : (
+            // Browse mode — add + upload actions per tab
+            <>
+              {vaultTab !== 'brain' && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+                    onChange={handleFileChange}
+                    aria-hidden="true"
+                    tabIndex={-1}
+                  />
+                  <DockBtn label="Upload file" onClick={() => fileInputRef.current?.click()}>
+                    <UploadIcon />
+                  </DockBtn>
+                </>
+              )}
+              {vaultTab === 'shelf' && (
+                <DockBtn label="New card" onClick={onVaultNewCard}>
+                  <CardPlusIcon />
+                </DockBtn>
+              )}
+              {vaultTab === 'library' && (
+                <DockBtn label="New folder" onClick={onVaultNewFolder}>
+                  <FolderPlusIcon />
+                </DockBtn>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Right: dismiss or back */}
+        <div className="dock__vault-dismiss">
+          {(vaultItem || pickingFolder) ? (
+            <DockBtn label="Back" onClick={() => {
+              if (pickingFolder) {
+                onVaultPickFolderCancel?.()
+              } else {
+                onClearVaultItem?.()
+                setConfirmDelete(false)
+              }
+            }}>‹</DockBtn>
+          ) : (
+            <DockBtn label="Close vault" onClick={onFolderOpen}>✕</DockBtn>
+          )}
+        </div>
       </div>
     )
   }
@@ -591,6 +556,26 @@ export function Dock({
       </button>
       <span className="dock__divider" aria-hidden="true" />
       <div className="dock__actions">
+        {onUploadFile && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+              onChange={handleFileChange}
+              aria-hidden="true"
+              tabIndex={-1}
+            />
+            <button
+              type="button"
+              className="dock__btn"
+              aria-label="Upload file"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <UploadIcon />
+            </button>
+          </>
+        )}
         <button
           type="button"
           className="dock__btn"
