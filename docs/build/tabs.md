@@ -26,6 +26,18 @@ src/
     DockPrompt.css
     DockPrompt.test.jsx       # [TEST]
     DockPrompt.stories.jsx    # [STORY]
+  stack/
+    createStack.js            # Stack card factory (pure)
+    createStack.test.js       # [TEST]
+    stackLogic.js             # Pure: addMember, removeMember, flattenIds, flattenMembers, …
+    stackLogic.test.js        # [TEST]
+    StackCard.jsx             # Collapsed/expanded stack view with nested stack support
+    StackCard.css
+    StackCard.test.jsx        # [TEST]
+    StackCard.stories.jsx     # [STORY]
+    SelectionBar.jsx          # Dumb: count + action row shown above the tab feed
+    SelectionBar.css
+    SelectionBar.test.jsx     # [TEST]
   sync/
     cardSyncLogic.js          # Pure: hash, classify, resolve conflict
     cardSyncLogic.test.js     # [TEST]
@@ -218,22 +230,26 @@ Records in the `dock_cards` Dexie table (version 7) track which cards are pinned
 Pure function. No React, no storage.
 
 ```js
-computeDockState({ activeDockCardId, activeEditorCardId, activeSurface })
+computeDockState({ activeDockCardId, activeEditorCardId, activeSurface, selectedCardCount, moveCardId })
   → DOCK_STATE.BASE | DOCK_STATE.DOCK_EDITOR | DOCK_STATE.TAB_EDITOR
+     | DOCK_STATE.CARD_SELECTED | DOCK_STATE.CARD_MOVE
 ```
 
-Priority order:
+Priority order (highest wins):
 
 1. `activeEditorCardId` is set **and** `activeSurface === 'dock'` → **DOCK_EDITOR**
 2. `activeEditorCardId` is set (any other surface) → **TAB_EDITOR**
-3. `activeDockCardId` is set → **DOCK_EDITOR**
-4. Otherwise → **BASE**
+3. `moveCardId` is set → **CARD_MOVE**
+4. `selectedCardCount > 0` → **CARD_SELECTED**
+5. Otherwise → **BASE**
 
-Both `DOCK_EDITOR` and `TAB_EDITOR` render the same formatting toolbar. The distinction is used historically but the current Dock renders the same UI for both.
+`DOCK_EDITOR` and `TAB_EDITOR` render the same formatting toolbar. `CARD_MOVE` takes priority over `CARD_SELECTED` so entering move mode from a selection immediately shows move controls. See [stacks.md](./stacks.md) for full detail on the selection/move flow.
 
 ## React hook — useDock
 
-`useDock({ cardsById, activeEditorCardId, activeSurface })` — manages dock card state and open/close lifecycle.
+`useDock({ cardsById, activeEditorCardId, activeSurface, selectedCardCount, moveCardId })` — manages dock card state and open/close lifecycle.
+
+`selectedCardCount` and `moveCardId` are passed through to `computeDockState` so the dock can enter `CARD_SELECTED` and `CARD_MOVE` states driven by selection/move state owned in `App.jsx`.
 
 ### State
 
@@ -347,6 +363,23 @@ Both `DOCK_EDITOR` and `TAB_EDITOR` render the same formatting toolbar. The dist
 | `bulkDeleteCards` | function | `(cardIds)` — batch card delete, removes from Dexie and Supabase |
 | `bulkMoveTabs` | function | `(tabIds, folderId)` — batch tab move to library folder, persists |
 
+**Stack and selection state:**
+
+| Property | Type | Description |
+|---|---|---|
+| `selectedCardIds` | `Set<string>` | Cards checked in the active tab. Cleared on tab switch. Any card type (text, file, stack) can be selected. |
+| `toggleCardSelection(cardId)` | function | Adds or removes a card from `selectedCardIds` |
+| `clearSelection()` | function | Empties `selectedCardIds` |
+| `selectAll()` | function | Selects all card IDs in the active tab |
+| `createStack(memberIds, options?)` | async function | Low-level: creates a stack and appends it to the tab. Does not remove member cards. |
+| `stackSelectedFlat(ids)` | async function | Flat merge: expands stacks in `ids` to their leaf cards, removes all selected items from the tab, creates one flat stack at the first selected position, dissolves the source stacks. |
+| `nestMoveCardInTarget(movingId, targetId)` | async function | Nested: if target is a stack, appends `movingId` as a member and removes it from the tab; if target is a card, creates `Stack{target, moving}` at the target's position removing both from the tab. `movingId` may itself be a stack (creates stack-in-stack). |
+| `addToStack(stackId, cardId)` | async function | Appends member; does not touch tab cards |
+| `removeFromStack(stackId, cardId)` | async function | Removes member; dissolves if < 2 members remain |
+| `dissolveStack(stackId)` | async function | Replaces the stack in the tab with its flat members in order; deletes stack if `location === 'none'` |
+| `setStackTopCard(stackId, cardId)` | async function | Updates `topCardId` (collapsed preview) |
+| `reorderStackMembers(stackId, from, to)` | async function | Moves a member within the `memberIds` array |
+
 ### `saveToShelf` behaviour
 
 When `saveToShelf(cardId)` is called:
@@ -382,8 +415,9 @@ Before creating a portal card, checks the active tab for any entry whose card id
 - `<RichTextEditorProvider><AppShell userId={userId}></RichTextEditorProvider>` when authenticated
 
 `AppShell` owns:
-- `useTabs({ userId })` — all card, tab, folder, and prompt state
-- `useDock({ cardsById, activeEditorCardId, activeSurface })` — dock card list, panel open state, dock state machine
+- `useTabs({ userId })` — all card, tab, folder, prompt, and selection state
+- `useDock({ cardsById, activeEditorCardId, activeSurface, selectedCardCount: selectedCardIds.size, moveCardId })` — dock card list, panel open state, dock state machine
+- `moveCardId` (`string | null`) — the card currently in move mode; drives `CARD_MOVE` dock state and insert slots in the tab
 - `folderPanelOpen` — whether `FolderPanel` is visible
 - `promptOpen` — whether `DockPrompt` form is visible
 - `embedOpen` — whether `EmbedSourcePanel` is visible (opened from Dock's `[[]]` button)
@@ -397,6 +431,26 @@ Before creating a portal card, checks the active tab for any entry whose card id
 - `newItemPendingId` (`string | null`) — id of a newly created folder awaiting name input (deleted on cancel)
 - `moveConflict` — pending conflict state when a card/tab being moved has a name clash at the destination
 - `deleteFolderModal` — state (`{ folderId, name, cardCount, folderCount }`) for non-empty folder delete confirmation
+
+**Derived values computed from selection/move state:**
+
+| Derived | Description |
+|---|---|
+| `singleSelectedId` | `selectedCardIds.size === 1 ? first id : null` |
+| `singleSelectedCard` | Card object for `singleSelectedId`, or `null` |
+| `movingCard` | Card object for `moveCardId`, or `null` |
+| `dockActionCardId` | `moveCardId ?? singleSelectedId` — used for dock-pin and move-to-dock actions |
+
+**Key handlers for selection/move:**
+
+| Handler | Effect |
+|---|---|
+| `handleToggleCardSelection(cardId)` | `toggleCardSelection(cardId)` + clears `moveCardId` |
+| `handleClearSelection()` | `clearSelection()` + clears `moveCardId` |
+| `handleCreateStackFromSelection()` | `stackSelectedFlat(Array.from(selectedCardIds))` then clears selection + `moveCardId` |
+| `handleNestInTarget(movingId, targetId)` | `nestMoveCardInTarget(movingId, targetId)` then clears selection + `moveCardId` |
+| `handleAddToStack(stackId, cardId)` | `addToStack(stackId, cardId)` + `detachCardFromTab(cardId)` then clears selection + `moveCardId` |
+| `handleDockFromMove()` | `addToDock(dockActionCardId)` + `detachCardFromTab(dockActionCardId)` then clears |
 
 **EmbedActionsProvider** wraps AppShell content providing `onSaveToShelf`, `onMoveToDock`, `onMoveToTab`, `onUpdate` to `EmbeddedCardView` nodes.
 
@@ -471,26 +525,35 @@ RichTextEditorProvider
 
 ### Tab
 
-`Tab({ entries, folders, cardsById, onReorder, onUpdate, onRemove, onFold, onUnfold, onHide, onUnhide, onSaveToShelf, onMoveToLibrary, onLocate, onMoveToDock, flipCard, isFlipped })` — presentational.
+`Tab({ entries, folders, cardsById, onReorder, onUpdate, onRemove, onFold, onUnfold, onHide, onUnhide, onSaveToShelf, onMoveToLibrary, onLocate, flipCard, isFlipped, selectedCardIds, onToggleSelect, onCreateStack, onClearSelection, onMove, onAddToStack, onNestInTarget, moveCardId, onExitMoveMode, setStackTopCard, onReorderStackMember, onDissolveStack })` — presentational.
 
 **Card type branching:**
-- `card.type === 'portal'` → renders `PortalCard`. Binds `onUpdate` to the **target card's id**. No `onSaveToShelf` on portal cards.
-- `card.type === 'file'` → renders `FileCard` with `onSendToDock` and `onSaveToShelf`.
-- Otherwise → renders `Card` with `onSaveToShelf`, `onSendToDock`, `onFlip`.
+- `card.type === 'stack'` → renders `StackCard`. Receives cycle, reorder, and dissolve callbacks.
+- `card.type === 'portal'` → renders `PortalCard`. Binds `onUpdate` to the **target card's id**. No `onSaveToShelf`.
+- `card.type === 'file'` → renders `FileCard` with `onSaveToShelf`.
+- Otherwise → renders `Card` with `onSaveToShelf`, `onFlip`.
 
-**Callbacks per type:**
-- Text cards: `onSaveToShelf`, `onSendToDock` (bound to `onMoveToDock`), `onFlip` (when `flipCard` provided).
-- File cards: `onSaveToShelf`, `onSendToDock`. No flip.
-- Portal cards: no `onSaveToShelf`. `onFlip` wired.
-- All cards: `onToggleFold`, `onToggleHide`, `onClose`, `onUpdate`.
+All card types receive `selected` / `onToggleSelect` (the selection checkbox in `CardHeader`).
 
-Note: `flipCard` and `isFlipped` are accepted as props and are wired to `Card` and `PortalCard` rendering; flip from the tab layer is functional. File cards do not participate in flip.
+**Move mode:**
+
+When `moveCardId` is set and the moving card is in this tab's entries:
+- `inMoveMode = true`; insert slots appear between every pair of cards.
+- Slots at `index === moveIndex` and `index === moveIndex + 1` are suppressed (they are no-ops).
+- `slotToPosition = index <= moveIndex ? index : index - 1` — the `toPosition` for `onReorder` in the without-moving-card array.
+- A final slot appears after all cards if `entries.length > moveIndex + 1`.
+- Clicking a slot calls `onReorder(moveCardId, slotToPosition)` then `onExitMoveMode()`.
+- Non-moving cards show a `tab__card-action` footer:
+  - Stack card target → `onAddToStack(entry.card.id, moveCardId)` then `onExitMoveMode()`.
+  - Regular card target → `onNestInTarget(moveCardId, entry.card.id)` then `onExitMoveMode()`.
+
+`onMoveToDock` and `onStackCardsWith` props have been removed. `onNestInTarget` replaces `onStackCardsWith`.
 
 ### Dock
 
 `Dock({ dockState, dockCardEntries, activeDockCardId, onAddDockCard, onOpenDockCard, onFolderOpen, onSettings, onEmbedOpen, onUploadFile, lightningActive, onLightningToggle, vaultOpen, vaultTab, onVaultTabChange, onVaultNewCard, onVaultNewFolder, selectedVaultItem, onClearVaultItem, onVaultAddToDock, onVaultSwitchToTab, onVaultDeleteTab, onVaultDeleteCard, onVaultDeleteFolderRequest, onVaultStartInlineRename, pickingFolder, onVaultPickFolder, onVaultPickFolderCancel, moveTarget, onConfirmMove })` — bottom toolbar.
 
-Three display modes:
+Five display modes (priority order as per the state machine above):
 
 **1. DOCK_EDITOR or TAB_EDITOR** (`role="toolbar" aria-label="Formatting options"`):
 - `FormattingToolbar` (scrollable): Exit editor (`‹`), separator, AI prompt (lightning), Embed card (`[[]]`), separator, Undo, Redo, separator, Heading (expandable H1/H2/H3), Bold, Italic, Highlight, Code block, Bullet list, Ordered list, Indent, Outdent, Checkbox list, Strikethrough.
@@ -504,7 +567,32 @@ Three display modes:
 - Divider
 - Right: Upload file button (hidden `<input type="file">` + UploadIcon; only when `onUploadFile` provided), Library button (FolderIcon), Settings button (MenuIcon)
 
-**3. VAULT** (`vaultOpen && dockState === BASE`, no explicit role; inner toolbar has `aria-label="Vault actions"`):
+**3. CARD_MOVE** (`role="toolbar" aria-label="Move card"`):
+
+Shown when `moveCardId` is set. Layout: `[card name (italic, truncated)]  sep  [⬇ Dock]  sep  [✕]`
+
+- Card name uses `.dock__card-name--moving` (italic, muted).
+- ⬇ Dock (`DockPinIcon`) — calls `onDockFromMove`; pins the card and exits move mode.
+- ✕ — calls `onExitMoveMode`; returns to `CARD_SELECTED`.
+
+Props consumed: `moveCardTitle`, `onDockFromMove`, `onExitMoveMode`.
+
+**4. CARD_SELECTED** (`role="toolbar" aria-label="Card actions"`):
+
+Shown when `selectedCardCount > 0` and no editor or move is active. Layout: `[label]  sep  [actions]  sep  [✕]`
+
+Single selection: `[card title]  sep  [↕ Move icon]  [⬇ Dock icon]  sep  [✕]`
+- ↕ (`ReorderIcon`) — calls `onEnterMoveMode`; sets `moveCardId` and switches to `CARD_MOVE`.
+- ⬇ (`DockPinIcon`) — calls `onDockFromMove`; pins immediately.
+
+Multi-selection: `[N selected]  sep  [≡ Stack icon]  sep  [✕]`
+- ≡ (`StackCardsIcon`) — calls `onCreateStack`; runs `stackSelectedFlat` (flat merge).
+
+✕ always calls `onClearSelection`.
+
+Props consumed: `selectedCardCount`, `selectedCardTitle`, `onEnterMoveMode`, `onDockFromMove`, `onCreateStack`, `onClearSelection`.
+
+**5. VAULT** (`vaultOpen && dockState === BASE`, no explicit role; inner toolbar has `aria-label="Vault actions"`):
 Three sections:
 - **Left:** Three tab selectors — Shelf (ShelfIcon), Library (LibraryIcon), Brain (BrainIcon). `aria-pressed` reflects active tab.
 - **Center (context-dependent):**
@@ -562,13 +650,13 @@ Slide-up panel with three tabs: **Shelf**, **Library**, **Brain**. X button call
 | `createTab.test.js` | `createTab` defaults/custom/unique ids; `savedLocation`/`savedFolderId` defaults; `createTabCard` defaults; `nextPosition`; `reorderTabCard`; `setTabCardFold`; `setTabCardHidden`; `removeTabCard`; `updateTabFields`; `setTabName`; `removeTab`; `reorderTabs`; `saveTabToShelf`; `moveTabToLibrary` |
 | `tabStorage.test.js` | Empty reads; `putTab` round-trip + upsert; `deleteTab`; `putTabCard` round-trip, foldState/hiddenState, position upsert; `deleteTabCard`; `deleteAllTabCards` |
 | `dockCardStorage.test.js` | Empty read; `addDockCard` round-trip; order appended; `removeDockCard`; `getDockCardIds` sorted |
-| `dockStateMachine.test.js` | BASE when nothing active; TAB_EDITOR when editor active (tab surface); DOCK_EDITOR when activeDockCardId set; DOCK_EDITOR when editing dock surface; TAB_EDITOR when editing with surface='tab' even if ids match |
+| `dockStateMachine.test.js` | BASE when nothing active; TAB_EDITOR when editor active (tab surface); DOCK_EDITOR when activeDockCardId set; DOCK_EDITOR when editing dock surface; TAB_EDITOR when editing with surface='tab' even if ids match; CARD_SELECTED when selectedCardCount > 0; CARD_MOVE when moveCardId set; editor states take priority over CARD_MOVE; CARD_MOVE takes priority over CARD_SELECTED |
 | `useDock.test.js` | Loads dock card ids on mount; openDockCard sets active; closeDockCard clears; addToDock appends; removeFromDock clears active; createAndPinCard creates+pins+opens+calls onCreated; moveDockCardToTab adds to tab if not already there, removes from dock |
 | `useTabs.test.js` | Default tab on first mount; state loaded on mount; `addTabCard`; `addPortalCard` (creates portal, appends, dedup); `updateCard`; `removeCard`; `detachCardFromTab`; `reorder`; `fold`/`unfold`; `hide`/`unhide`; `saveToShelf`; `moveToLibrary` (state + Dexie + wiki-index); `shelfEntries`/`libraryEntries`; `shelfTabs`/`libraryTabs`; `createFolder`; remount persistence; multi-tab; localStorage; sync wiring; orphan card detection; `runDockPrompt`; `brainFeedItems`; `flipCard`/`isFlippedCard`; `addToCardsById` |
 | `TabHeader.test.jsx` | Renders name; click → edit mode; Enter/blur commits; Escape cancels; shelf state; library state (disabled); no buttons without callbacks; Tab overview button |
 | `TabSwitcher.test.jsx` | Renders all tiles; active tile highlighted; card counts; shelf/library badges; switch on tile click; add tile; close on ×; backdrop click; Escape closes; remove tile; save button |
 | `Tab.test.jsx` | Empty state; renders title+body; fold hides body; hidden card class; position order; callbacks (fold/unfold/hide/unhide/remove/save); portal card renders target; portal placeholder; portal onUpdate routes to target id; null target not editable; onLocate with target id; inline update |
-| `Dock.test.jsx` | BASE: pill list, active pill class, Pin new card, Library, Settings, pill click calls onOpenDockCard, no formatting buttons. DOCK_EDITOR: Exit editor, Bold/Italic/all toolbar buttons, expandable Heading, AI prompt/lightning, Embed [[]], no Move-card-to-tab, no Settings, no Pin-to-dock, no pills, lightningActive aria-pressed. TAB_EDITOR: same formatting toolbar, no Pin-to-dock, no Move-card-to-tab, no Settings. |
+| `Dock.test.jsx` | BASE: pill list, active pill class, Pin new card, Library, Settings, pill click calls onOpenDockCard, no formatting buttons. DOCK_EDITOR: Exit editor, Bold/Italic/all toolbar buttons, expandable Heading, AI prompt/lightning, Embed [[]], no Settings, no pills, lightningActive aria-pressed. TAB_EDITOR: same formatting toolbar, no Settings. CARD_SELECTED: shows card name + Move in tab + Dock icons + ✕; multi-select shows Stack icon. CARD_MOVE: shows card name (italic) + Dock icon + ✕. |
 | `DockCardPanel.test.jsx` | Returns null when no card; renders card heading; landmark role; close button calls onClose (Remove card); fold toggle present and works; no flip button; Move to tab button present/absent; calls onMoveToTab; Card body wrapper present |
 | `DockPrompt.test.jsx` | Renders textarea + buttons; Send disabled when empty; enables after typing; `onSubmit` with trimmed text; `onDismiss`; whitespace-only no-op; loading state; error alert; no alert when error empty |
 | `AuthForm.test.jsx` | Inputs; buttons disabled when empty; enable on type; callbacks; error; loading |

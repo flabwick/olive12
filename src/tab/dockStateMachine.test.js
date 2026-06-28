@@ -36,6 +36,26 @@ describe('computeDockState', () => {
   it('treats empty string ids as falsy and returns BASE', () => {
     expect(computeDockState({ activeDockCardId: '', activeEditorCardId: '' })).toBe(DOCK_STATE.BASE)
   })
+
+  it('returns CARD_SELECTED when selectedCardCount > 0 and no editor active', () => {
+    expect(computeDockState({ activeEditorCardId: null, selectedCardCount: 1 })).toBe(DOCK_STATE.CARD_SELECTED)
+  })
+
+  it('returns CARD_SELECTED for multi-select', () => {
+    expect(computeDockState({ activeEditorCardId: null, selectedCardCount: 3 })).toBe(DOCK_STATE.CARD_SELECTED)
+  })
+
+  it('returns CARD_MOVE when moveCardId is set', () => {
+    expect(computeDockState({ activeEditorCardId: null, selectedCardCount: 1, moveCardId: 'card-1' })).toBe(DOCK_STATE.CARD_MOVE)
+  })
+
+  it('editor states take priority over CARD_MOVE', () => {
+    expect(computeDockState({ activeEditorCardId: 'card-1', activeSurface: 'dock', moveCardId: 'card-2' })).toBe(DOCK_STATE.DOCK_EDITOR)
+  })
+
+  it('CARD_MOVE takes priority over CARD_SELECTED', () => {
+    expect(computeDockState({ activeEditorCardId: null, selectedCardCount: 1, moveCardId: 'card-1' })).toBe(DOCK_STATE.CARD_MOVE)
+  })
 })
 
 describe('openDockCard', () => {

@@ -108,6 +108,23 @@ function LibraryIcon() {
   )
 }
 
+function ReorderIcon() {
+  return (
+    <svg width="10" height="13" viewBox="0 0 10 13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 1v11M2 4l3-3 3 3M2 9l3 3 3-3" />
+    </svg>
+  )
+}
+
+function StackCardsIcon() {
+  return (
+    <svg width="13" height="12" viewBox="0 0 13 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="9" height="7" rx="1" />
+      <rect x="1" y="1.5" width="9" height="7" rx="1" />
+    </svg>
+  )
+}
+
 function DockPinIcon() {
   return (
     <svg width="13" height="12" viewBox="0 0 13 12" fill="none" aria-hidden="true">
@@ -365,6 +382,14 @@ export function Dock({
   onVaultPickFolderCancel,
   moveTarget = null,
   onConfirmMove,
+  selectedCardCount = 0,
+  selectedCardTitle = '',
+  moveCardTitle = '',
+  onEnterMoveMode,
+  onExitMoveMode,
+  onDockFromMove,
+  onClearSelection,
+  onCreateStack,
 }) {
   const fileInputRef = useRef(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -399,6 +424,55 @@ export function Dock({
           onLightningToggle={onLightningToggle}
           onEmbedOpen={onEmbedOpen}
         />
+      </div>
+    )
+  }
+
+  if (dockState === DOCK_STATE.CARD_MOVE) {
+    return (
+      <div className="dock dock--card-move" role="toolbar" aria-label="Move card">
+        <span className="dock__card-name dock__card-name--moving" title={moveCardTitle}>
+          {moveCardTitle || 'Card'}
+        </span>
+        <span className="dock__sep" aria-hidden="true" />
+        {onDockFromMove && (
+          <DockBtn label="Move to dock" onClick={onDockFromMove}>
+            <DockPinIcon />
+          </DockBtn>
+        )}
+        <span className="dock__sep" aria-hidden="true" />
+        <DockBtn label="Cancel move" onClick={onExitMoveMode}>✕</DockBtn>
+      </div>
+    )
+  }
+
+  if (dockState === DOCK_STATE.CARD_SELECTED) {
+    const label = selectedCardCount === 1
+      ? (selectedCardTitle || 'Card')
+      : `${selectedCardCount} selected`
+    return (
+      <div className="dock dock--card-selected" role="toolbar" aria-label="Card actions">
+        <span className="dock__card-name" title={selectedCardCount === 1 ? selectedCardTitle : undefined}>
+          {label}
+        </span>
+        <span className="dock__sep" aria-hidden="true" />
+        {selectedCardCount === 1 && onEnterMoveMode && (
+          <DockBtn label="Move in tab" onClick={onEnterMoveMode}>
+            <ReorderIcon />
+          </DockBtn>
+        )}
+        {selectedCardCount === 1 && onDockFromMove && (
+          <DockBtn label="Move to dock" onClick={onDockFromMove}>
+            <DockPinIcon />
+          </DockBtn>
+        )}
+        {selectedCardCount >= 2 && onCreateStack && (
+          <DockBtn label="Create stack" onClick={onCreateStack}>
+            <StackCardsIcon />
+          </DockBtn>
+        )}
+        <span className="dock__sep" aria-hidden="true" />
+        <DockBtn label="Clear selection" onClick={onClearSelection}>✕</DockBtn>
       </div>
     )
   }

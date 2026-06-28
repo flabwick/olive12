@@ -1497,6 +1497,145 @@ describe('useTabs', () => {
       expect(result.current.activeTabId).toBe('new-default')
     })
 
+    it('removeTab of a saved tab marks it isOpen: false in state', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('tab-fallback')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.saveTabToShelf('tab-1') })
+      await act(async () => { await result.current.removeTab('tab-1') })
+
+      const closed = result.current.tabs.find((t) => t.id === 'tab-1')
+      expect(closed?.isOpen).toBe(false)
+    })
+
+    it('removeTab of a saved tab persists isOpen false to Dexie', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('tab-fallback')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.saveTabToShelf('tab-1') })
+      await act(async () => { await result.current.removeTab('tab-1') })
+
+      const stored = await getAllTabs()
+      expect(stored.find((t) => t.id === 'tab-1')?.isOpen).toBe(false)
+    })
+
+    it('removeTab of a saved tab excludes it from openTabs', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('tab-fallback')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.saveTabToShelf('tab-1') })
+      expect(result.current.openTabs.map((t) => t.id)).toContain('tab-1')
+
+      await act(async () => { await result.current.removeTab('tab-1') })
+      expect(result.current.openTabs.map((t) => t.id)).not.toContain('tab-1')
+    })
+
+    it('removeTab of a saved tab switches to another open saved tab if one exists', async () => {
+      await db.tabs.put({ id: 'shelf-a', name: 'Shelf A', kind: 'blank', order: 0, savedLocation: 'shelf', savedFolderId: null, isOpen: true, createdAt: 1_000, updatedAt: 1_000 })
+      await db.tabs.put({ id: 'shelf-b', name: 'Shelf B', kind: 'blank', order: 1, savedLocation: 'shelf', savedFolderId: null, isOpen: true, createdAt: 1_000, updatedAt: 1_000 })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      act(() => { result.current.switchTab('shelf-a') })
+      await act(async () => { await result.current.removeTab('shelf-a') })
+
+      expect(result.current.activeTabId).toBe('shelf-b')
+    })
+
+    it('reopenSavedTab marks a closed tab as open in state', async () => {
+      await db.tabs.put({ id: 'saved-tab', name: 'My Tab', kind: 'blank', order: 0, savedLocation: 'shelf', savedFolderId: null, isOpen: false, createdAt: 1_000, updatedAt: 1_000 })
+      await db.tabs.put({ id: 'open-tab', name: 'Open', kind: 'blank', order: 1, savedLocation: 'none', savedFolderId: null, isOpen: true, createdAt: 1_000, updatedAt: 1_000 })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(result.current.openTabs.map((t) => t.id)).not.toContain('saved-tab')
+
+      await act(async () => { await result.current.reopenSavedTab('saved-tab') })
+
+      expect(result.current.tabs.find((t) => t.id === 'saved-tab')?.isOpen).toBe(true)
+      expect(result.current.openTabs.map((t) => t.id)).toContain('saved-tab')
+    })
+
+    it('reopenSavedTab sets the reopened tab as active', async () => {
+      await db.tabs.put({ id: 'saved-tab', name: 'My Tab', kind: 'blank', order: 0, savedLocation: 'shelf', savedFolderId: null, isOpen: false, createdAt: 1_000, updatedAt: 1_000 })
+      await db.tabs.put({ id: 'open-tab', name: 'Open', kind: 'blank', order: 1, savedLocation: 'none', savedFolderId: null, isOpen: true, createdAt: 1_000, updatedAt: 1_000 })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+      expect(result.current.activeTabId).toBe('open-tab')
+
+      await act(async () => { await result.current.reopenSavedTab('saved-tab') })
+
+      expect(result.current.activeTabId).toBe('saved-tab')
+    })
+
+    it('reopenSavedTab persists isOpen true to Dexie', async () => {
+      await db.tabs.put({ id: 'saved-tab', name: 'My Tab', kind: 'blank', order: 0, savedLocation: 'shelf', savedFolderId: null, isOpen: false, createdAt: 1_000, updatedAt: 1_000 })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.reopenSavedTab('saved-tab') })
+
+      const stored = await getAllTabs()
+      expect(stored.find((t) => t.id === 'saved-tab')?.isOpen).toBe(true)
+    })
+
+    it('init falls back to first open tab when savedActiveTabId points to a closed tab', async () => {
+      await db.tabs.put({ id: 'closed-tab', name: 'Closed', kind: 'blank', order: 0, savedLocation: 'shelf', savedFolderId: null, isOpen: false, createdAt: 1_000, updatedAt: 1_000 })
+      await db.tabs.put({ id: 'open-tab', name: 'Open', kind: 'blank', order: 1, savedLocation: 'none', savedFolderId: null, isOpen: true, createdAt: 1_000, updatedAt: 1_000 })
+      localStorage.setItem('olive12:activeTabId', 'closed-tab')
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(result.current.activeTabId).toBe('open-tab')
+    })
+
+    it('openTabs only includes tabs where isOpen is true', async () => {
+      await db.tabs.put({ id: 'tab-open', name: 'Open', kind: 'blank', order: 0, savedLocation: 'none', savedFolderId: null, isOpen: true, createdAt: 1_000, updatedAt: 1_000 })
+      await db.tabs.put({ id: 'tab-closed', name: 'Closed', kind: 'blank', order: 1, savedLocation: 'shelf', savedFolderId: null, isOpen: false, createdAt: 1_000, updatedAt: 1_000 })
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      const openIds = result.current.openTabs.map((t) => t.id)
+      expect(openIds).toContain('tab-open')
+      expect(openIds).not.toContain('tab-closed')
+    })
+
+    it('addTab assigns correct order when called after other tabs exist', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-1')
+        .mockReturnValueOnce('tab-2')
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.addTab() })
+
+      const stored = await getAllTabs()
+      const tab2 = stored.find((t) => t.id === 'tab-2')
+      expect(tab2?.order).toBe(1)
+    })
+
     it('renameTab updates name in state and persists', async () => {
       vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-1')
       vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
@@ -1970,6 +2109,948 @@ describe('useTabs', () => {
       await act(async () => { await result.current.moveFolder('parent-folder', 'child-folder') })
 
       expect(result.current.folders.find((f) => f.id === 'parent-folder')?.parentId).toBeNull()
+    })
+  })
+
+  describe('stack actions', () => {
+    describe('stackSelectedFlat', () => {
+      it('creates a flat stack and removes selected cards from the tab', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('card-b')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+        await act(async () => {
+          await result.current.stackSelectedFlat(['card-a', 'card-b'])
+        })
+
+        expect(result.current.entries).toHaveLength(1)
+        expect(result.current.entries[0].card.type).toBe('stack')
+        expect(result.current.entries[0].card.config.memberIds).toEqual(['card-a', 'card-b'])
+      })
+
+      it('places the new stack at the first selected card position', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('card-b')
+          .mockReturnValueOnce('card-c')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'C', body: '' }) })
+        await act(async () => {
+          await result.current.stackSelectedFlat(['card-b', 'card-c'])
+        })
+
+        // A stays, stack (from B+C) is at position 1
+        expect(result.current.entries).toHaveLength(2)
+        expect(result.current.entries[0].card.id).toBe('card-a')
+        expect(result.current.entries[1].card.id).toBe('stack-uuid')
+      })
+
+      it('flattens a nested stack into the new flat stack', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('inner-stack')
+          .mockReturnValueOnce('outer-stack')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        // Create an existing stack{b, c} in the tab
+        await act(async () => { await result.current.createStack(['card-b', 'card-c']) })
+        // Flat-merge card-a + inner-stack → should produce flat [b, c, a]? No: [a, b, c]
+        await act(async () => {
+          await result.current.stackSelectedFlat(['card-a', 'inner-stack'])
+        })
+
+        expect(result.current.entries).toHaveLength(1)
+        const flat = result.current.entries[0].card.config.memberIds
+        expect(flat).toContain('card-a')
+        expect(flat).toContain('card-b')
+        expect(flat).toContain('card-c')
+        expect(flat).not.toContain('inner-stack')
+      })
+
+      it('is a no-op when fewer than 2 ids provided', async () => {
+        vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => {
+          await result.current.stackSelectedFlat(['only-one'])
+        })
+
+        expect(result.current.entries).toHaveLength(0)
+      })
+    })
+
+    describe('nestMoveCardInTarget', () => {
+      it('creates a stack at the target position and removes both from the tab', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('card-b')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+        await act(async () => {
+          await result.current.nestMoveCardInTarget('card-a', 'card-b')
+        })
+
+        expect(result.current.entries).toHaveLength(1)
+        expect(result.current.entries[0].card.type).toBe('stack')
+        expect(result.current.entries[0].card.config.memberIds).toEqual(['card-b', 'card-a'])
+        expect(result.current.entries[0].card.config.topCardId).toBe('card-b')
+      })
+
+      it('places the new stack at the target card position', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('card-b')
+          .mockReturnValueOnce('card-c')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'C', body: '' }) })
+        // Move A into B: stack replaces B at position 1, A removed from position 0
+        await act(async () => {
+          await result.current.nestMoveCardInTarget('card-a', 'card-b')
+        })
+
+        expect(result.current.entries).toHaveLength(2)
+        expect(result.current.entries[0].card.id).toBe('stack-uuid')
+        expect(result.current.entries[1].card.id).toBe('card-c')
+      })
+
+      it('adds moving card as a member when target is already a stack', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('existing-stack')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.createStack(['card-b', 'card-c']) })
+        await act(async () => {
+          await result.current.nestMoveCardInTarget('card-a', 'existing-stack')
+        })
+
+        // Only the stack remains in the tab (card-a removed from tab, added as member)
+        expect(result.current.entries).toHaveLength(1)
+        expect(result.current.entries[0].card.config.memberIds).toEqual(['card-b', 'card-c', 'card-a'])
+      })
+
+      it('allows a stack to be nested inside a regular card (stack-in-stack)', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('inner-stack')
+          .mockReturnValueOnce('outer-stack')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.createStack(['card-b', 'card-c']) })
+        // Nest inner-stack inside card-a
+        await act(async () => {
+          await result.current.nestMoveCardInTarget('inner-stack', 'card-a')
+        })
+
+        expect(result.current.entries).toHaveLength(1)
+        const outer = result.current.entries[0].card
+        expect(outer.config.memberIds).toEqual(['card-a', 'inner-stack'])
+        // inner-stack is still in cardsById (it's nested, not deleted)
+        expect(result.current.cardsById['inner-stack']).toBeDefined()
+      })
+    })
+
+    describe('createStack', () => {
+      it('creates a stack card and places it in the active tab', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => {
+          await result.current.createStack(['card-a', 'card-b'])
+        })
+
+        expect(result.current.entries).toHaveLength(1)
+        expect(result.current.entries[0].card.type).toBe('stack')
+        expect(result.current.entries[0].card.config.memberIds).toEqual(['card-a', 'card-b'])
+      })
+
+      it('returns the stack id', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        let returnedId
+        await act(async () => {
+          returnedId = await result.current.createStack(['card-a', 'card-b'])
+        })
+
+        expect(returnedId).toBe('stack-uuid')
+      })
+
+      it('persists the stack to Dexie', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.createStack(['card-a', 'card-b']) })
+
+        const cards = await getAllCards()
+        const stack = cards.find((c) => c.id === 'stack-uuid')
+        expect(stack).toBeDefined()
+        expect(stack.type).toBe('stack')
+        expect(stack.config.memberIds).toEqual(['card-a', 'card-b'])
+      })
+
+      it('does not remove source cards from the tab', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('card-b')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+        await act(async () => {
+          await result.current.createStack(['card-a', 'card-b'])
+        })
+
+        // Source cards still in tab + stack = 3 entries
+        expect(result.current.entries).toHaveLength(3)
+      })
+
+      it('is a no-op when memberIds has fewer than 2 entries', async () => {
+        vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        let returnedId
+        await act(async () => {
+          returnedId = await result.current.createStack(['only-one'])
+        })
+
+        expect(returnedId).toBeUndefined()
+        expect(result.current.entries).toHaveLength(0)
+      })
+
+      it('inserts at insertPosition when provided', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('card-b')
+          .mockReturnValueOnce('card-c')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'C', body: '' }) })
+
+        await act(async () => {
+          await result.current.createStack(['card-a', 'card-b'], { insertPosition: 1 })
+        })
+
+        // stack is at position 1 (0-indexed)
+        expect(result.current.entries[1].card.id).toBe('stack-uuid')
+      })
+
+      it('appends to end when insertPosition not provided', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('card-b')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+        await act(async () => {
+          await result.current.createStack(['card-a', 'card-b'])
+        })
+
+        const lastEntry = result.current.entries[result.current.entries.length - 1]
+        expect(lastEntry.card.id).toBe('stack-uuid')
+      })
+    })
+
+    describe('addToStack', () => {
+      it('adds cardId to the stack memberIds', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.createStack(['card-a', 'card-b']) })
+        await act(async () => { await result.current.addToStack('stack-uuid', 'card-c') })
+
+        expect(result.current.cardsById['stack-uuid'].config.memberIds).toEqual(['card-a', 'card-b', 'card-c'])
+      })
+
+      it('persists the updated stack to Dexie', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.createStack(['card-a', 'card-b']) })
+        await act(async () => { await result.current.addToStack('stack-uuid', 'card-c') })
+
+        const cards = await getAllCards()
+        const stack = cards.find((c) => c.id === 'stack-uuid')
+        expect(stack.config.memberIds).toEqual(['card-a', 'card-b', 'card-c'])
+      })
+
+      it('is a no-op when stackId is not found', async () => {
+        vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await expect(act(async () => {
+          await result.current.addToStack('nonexistent', 'card-c')
+        })).resolves.not.toThrow()
+      })
+
+      it('is a no-op when the card is not a stack type', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.addToStack('card-uuid', 'card-c') })
+
+        expect(result.current.cardsById['card-uuid'].type).toBe('text')
+        expect(result.current.cardsById['card-uuid'].config).toBeNull()
+      })
+    })
+
+    describe('removeFromStack', () => {
+      it('removes cardId from stack memberIds when result has >= 2 members', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.createStack(['card-a', 'card-b', 'card-c']) })
+        await act(async () => { await result.current.removeFromStack('stack-uuid', 'card-b') })
+
+        expect(result.current.cardsById['stack-uuid'].config.memberIds).toEqual(['card-a', 'card-c'])
+        expect(result.current.cardsById['stack-uuid']).toBeDefined()
+      })
+
+      it('dissolves the stack when result would have fewer than 2 members', async () => {
+        vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        // Pre-seed tab so init() uses the else branch (preserves cardsById from getAllCards)
+        await db.tabs.put({
+          id: 'tab-uuid', name: 'Main', kind: 'blank', order: 0,
+          savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000,
+        })
+        await db.cards.put({
+          id: 'card-a', type: 'text', title: 'A', body: '', back: '', config: null,
+          location: 'none', folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false,
+        })
+        await db.cards.put({
+          id: 'card-b', type: 'text', title: 'B', body: '', back: '', config: null,
+          location: 'none', folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false,
+        })
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.createStack(['card-a', 'card-b']) })
+        expect(result.current.entries).toHaveLength(1)
+        expect(result.current.entries[0].card.type).toBe('stack')
+
+        await act(async () => { await result.current.removeFromStack('stack-uuid', 'card-b') })
+
+        // Stack dissolved — stack card gone, members inserted
+        expect(result.current.cardsById['stack-uuid']).toBeUndefined()
+        const entryIds = result.current.entries.map((e) => e.card.id)
+        expect(entryIds).toContain('card-a')
+        expect(entryIds).toContain('card-b')
+      })
+
+      it('is a no-op when stackId is not found', async () => {
+        vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await expect(act(async () => {
+          await result.current.removeFromStack('nonexistent', 'card-a')
+        })).resolves.not.toThrow()
+      })
+    })
+
+    describe('dissolveStack', () => {
+      it('removes the stack from the active tab', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        await db.cards.put({
+          id: 'card-a', type: 'text', title: 'A', body: '', back: '', config: null,
+          location: 'none', folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false,
+        })
+        await db.cards.put({
+          id: 'card-b', type: 'text', title: 'B', body: '', back: '', config: null,
+          location: 'none', folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false,
+        })
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.createStack(['card-a', 'card-b']) })
+        expect(result.current.entries[0].card.type).toBe('stack')
+
+        await act(async () => { await result.current.dissolveStack('stack-uuid') })
+
+        const entryIds = result.current.entries.map((e) => e.card.id)
+        expect(entryIds).not.toContain('stack-uuid')
+      })
+
+      it('inserts member cards at the stack position', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('card-x')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        // Pre-seed tab so init() uses the else branch (preserves cardsById from getAllCards)
+        await db.tabs.put({
+          id: 'tab-uuid', name: 'Main', kind: 'blank', order: 0,
+          savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000,
+        })
+        await db.cards.put({
+          id: 'card-a', type: 'text', title: 'A', body: '', back: '', config: null,
+          location: 'none', folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false,
+        })
+        await db.cards.put({
+          id: 'card-b', type: 'text', title: 'B', body: '', back: '', config: null,
+          location: 'none', folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false,
+        })
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        // Tab: [card-x, stack]
+        await act(async () => { await result.current.addCard({ title: 'X', body: '' }) })
+        await act(async () => { await result.current.createStack(['card-a', 'card-b']) })
+        expect(result.current.entries).toHaveLength(2)
+
+        await act(async () => { await result.current.dissolveStack('stack-uuid') })
+
+        // Stack (at position 1) dissolves → card-a and card-b inserted at position 1
+        expect(result.current.entries).toHaveLength(3)
+        expect(result.current.entries[0].card.id).toBe('card-x')
+        expect(result.current.entries[1].card.id).toBe('card-a')
+        expect(result.current.entries[2].card.id).toBe('card-b')
+      })
+
+      it('deletes the stack card from Dexie when location is none', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        await db.cards.put({
+          id: 'card-a', type: 'text', title: 'A', body: '', back: '', config: null,
+          location: 'none', folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false,
+        })
+        await db.cards.put({
+          id: 'card-b', type: 'text', title: 'B', body: '', back: '', config: null,
+          location: 'none', folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false,
+        })
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.createStack(['card-a', 'card-b']) })
+        await act(async () => { await result.current.dissolveStack('stack-uuid') })
+
+        const cards = await getAllCards()
+        expect(cards.find((c) => c.id === 'stack-uuid')).toBeUndefined()
+      })
+
+      it('does not delete the stack card when location is shelf', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        // Seed a stack with location shelf directly
+        await db.cards.put({
+          id: 'stack-uuid', type: 'stack', title: '', body: '', back: '',
+          config: { memberIds: ['card-a', 'card-b'], topCardId: 'card-a' },
+          location: 'shelf', folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false,
+        })
+        await db.cards.put({
+          id: 'card-a', type: 'text', title: 'A', body: '', back: '', config: null,
+          location: 'none', folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false,
+        })
+        await db.cards.put({
+          id: 'card-b', type: 'text', title: 'B', body: '', back: '', config: null,
+          location: 'none', folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false,
+        })
+        await db.tab_cards.put({ tabId: 'tab-uuid', cardId: 'stack-uuid', position: 0, foldState: false, hiddenState: false })
+        await db.tabs.put({
+          id: 'tab-uuid', name: 'Main', kind: 'blank', order: 0,
+          savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000,
+        })
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.dissolveStack('stack-uuid') })
+
+        const cards = await getAllCards()
+        expect(cards.find((c) => c.id === 'stack-uuid')).toBeDefined()
+        expect(result.current.shelfEntries.find((c) => c.id === 'stack-uuid')).toBeDefined()
+      })
+
+      it('is a no-op when stackId not found', async () => {
+        vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await expect(act(async () => {
+          await result.current.dissolveStack('nonexistent')
+        })).resolves.not.toThrow()
+      })
+    })
+
+    describe('setStackTopCard', () => {
+      it('sets topCardId on the stack', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.createStack(['card-a', 'card-b']) })
+        await act(async () => { await result.current.setStackTopCard('stack-uuid', 'card-b') })
+
+        expect(result.current.cardsById['stack-uuid'].config.topCardId).toBe('card-b')
+      })
+
+      it('persists the updated topCardId to Dexie', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.createStack(['card-a', 'card-b']) })
+        await act(async () => { await result.current.setStackTopCard('stack-uuid', 'card-b') })
+
+        const cards = await getAllCards()
+        expect(cards.find((c) => c.id === 'stack-uuid')?.config.topCardId).toBe('card-b')
+      })
+
+      it('is a no-op when cardId is not in memberIds', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.createStack(['card-a', 'card-b']) })
+        const topBefore = result.current.cardsById['stack-uuid'].config.topCardId
+
+        await act(async () => { await result.current.setStackTopCard('stack-uuid', 'card-z') })
+
+        expect(result.current.cardsById['stack-uuid'].config.topCardId).toBe(topBefore)
+      })
+
+      it('is a no-op when stackId not found', async () => {
+        vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid')
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await expect(act(async () => {
+          await result.current.setStackTopCard('nonexistent', 'card-a')
+        })).resolves.not.toThrow()
+      })
+    })
+
+    describe('reorderStackMembers', () => {
+      it('reorders memberIds within the stack', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.createStack(['card-a', 'card-b', 'card-c']) })
+        await act(async () => { await result.current.reorderStackMembers('stack-uuid', 0, 2) })
+
+        expect(result.current.cardsById['stack-uuid'].config.memberIds).toEqual(['card-b', 'card-c', 'card-a'])
+      })
+
+      it('is a no-op when fromIndex equals toIndex', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.createStack(['card-a', 'card-b', 'card-c']) })
+        const stackBefore = result.current.cardsById['stack-uuid']
+
+        await act(async () => { await result.current.reorderStackMembers('stack-uuid', 1, 1) })
+
+        expect(result.current.cardsById['stack-uuid'].config.memberIds).toEqual(stackBefore.config.memberIds)
+      })
+
+      it('persists reordered memberIds to Dexie', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.createStack(['card-a', 'card-b', 'card-c']) })
+        await act(async () => { await result.current.reorderStackMembers('stack-uuid', 2, 0) })
+
+        const cards = await getAllCards()
+        expect(cards.find((c) => c.id === 'stack-uuid')?.config.memberIds).toEqual(['card-c', 'card-a', 'card-b'])
+      })
+    })
+
+    describe('convertTabToStack', () => {
+      it('creates a stack with location shelf from the active tab card order', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('card-b')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+        await act(async () => { await result.current.convertTabToStack() })
+
+        const stack = result.current.cardsById['stack-uuid']
+        expect(stack).toBeDefined()
+        expect(stack.type).toBe('stack')
+        expect(stack.location).toBe('shelf')
+        expect(stack.config.memberIds).toEqual(['card-a', 'card-b'])
+      })
+
+      it('does not modify the tab card order', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('card-b')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+        await act(async () => { await result.current.convertTabToStack() })
+
+        // Tab still has the same 2 cards
+        expect(result.current.entries).toHaveLength(2)
+        expect(result.current.entries[0].card.id).toBe('card-a')
+        expect(result.current.entries[1].card.id).toBe('card-b')
+      })
+
+      it('returns the stack id', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('card-b')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+
+        let returnedId
+        await act(async () => {
+          returnedId = await result.current.convertTabToStack()
+        })
+
+        expect(returnedId).toBe('stack-uuid')
+      })
+
+      it('is a no-op when the tab has fewer than 2 cards', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+        let returnedId
+        await act(async () => {
+          returnedId = await result.current.convertTabToStack()
+        })
+
+        expect(returnedId).toBeUndefined()
+        expect(result.current.shelfEntries.filter((c) => c.type === 'stack')).toHaveLength(0)
+      })
+
+      it('stack appears in shelfEntries', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('card-b')
+          .mockReturnValueOnce('stack-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+        await act(async () => { await result.current.convertTabToStack() })
+
+        expect(result.current.shelfEntries.find((c) => c.id === 'stack-uuid')).toBeDefined()
+      })
+    })
+  })
+
+  describe('multi-select', () => {
+    it('selectedCardIds starts as an empty Set', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('tab-uuid')
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      expect(result.current.selectedCardIds.size).toBe(0)
+    })
+
+    describe('toggleCardSelection', () => {
+      it('adds cardId to selectedCardIds when not present', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+        act(() => { result.current.toggleCardSelection('card-uuid') })
+
+        expect(result.current.selectedCardIds.has('card-uuid')).toBe(true)
+      })
+
+      it('removes cardId from selectedCardIds when already present', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+        act(() => { result.current.toggleCardSelection('card-uuid') })
+        expect(result.current.selectedCardIds.has('card-uuid')).toBe(true)
+
+        act(() => { result.current.toggleCardSelection('card-uuid') })
+        expect(result.current.selectedCardIds.has('card-uuid')).toBe(false)
+      })
+
+      it('multiple cards can be selected simultaneously', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('card-b')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+
+        act(() => { result.current.toggleCardSelection('card-a') })
+        act(() => { result.current.toggleCardSelection('card-b') })
+
+        expect(result.current.selectedCardIds.has('card-a')).toBe(true)
+        expect(result.current.selectedCardIds.has('card-b')).toBe(true)
+        expect(result.current.selectedCardIds.size).toBe(2)
+      })
+    })
+
+    describe('clearSelection', () => {
+      it('empties selectedCardIds', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-uuid')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+
+        act(() => { result.current.toggleCardSelection('card-uuid') })
+        expect(result.current.selectedCardIds.size).toBe(1)
+
+        act(() => { result.current.clearSelection() })
+        expect(result.current.selectedCardIds.size).toBe(0)
+      })
+    })
+
+    describe('selectAll', () => {
+      it('adds all active tab card IDs to selectedCardIds', async () => {
+        vi.spyOn(crypto, 'randomUUID')
+          .mockReturnValueOnce('tab-uuid')
+          .mockReturnValueOnce('card-a')
+          .mockReturnValueOnce('card-b')
+        vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+        await act(async () => { await result.current.addCard({ title: 'A', body: '' }) })
+        await act(async () => { await result.current.addCard({ title: 'B', body: '' }) })
+
+        act(() => { result.current.selectAll() })
+
+        expect(result.current.selectedCardIds.has('card-a')).toBe(true)
+        expect(result.current.selectedCardIds.has('card-b')).toBe(true)
+        expect(result.current.selectedCardIds.size).toBe(2)
+      })
+
+      it('does not include cards from other tabs', async () => {
+        await db.tabs.put({
+          id: 'tab-a', name: 'A', kind: 'blank', order: 0,
+          savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000,
+        })
+        await db.tabs.put({
+          id: 'tab-b', name: 'B', kind: 'blank', order: 1,
+          savedLocation: 'none', savedFolderId: null, createdAt: 1_000, updatedAt: 1_000,
+        })
+        await db.cards.put({
+          id: 'card-in-a', type: 'text', title: 'A', body: '', location: 'none',
+          folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false,
+        })
+        await db.cards.put({
+          id: 'card-in-b', type: 'text', title: 'B', body: '', location: 'none',
+          folderId: null, createdAt: 1_000, updatedAt: 1_000, dirty: false,
+        })
+        await db.tab_cards.put({ tabId: 'tab-a', cardId: 'card-in-a', position: 0, foldState: false, hiddenState: false })
+        await db.tab_cards.put({ tabId: 'tab-b', cardId: 'card-in-b', position: 0, foldState: false, hiddenState: false })
+
+        const { result } = renderHook(() => useTabs())
+        await waitFor(() => expect(result.current.isReady).toBe(true))
+        expect(result.current.activeTabId).toBe('tab-a')
+
+        act(() => { result.current.selectAll() })
+
+        expect(result.current.selectedCardIds.has('card-in-a')).toBe(true)
+        expect(result.current.selectedCardIds.has('card-in-b')).toBe(false)
+        expect(result.current.selectedCardIds.size).toBe(1)
+      })
     })
   })
 

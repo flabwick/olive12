@@ -257,6 +257,37 @@ describe('Card', () => {
     })
   })
 
+  describe('selection', () => {
+    it('renders checkbox when onToggleSelect is provided', () => {
+      render(<Card title="T" body="B" onToggleSelect={() => {}} />)
+      expect(screen.getByRole('checkbox', { name: 'Select card' })).toBeInTheDocument()
+    })
+
+    it('does not render checkbox when onToggleSelect is not provided', () => {
+      render(<Card title="T" body="B" />)
+      expect(screen.queryByRole('checkbox', { name: 'Select card' })).not.toBeInTheDocument()
+    })
+
+    it('applies card--selected class when selected is true', () => {
+      render(<Card title="T" body="B" selected={true} onToggleSelect={() => {}} />)
+      const card = screen.getByRole('heading', { level: 3, name: 'T' }).closest('.card')
+      expect(card).toHaveClass('card--selected')
+    })
+
+    it('does not apply card--selected when selected is false', () => {
+      render(<Card title="T" body="B" selected={false} onToggleSelect={() => {}} />)
+      const card = screen.getByRole('heading', { level: 3, name: 'T' }).closest('.card')
+      expect(card).not.toHaveClass('card--selected')
+    })
+
+    it('calls onToggleSelect when checkbox is clicked', async () => {
+      const onToggleSelect = vi.fn()
+      render(<Card title="T" body="B" onToggleSelect={onToggleSelect} />)
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Select card' }))
+      expect(onToggleSelect).toHaveBeenCalledOnce()
+    })
+  })
+
   describe('location', () => {
     it('renders Save card button when location is "none" and onSaveToShelf is provided', () => {
       render(<Card title="T" body="B" location="none" onSaveToShelf={() => {}} />)

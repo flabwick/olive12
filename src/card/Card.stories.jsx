@@ -104,3 +104,21 @@ export const NoBackCard = {
     onFlip: () => console.log('flip'),
   },
 }
+
+export const Selected = {
+  args: {
+    title: 'Selected card',
+    body: 'This card is selected.',
+    selected: true,
+    onToggleSelect: () => {},
+  },
+}
+
+export const Selectable = {
+  args: {
+    title: 'Selectable card',
+    body: 'Click the checkbox to select.',
+    selected: false,
+    onToggleSelect: () => {},
+  },
+}

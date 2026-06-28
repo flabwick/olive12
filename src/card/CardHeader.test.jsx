@@ -121,24 +121,7 @@ describe('CardHeader', () => {
     })
   })
 
-  describe('send to dock / send to tab', () => {
-    it('renders Move to dock button when onSendToDock is provided', () => {
-      render(<CardHeader title="A" onSendToDock={() => {}} />)
-      expect(screen.getByRole('button', { name: 'Move to dock' })).toBeInTheDocument()
-    })
-
-    it('does not render Move to dock button when onSendToDock is absent', () => {
-      render(<CardHeader title="A" />)
-      expect(screen.queryByRole('button', { name: 'Move to dock' })).not.toBeInTheDocument()
-    })
-
-    it('calls onSendToDock when Move to dock is clicked', async () => {
-      const onSendToDock = vi.fn()
-      render(<CardHeader title="A" onSendToDock={onSendToDock} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Move to dock' }))
-      expect(onSendToDock).toHaveBeenCalledOnce()
-    })
-
+  describe('send to tab', () => {
     it('renders Move to tab button when onSendToTab is provided', () => {
       render(<CardHeader title="A" onSendToTab={() => {}} />)
       expect(screen.getByRole('button', { name: 'Move to tab' })).toBeInTheDocument()

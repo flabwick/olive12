@@ -20,7 +20,9 @@ import { Tab } from './tab/Tab'
 import { TabHeader } from './tab/TabHeader'
 import { TabSwitcher } from './tab/TabSwitcher'
 import { useDock } from './tab/useDock'
+import { isTabOpen } from './tab/createTab'
 import { useTabs } from './tab/useTabs'
+import './dev/seedData'
 import './App.css'
 
 function AppShell({ userId }) {
@@ -29,6 +31,7 @@ function AppShell({ userId }) {
   const {
     tab,
     tabs,
+    openTabs,
     activeTabId,
     entries,
     shelfEntries,
@@ -39,6 +42,7 @@ function AppShell({ userId }) {
     switchTab,
     addTab,
     removeTab,
+    reopenSavedTab,
     renameTab,
     saveTabToShelf,
     moveTabToLibrary,
@@ -75,19 +79,17 @@ function AppShell({ userId }) {
     reindexCard,
     flipCard,
     isFlippedCard,
+    selectedCardIds,
+    createStack,
+    stackSelectedFlat,
+    nestMoveCardInTarget,
+    addToStack,
+    dissolveStack,
+    setStackTopCard,
+    reorderStackMembers,
+    toggleCardSelection,
+    clearSelection,
   } = useTabs({ userId })
-
-  const {
-    dockCardEntries,
-    activeDockCardId,
-    dockState,
-    openDockCard,
-    closeDockCard,
-    addToDock,
-    removeFromDock,
-    createAndPinCard,
-    moveDockCardToTab,
-  } = useDock({ cardsById, activeEditorCardId, activeSurface })
 
   const embedEditorRef = useRef(null)
   const [folderPanelOpen, setFolderPanelOpen] = useState(false)
@@ -105,6 +107,20 @@ function AppShell({ userId }) {
   const [newItemPendingId, setNewItemPendingId] = useState(null)
   const [moveConflict, setMoveConflict] = useState(null)
   const [moveTarget, setMoveTarget] = useState(null)
+  const [movingSelection, setMovingSelection] = useState(false)
+  const [moveCardId, setMoveCardId] = useState(null)
+
+  const {
+    dockCardEntries,
+    activeDockCardId,
+    dockState,
+    openDockCard,
+    closeDockCard,
+    addToDock,
+    removeFromDock,
+    createAndPinCard,
+    moveDockCardToTab,
+  } = useDock({ cardsById, activeEditorCardId, activeSurface, selectedCardCount: selectedCardIds.size, moveCardId })
 
   function handleOpenAsPortal(cardId) {
     addPortalCard(cardId)
@@ -148,7 +164,12 @@ function AppShell({ userId }) {
   }
 
   function handleVaultSwitchToTab(tabId) {
-    switchTab(tabId)
+    const t = tabs.find((tab) => tab.id === tabId)
+    if (t && !isTabOpen(t)) {
+      reopenSavedTab(tabId)
+    } else {
+      switchTab(tabId)
+    }
     setFolderPanelOpen(false)
     setSelectedVaultItem(null)
   }
@@ -169,9 +190,10 @@ function AppShell({ userId }) {
   }
 
   async function handleUploadCard(file) {
-    const card = { ...createFileCard(file), location: 'library' }
+    const card = createFileCard(file)
     await putCard(card)
     addToCardsById(card)
+    await addToDock(card.id)
   }
 
   async function handleVaultNewFolder() {
@@ -190,6 +212,7 @@ function AppShell({ userId }) {
 
   function handlePickFolderCancel() {
     setPickingFolder(false)
+    setMovingSelection(false)
     setMoveTarget(null)
   }
 
@@ -197,7 +220,69 @@ function AppShell({ userId }) {
     setMoveTarget((prev) => (prev?.id === folder.id ? null : { id: folder.id, name: folder.name }))
   }
 
+  async function handleCreateStackFromSelection() {
+    if (selectedCardIds.size < 2) return
+    await stackSelectedFlat(Array.from(selectedCardIds))
+    clearSelection()
+    setMoveCardId(null)
+  }
+
+  async function handleNestInTarget(movingId, targetId) {
+    await nestMoveCardInTarget(movingId, targetId)
+    clearSelection()
+    setMoveCardId(null)
+  }
+
+  async function handleAddToStack(stackId, cardId) {
+    await addToStack(stackId, cardId)
+    await detachCardFromTab(cardId)
+    clearSelection()
+    setMoveCardId(null)
+  }
+
+  function handleToggleCardSelection(cardId) {
+    toggleCardSelection(cardId)
+    setMoveCardId(null)
+  }
+
+  function handleClearSelection() {
+    clearSelection()
+    setMoveCardId(null)
+  }
+
+  function handleMoveSelection() {
+    if (selectedCardIds.size === 0) return
+    setMoveCardId(null)
+    setMovingSelection(true)
+    setPickingFolder(true)
+    setFolderPanelOpen(true)
+    setVaultTab('library')
+  }
+
+  const singleSelectedId = selectedCardIds.size === 1 ? selectedCardIds.values().next().value : null
+  const singleSelectedCard = singleSelectedId ? cardsById[singleSelectedId] : null
+  const movingCard = moveCardId ? cardsById[moveCardId] : null
+  const dockActionCardId = moveCardId ?? singleSelectedId
+
+  function handleDockFromMove() {
+    if (!dockActionCardId) return
+    addToDock(dockActionCardId)
+    detachCardFromTab(dockActionCardId)
+    handleClearSelection()
+    setMoveCardId(null)
+  }
+
   function handleConfirmMove() {
+    if (movingSelection) {
+      const folderId = moveTarget?.id ?? null
+      bulkMoveCards(Array.from(selectedCardIds), folderId)
+      clearSelection()
+      setMovingSelection(false)
+      setPickingFolder(false)
+      setMoveTarget(null)
+      setFolderPanelOpen(false)
+      return
+    }
     if (!selectedVaultItem) return
     const { item, type } = selectedVaultItem
     if (vaultTab === 'shelf' && type === 'card') {
@@ -433,9 +518,17 @@ function AppShell({ userId }) {
           onSaveToShelf={saveToShelf}
           onMoveToLibrary={moveToLibrary}
           onLocate={handleLocate}
-          onMoveToDock={(cardId) => { addToDock(cardId); detachCardFromTab(cardId) }}
           flipCard={flipCard}
           isFlipped={isFlippedCard}
+          selectedCardIds={selectedCardIds}
+          onToggleSelect={handleToggleCardSelection}
+          onAddToStack={handleAddToStack}
+          onNestInTarget={handleNestInTarget}
+          moveCardId={moveCardId}
+          onExitMoveMode={() => setMoveCardId(null)}
+          setStackTopCard={setStackTopCard}
+          onReorderStackMember={reorderStackMembers}
+          onDissolveStack={dissolveStack}
         />
       </div>
       <div className="app-shell__dock-area">
@@ -545,14 +638,22 @@ function AppShell({ userId }) {
           onVaultPickFolderCancel={handlePickFolderCancel}
           moveTarget={moveTarget}
           onConfirmMove={handleConfirmMove}
+          selectedCardCount={selectedCardIds.size}
+          selectedCardTitle={singleSelectedCard?.title ?? ''}
+          moveCardTitle={movingCard?.title ?? ''}
+          onEnterMoveMode={singleSelectedId ? () => setMoveCardId(singleSelectedId) : undefined}
+          onExitMoveMode={() => setMoveCardId(null)}
+          onDockFromMove={dockActionCardId ? handleDockFromMove : undefined}
+          onClearSelection={handleClearSelection}
+          onCreateStack={selectedCardIds.size >= 2 ? handleCreateStackFromSelection : undefined}
         />
       </div>
       {tabSwitcherOpen && (
         <TabSwitcher
-          tabs={tabs}
+          tabs={openTabs}
           activeTabId={activeTabId}
           tabEntries={Object.fromEntries(
-            tabs.map((t) => [
+            openTabs.map((t) => [
               t.id,
               allTabCards
                 .filter((tc) => tc.tabId === t.id)

@@ -11,6 +11,8 @@ import {
 } from '../folder/createFolder'
 import { deleteFolder as deleteFolderStorage, getAllFolders, putFolder } from '../folder/folderStorage'
 import { supabase } from '../lib/supabaseClient'
+import { createStack as makeStackCard } from '../stack/createStack'
+import { addMember, flattenIds, isStackCard, removeMember, reorderMembers, setTopCard } from '../stack/stackLogic'
 import { assembleContext } from '../prompt/assembleContext'
 import { createCardSyncScheduler } from '../sync/cardSync'
 import { makeCardSupabaseStorage } from '../sync/cardSupabaseStorage'
@@ -22,12 +24,15 @@ import { createIndexEntry } from '../brain/createIndexEntry'
 import { getAllIndexEntries, putIndexEntry } from '../brain/indexEntryStorage'
 import { db } from '../db/vaultDb'
 import {
+  closeSavedTab,
   createTab,
   createTabCard,
+  isTabOpen,
   moveTabToLibrary as moveTabToLibraryPure,
   nextPosition,
   removeTab as removeTabPure,
   removeTabCard,
+  reopenTab,
   reorderTabCard,
   saveTabToShelf as saveTabToShelfPure,
   setTabCardFold,
@@ -60,6 +65,7 @@ export function useTabs({ userId } = {}) {
   const [indexEntries, setIndexEntries] = useState([])
   const [allLinks, setAllLinks] = useState([])
   const [flippedCardIds, setFlippedCardIds] = useState(() => new Set())
+  const [selectedCardIds, setSelectedCardIds] = useState(() => new Set())
   const [promptLoading, setPromptLoading] = useState(false)
   const [promptError, setPromptError] = useState('')
   const schedulerRef = useRef(null)
@@ -103,6 +109,10 @@ export function useTabs({ userId } = {}) {
           const localTabsNow = await getAllTabs()
           const localById = Object.fromEntries(localTabsNow.map((t) => [t.id, t]))
 
+          const tabsToAdd = []
+          const tabsToUpdate = {}
+          let nextOrder = localTabsNow.length
+
           for (const row of remoteTabs) {
             const existing = localById[row.id]
             if (!existing) {
@@ -110,7 +120,7 @@ export function useTabs({ userId } = {}) {
                 id: row.id,
                 name: row.name,
                 kind: 'blank',
-                order: localTabsNow.length,
+                order: nextOrder++,
                 savedLocation: row.saved_location,
                 savedFolderId: row.saved_folder_id ?? null,
                 isOpen: false,
@@ -118,7 +128,7 @@ export function useTabs({ userId } = {}) {
                 updatedAt: new Date(row.updated_at).getTime(),
               }
               await putTab(newTab)
-              setTabs((prev) => [...prev, newTab])
+              tabsToAdd.push(newTab)
             } else {
               const remoteTs = new Date(row.updated_at).getTime()
               if (remoteTs > (existing.updatedAt ?? 0)) {
@@ -130,9 +140,16 @@ export function useTabs({ userId } = {}) {
                   updatedAt: remoteTs,
                 }
                 await putTab(updated)
-                setTabs((prev) => prev.map((t) => (t.id === row.id ? updated : t)))
+                tabsToUpdate[updated.id] = updated
               }
             }
+          }
+
+          if (tabsToAdd.length > 0 || Object.keys(tabsToUpdate).length > 0) {
+            setTabs((prev) => {
+              const withUpdates = prev.map((t) => tabsToUpdate[t.id] ?? t)
+              return [...withUpdates, ...tabsToAdd]
+            })
           }
         } catch (err) {
           console.error('[useTabs] pull saved tabs error:', err)
@@ -206,9 +223,10 @@ export function useTabs({ userId } = {}) {
         setCardsById({})
       } else {
         const savedId = localStorage.getItem(ACTIVE_TAB_KEY)
-        const restoredId = savedId && sortedTabs.find((t) => t.id === savedId)
+        const openSortedTabs = sortedTabs.filter(isTabOpen)
+        const restoredId = savedId && openSortedTabs.find((t) => t.id === savedId)
           ? savedId
-          : sortedTabs[0].id
+          : (openSortedTabs[0]?.id ?? sortedTabs[0].id)
         setTabs(sortedTabs)
         setActiveTabId(restoredId)
         setTabCards(tcs)
@@ -234,20 +252,24 @@ export function useTabs({ userId } = {}) {
   }, [])
 
   const addTab = useCallback(async () => {
-    const newTab = createTab({ name: 'New tab', order: tabs.length })
+    const allTabs = await getAllTabs()
+    const newTab = createTab({ name: 'New tab', order: allTabs.length })
     await putTab(newTab)
     setTabs((prev) => [...prev, newTab])
     setActiveTabId(newTab.id)
-  }, [tabs])
+  }, [])
 
   const removeTab = useCallback(async (tabId) => {
     const tab = tabs.find((t) => t.id === tabId)
 
-    // Saved tabs (shelf/library) are kept in storage so the vault still shows them.
-    // Just switch the active tab away from it without deleting anything.
+    // Saved tabs (shelf/library): mark as closed so vault still shows them but tab bar hides them.
     if (tab?.savedLocation !== 'none') {
+      const closed = closeSavedTab(tab)
+      await putTab(closed)
+      setTabs((prev) => prev.map((t) => (t.id === tabId ? closed : t)))
+
       if (activeTabId === tabId) {
-        const other = tabs.find((t) => t.id !== tabId && t.savedLocation === 'none')
+        const other = tabs.find((t) => t.id !== tabId && isTabOpen(t))
         if (other) {
           setActiveTabId(other.id)
         } else {
@@ -274,7 +296,11 @@ export function useTabs({ userId } = {}) {
       let nextActiveId = activeTabId
       if (activeTabId === tabId) {
         const removedIndex = tabs.findIndex((t) => t.id === tabId)
-        const adjacent = nextTabs[removedIndex] ?? nextTabs[removedIndex - 1] ?? nextTabs[0]
+        // Prefer an open tab adjacent to the removed slot; fall back to any open tab
+        const adjacent = [nextTabs[removedIndex], nextTabs[removedIndex - 1], ...nextTabs]
+          .filter(Boolean)
+          .find(isTabOpen)
+          ?? nextTabs[0]
         nextActiveId = adjacent.id
       }
       setTabs(nextTabs)
@@ -283,6 +309,15 @@ export function useTabs({ userId } = {}) {
 
     setTabCards((prev) => prev.filter((tc) => tc.tabId !== tabId))
   }, [tabs, activeTabId])
+
+  const reopenSavedTab = useCallback(async (tabId) => {
+    const tab = tabs.find((t) => t.id === tabId)
+    if (!tab) return
+    const opened = reopenTab(tab)
+    await putTab(opened)
+    setTabs((prev) => prev.map((t) => (t.id === tabId ? opened : t)))
+    setActiveTabId(tabId)
+  }, [tabs])
 
   const renameTab = useCallback(async (tabId, name) => {
     const nextTabs = setTabNamePure(tabs, tabId, name)
@@ -834,6 +869,284 @@ export function useTabs({ userId } = {}) {
     return isFlippedFn(flippedCardIds, cardId)
   }, [flippedCardIds])
 
+  const dissolveStack = useCallback(
+    async (stackId) => {
+      const stack = cardsById[stackId]
+      if (!stack || !isStackCard(stack)) return
+      if (!activeTab) return
+
+      const activeTabCards = tabCards
+        .filter((tc) => tc.tabId === activeTab.id)
+        .sort((a, b) => a.position - b.position)
+      const stackTcIndex = activeTabCards.findIndex((tc) => tc.cardId === stackId)
+      if (stackTcIndex === -1) return
+
+      const withoutStack = activeTabCards.filter((tc) => tc.cardId !== stackId)
+      const memberTcs = stack.config.memberIds.map((memberId) =>
+        createTabCard({ tabId: activeTab.id, cardId: memberId, position: 0 }),
+      )
+      const newActiveTabCards = [
+        ...withoutStack.slice(0, stackTcIndex),
+        ...memberTcs,
+        ...withoutStack.slice(stackTcIndex),
+      ].map((tc, i) => ({ ...tc, position: i }))
+
+      const otherTabCards = tabCards.filter((tc) => tc.tabId !== activeTab.id)
+      setTabCards([...otherTabCards, ...newActiveTabCards])
+
+      if (stack.location === 'none') {
+        setCardsById((prev) => {
+          const { [stackId]: _, ...rest } = prev
+          return rest
+        })
+        await deleteCard(stackId)
+      }
+
+      await deleteTabCard(activeTab.id, stackId)
+      await Promise.all(newActiveTabCards.map((tc) => putTabCard(tc)))
+    },
+    [activeTab, tabCards, cardsById],
+  )
+
+  const createStack = useCallback(
+    async (memberIds, options = {}) => {
+      if (!activeTab || memberIds.length < 2) return
+      const stack = makeStackCard({ memberIds, title: options?.title ?? '' })
+
+      setCardsById((prev) => ({ ...prev, [stack.id]: stack }))
+      await putCard(stack)
+
+      const activeTabCards = tabCards.filter((tc) => tc.tabId === activeTab.id)
+
+      if (options?.insertPosition !== undefined) {
+        const sorted = [...activeTabCards].sort((a, b) => a.position - b.position)
+        const insertAt = Math.min(options.insertPosition, sorted.length)
+        const stackTc = createTabCard({ tabId: activeTab.id, cardId: stack.id, position: 0 })
+        const newActiveTabCards = [
+          ...sorted.slice(0, insertAt),
+          stackTc,
+          ...sorted.slice(insertAt),
+        ].map((tc, i) => ({ ...tc, position: i }))
+        const otherTabCards = tabCards.filter((tc) => tc.tabId !== activeTab.id)
+        setTabCards([...otherTabCards, ...newActiveTabCards])
+        await Promise.all(newActiveTabCards.map((tc) => putTabCard(tc)))
+      } else {
+        const position = nextPosition(activeTabCards)
+        const stackTc = createTabCard({ tabId: activeTab.id, cardId: stack.id, position })
+        setTabCards((prev) => [...prev, stackTc])
+        await putTabCard(stackTc)
+      }
+
+      schedulerRef.current?.scheduleSync()
+      return stack.id
+    },
+    [activeTab, tabCards],
+  )
+
+  // Flat merge: dissolves any stacks in ids, collects all leaf card IDs, creates one flat stack.
+  // Removes all selected items from the tab and inserts the new stack at the first selected position.
+  const stackSelectedFlat = useCallback(
+    async (ids) => {
+      if (!activeTab || ids.length < 2) return
+
+      const selectedSet = new Set(ids)
+      const activeTabCards = tabCards
+        .filter((tc) => tc.tabId === activeTab.id)
+        .sort((a, b) => a.position - b.position)
+
+      const firstSelectedIndex = activeTabCards.findIndex((tc) => selectedSet.has(tc.cardId))
+      const insertAt = firstSelectedIndex === -1 ? activeTabCards.length : firstSelectedIndex
+
+      const flatIds = flattenIds(ids, cardsById)
+      const stackIdsToDissolve = ids.filter((id) => {
+        const card = cardsById[id]
+        return card && isStackCard(card)
+      })
+
+      if (flatIds.length < 2) return
+
+      const newStack = makeStackCard({ memberIds: flatIds })
+      const stackTc = createTabCard({ tabId: activeTab.id, cardId: newStack.id, position: 0 })
+      const without = activeTabCards.filter((tc) => !selectedSet.has(tc.cardId))
+      const newActiveTabCards = [
+        ...without.slice(0, insertAt),
+        stackTc,
+        ...without.slice(insertAt),
+      ].map((tc, i) => ({ ...tc, position: i }))
+      const otherTabCards = tabCards.filter((tc) => tc.tabId !== activeTab.id)
+
+      setCardsById((prev) => {
+        const next = { ...prev, [newStack.id]: newStack }
+        for (const stackId of stackIdsToDissolve) {
+          if (prev[stackId]?.location === 'none') delete next[stackId]
+        }
+        return next
+      })
+      setTabCards([...otherTabCards, ...newActiveTabCards])
+
+      await putCard(newStack)
+      await Promise.all(ids.map((id) => deleteTabCard(activeTab.id, id)))
+      for (const stackId of stackIdsToDissolve) {
+        if (cardsById[stackId]?.location === 'none') await deleteCard(stackId)
+      }
+      await Promise.all(newActiveTabCards.map((tc) => putTabCard(tc)))
+
+      schedulerRef.current?.scheduleSync()
+      return newStack.id
+    },
+    [activeTab, tabCards, cardsById],
+  )
+
+  // Nested: moves movingId inside targetId. If target is a stack, appends moving as a member.
+  // If target is a regular card, creates a new stack{target (top), moving} at target's tab position.
+  // In both cases, moving is removed from the tab.
+  const nestMoveCardInTarget = useCallback(
+    async (movingId, targetId) => {
+      if (!activeTab) return
+      const movingCard = cardsById[movingId]
+      const targetCard = cardsById[targetId]
+      if (!movingCard || !targetCard) return
+
+      const activeTabCards = tabCards
+        .filter((tc) => tc.tabId === activeTab.id)
+        .sort((a, b) => a.position - b.position)
+      const otherTabCards = tabCards.filter((tc) => tc.tabId !== activeTab.id)
+
+      if (isStackCard(targetCard)) {
+        const updatedStack = addMember(targetCard, movingId)
+        const newActiveTabCards = activeTabCards
+          .filter((tc) => tc.cardId !== movingId)
+          .map((tc, i) => ({ ...tc, position: i }))
+        setCardsById((prev) => ({ ...prev, [targetId]: updatedStack }))
+        setTabCards([...otherTabCards, ...newActiveTabCards])
+        await putCard(updatedStack)
+        await deleteTabCard(activeTab.id, movingId)
+        await Promise.all(newActiveTabCards.map((tc) => putTabCard(tc)))
+      } else {
+        const targetIdx = activeTabCards.findIndex((tc) => tc.cardId === targetId)
+        const movingIdx = activeTabCards.findIndex((tc) => tc.cardId === movingId)
+        // Adjust insert position for removal of the moving card if it precedes target
+        const adjustedIdx = movingIdx !== -1 && movingIdx < targetIdx ? targetIdx - 1 : targetIdx
+
+        const newStack = makeStackCard({ memberIds: [targetId, movingId], topCardId: targetId })
+        const stackTc = createTabCard({ tabId: activeTab.id, cardId: newStack.id, position: 0 })
+        const withoutBoth = activeTabCards.filter(
+          (tc) => tc.cardId !== targetId && tc.cardId !== movingId,
+        )
+        const insertAt = Math.max(0, Math.min(adjustedIdx, withoutBoth.length))
+        const newActiveTabCards = [
+          ...withoutBoth.slice(0, insertAt),
+          stackTc,
+          ...withoutBoth.slice(insertAt),
+        ].map((tc, i) => ({ ...tc, position: i }))
+
+        setCardsById((prev) => ({ ...prev, [newStack.id]: newStack }))
+        setTabCards([...otherTabCards, ...newActiveTabCards])
+        await putCard(newStack)
+        await deleteTabCard(activeTab.id, targetId)
+        await deleteTabCard(activeTab.id, movingId)
+        await Promise.all(newActiveTabCards.map((tc) => putTabCard(tc)))
+      }
+
+      schedulerRef.current?.scheduleSync()
+    },
+    [activeTab, tabCards, cardsById],
+  )
+
+  const addToStack = useCallback(
+    async (stackId, cardId) => {
+      const stack = cardsById[stackId]
+      if (!stack || !isStackCard(stack)) return
+      const updatedStack = addMember(stack, cardId)
+      setCardsById((prev) => ({ ...prev, [stackId]: updatedStack }))
+      await putCard(updatedStack)
+      schedulerRef.current?.scheduleSync()
+    },
+    [cardsById],
+  )
+
+  const removeFromStack = useCallback(
+    async (stackId, cardId) => {
+      const stack = cardsById[stackId]
+      if (!stack || !isStackCard(stack)) return
+      const result = removeMember(stack, cardId)
+      if (result === null) {
+        await dissolveStack(stackId)
+        return
+      }
+      setCardsById((prev) => ({ ...prev, [stackId]: result }))
+      await putCard(result)
+      schedulerRef.current?.scheduleSync()
+    },
+    [cardsById, dissolveStack],
+  )
+
+  const setStackTopCard = useCallback(
+    async (stackId, cardId) => {
+      const stack = cardsById[stackId]
+      if (!stack || !isStackCard(stack)) return
+      if (!stack.config.memberIds.includes(cardId)) return
+      const updatedStack = setTopCard(stack, cardId)
+      setCardsById((prev) => ({ ...prev, [stackId]: updatedStack }))
+      await putCard(updatedStack)
+      schedulerRef.current?.scheduleSync()
+    },
+    [cardsById],
+  )
+
+  const reorderStackMembers = useCallback(
+    async (stackId, fromIndex, toIndex) => {
+      const stack = cardsById[stackId]
+      if (!stack || !isStackCard(stack)) return
+      if (fromIndex === toIndex) return
+      const updatedStack = reorderMembers(stack, fromIndex, toIndex)
+      setCardsById((prev) => ({ ...prev, [stackId]: updatedStack }))
+      await putCard(updatedStack)
+      schedulerRef.current?.scheduleSync()
+    },
+    [cardsById],
+  )
+
+  const convertTabToStack = useCallback(
+    async (tabId) => {
+      const targetTabId = tabId ?? activeTabId
+      const targetTabCards = tabCards
+        .filter((tc) => tc.tabId === targetTabId)
+        .sort((a, b) => a.position - b.position)
+      if (targetTabCards.length < 2) return
+      const memberIds = targetTabCards.map((tc) => tc.cardId)
+      const stack = { ...makeStackCard({ memberIds }), location: 'shelf' }
+      setCardsById((prev) => ({ ...prev, [stack.id]: stack }))
+      await putCard(stack)
+      schedulerRef.current?.scheduleSync()
+      return stack.id
+    },
+    [activeTabId, tabCards],
+  )
+
+  const toggleCardSelection = useCallback((cardId) => {
+    setSelectedCardIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(cardId)) {
+        next.delete(cardId)
+      } else {
+        next.add(cardId)
+      }
+      return next
+    })
+  }, [])
+
+  const clearSelection = useCallback(() => {
+    setSelectedCardIds(new Set())
+  }, [])
+
+  const selectAll = useCallback(() => {
+    const ids = tabCards
+      .filter((tc) => tc.tabId === activeTabId)
+      .map((tc) => tc.cardId)
+    setSelectedCardIds(new Set(ids))
+  }, [tabCards, activeTabId])
+
   const entries = tabCards
     .filter((tc) => tc.tabId === activeTabId)
     .sort((a, b) => a.position - b.position)
@@ -862,6 +1175,7 @@ export function useTabs({ userId } = {}) {
 
   const brainFeedItems = getBrainFeedItems(cardsById, indexEntries, allLinks)
 
+  const openTabs = tabs.filter(isTabOpen)
   const shelfTabs = tabs.filter((t) => t.savedLocation === 'shelf')
   const libraryTabs = tabs.filter((t) => t.savedLocation === 'library')
 
@@ -988,6 +1302,7 @@ export function useTabs({ userId } = {}) {
   return {
     tab: activeTab,
     tabs,
+    openTabs,
     activeTabId,
     isReady,
     entries,
@@ -1001,6 +1316,7 @@ export function useTabs({ userId } = {}) {
     switchTab,
     addTab,
     removeTab,
+    reopenSavedTab,
     renameTab,
     saveTabToShelf,
     moveTabToLibrary,
@@ -1036,5 +1352,18 @@ export function useTabs({ userId } = {}) {
     reindexCard,
     flipCard,
     isFlippedCard,
+    selectedCardIds,
+    createStack,
+    stackSelectedFlat,
+    nestMoveCardInTarget,
+    addToStack,
+    removeFromStack,
+    dissolveStack,
+    setStackTopCard,
+    reorderStackMembers,
+    convertTabToStack,
+    toggleCardSelection,
+    clearSelection,
+    selectAll,
   }
 }

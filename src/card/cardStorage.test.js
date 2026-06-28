@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '../db/vaultDb'
 import { createCard } from './createCard'
 import { deleteCard, getAllCards, getDirtyCards, markCardClean, putCard } from './cardStorage'
+import { createStack } from '../stack/createStack'
 
 describe('cardStorage', () => {
   beforeEach(async () => {
@@ -108,5 +109,68 @@ describe('cardStorage', () => {
     const cards = await getAllCards()
     expect(cards[0].type).toBe('portal')
     expect(cards[0].config.target_card_id).toBe('target-123')
+  })
+})
+
+describe('stack card round-trip', () => {
+  beforeEach(async () => {
+    await db.cards.clear()
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('putCard followed by getAllCards returns stack with type stack intact', async () => {
+    const stack = createStack({ memberIds: ['card-a', 'card-b'] })
+    await putCard(stack)
+    const cards = await getAllCards()
+    expect(cards).toHaveLength(1)
+    expect(cards[0].type).toBe('stack')
+  })
+
+  it('config.memberIds and config.topCardId survive Dexie round-trip without corruption', async () => {
+    const stack = createStack({ memberIds: ['card-a', 'card-b'], topCardId: 'card-b' })
+    await putCard(stack)
+    const cards = await getAllCards()
+    expect(cards[0].config.memberIds).toEqual(['card-a', 'card-b'])
+    expect(cards[0].config.topCardId).toBe('card-b')
+  })
+
+  it('dirty: true is set on a freshly put stack', async () => {
+    const stack = createStack({ memberIds: ['card-a', 'card-b'] })
+    await putCard(stack)
+    const cards = await getAllCards()
+    expect(cards[0].dirty).toBe(true)
+  })
+
+  it('deleteCard removes a stack by id', async () => {
+    const stack = createStack({ memberIds: ['card-a', 'card-b'] })
+    await putCard(stack)
+    await deleteCard(stack.id)
+    expect(await getAllCards()).toEqual([])
+  })
+
+  it('markCardClean works on a stack card', async () => {
+    const stack = createStack({ memberIds: ['card-a', 'card-b'] })
+    await putCard(stack)
+    const merged = { ...stack, title: 'Named Stack' }
+    await markCardClean(stack.id, merged)
+    const cards = await getAllCards()
+    expect(cards[0].dirty).toBe(false)
+    expect(cards[0].title).toBe('Named Stack')
+  })
+
+  it('getAllCards returns both text cards and stack cards from the same table', async () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('text-id').mockReturnValueOnce('stack-id')
+    const textCard = createCard({ title: 'A text card' })
+    const stackCard = createStack({ memberIds: ['m1', 'm2'] })
+    await putCard(textCard)
+    await putCard(stackCard)
+    const cards = await getAllCards()
+    expect(cards).toHaveLength(2)
+    const types = cards.map((c) => c.type).sort()
+    expect(types).toEqual(['stack', 'text'])
   })
 })

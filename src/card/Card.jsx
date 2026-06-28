@@ -15,11 +15,12 @@ export function Card({
   flipped = false,
   foldState = false,
   hiddenState = false,
+  selected = false,
   location = 'none',
   onFlip,
   onToggleFold,
   onToggleHide,
-  onSendToDock,
+  onToggleSelect,
   onSendToTab,
   onUpdate,
   onClose,
@@ -120,7 +121,7 @@ export function Card({
 
   return (
     <div
-      className={`card${hiddenState ? ' card--hidden' : ''}${flipped ? ' card--flipped' : ''}`}
+      className={`card${hiddenState ? ' card--hidden' : ''}${flipped ? ' card--flipped' : ''}${selected ? ' card--selected' : ''}`}
       onBlur={editing ? commitEdit : undefined}
       onKeyDown={editing ? handleKeyDown : undefined}
     >
@@ -132,12 +133,13 @@ export function Card({
         onTitleClick={onUpdate && !flipped ? () => startEditing('title') : undefined}
         folded={foldState}
         hidden={hiddenState}
+        selected={selected}
+        onToggleSelect={onToggleSelect}
         location={location}
         onSaveToShelf={onSaveToShelf}
         onToggleFold={onToggleFold}
         onToggleHide={onToggleHide}
         onFlip={onFlip ? () => flushAndThen(onFlip) : undefined}
-        onSendToDock={onSendToDock ? () => flushAndThen(onSendToDock) : undefined}
         onSendToTab={onSendToTab ? () => flushAndThen(onSendToTab) : undefined}
         onClose={onClose}
       />

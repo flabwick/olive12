@@ -54,15 +54,6 @@ function CheckIcon() {
   )
 }
 
-function SendToDockIcon() {
-  return (
-    <svg viewBox="0 0 10 12" width="9" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M5 1v7M2 5.5l3 3 3-3" />
-      <line x1="1" y1="11" x2="9" y2="11" />
-    </svg>
-  )
-}
-
 function SendToTabIcon() {
   return (
     <svg viewBox="0 0 10 12" width="9" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -99,19 +90,31 @@ export function CardHeader({
   onTitleClick,
   folded = false,
   hidden = false,
+  selected = false,
   location = 'none',
   onSaveToShelf,
   onToggleFold,
   onToggleHide,
+  onToggleSelect,
   onFlip,
-  onSendToDock,
   onSendToTab,
   onClose,
 }) {
-  const hasControls = onSaveToShelf || onToggleHide || onFlip || onSendToDock || onSendToTab || onClose
+  const hasControls = onSaveToShelf || onToggleHide || onFlip || onSendToTab || onClose
 
   return (
     <div className="card-header">
+      {onToggleSelect && (
+        <label className="card-header__select" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            className="card-header__select-input"
+            aria-label="Select card"
+            checked={selected}
+            onChange={() => onToggleSelect()}
+          />
+        </label>
+      )}
       {onToggleFold && (
         <button
           type="button"
@@ -180,16 +183,6 @@ export function CardHeader({
               aria-label={hidden ? 'Show card' : 'Dim card'}
             >
               <EyeIcon hidden={hidden} />
-            </button>
-          )}
-          {onSendToDock && (
-            <button
-              type="button"
-              className="card-header__control"
-              onClick={onSendToDock}
-              aria-label="Move to dock"
-            >
-              <SendToDockIcon />
             </button>
           )}
           {onSendToTab && (

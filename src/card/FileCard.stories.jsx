@@ -90,3 +90,25 @@ export const ReadOnly = {
     onUpdate: undefined,
   },
 }
+
+export const Selected = {
+  args: {
+    title: 'selected-file.pdf',
+    fileName: 'selected-file.pdf',
+    fileType: 'application/pdf',
+    fileSize: 204_800,
+    selected: true,
+    onToggleSelect: () => {},
+  },
+}
+
+export const Selectable = {
+  args: {
+    title: 'selectable-file.pdf',
+    fileName: 'selectable-file.pdf',
+    fileType: 'application/pdf',
+    fileSize: 204_800,
+    selected: false,
+    onToggleSelect: () => {},
+  },
+}

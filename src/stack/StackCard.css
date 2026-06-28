@@ -1,0 +1,300 @@
+.stack-card {
+  border: 2px solid #6a5030;
+  border-radius: 0.4375rem;
+  background: var(--olive-cream, #fef8ee);
+  box-shadow: var(--olive-shadow, 4px 4px 0 #b09070);
+  overflow: hidden;
+  text-align: left;
+  transition: box-shadow 0.15s ease, transform 0.15s ease, opacity 0.2s ease;
+}
+
+.stack-card:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--olive-shadow-lift, 6px 6px 0 #9a7858);
+}
+
+.stack-card--hidden {
+  opacity: 0.38;
+}
+
+.stack-card--flipped {
+  /* marker class */
+}
+
+.stack-card--expanded {
+  /* marker class */
+}
+
+@media (prefers-color-scheme: dark) {
+  .stack-card {
+    border-color: #504030;
+    background: #201e16;
+    box-shadow: 4px 4px 0 #0a0a08;
+  }
+
+  .stack-card:hover {
+    box-shadow: 7px 7px 0 #080806;
+  }
+}
+
+/* Embedded member card — wraps Card, FileCard, or nested StackCard */
+
+.stack-card__embed > .card,
+.stack-card__embed > .file-card {
+  box-shadow: none;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+}
+
+/* Nested StackCard embedded inside a member slot */
+.stack-card__embed > .stack-card {
+  box-shadow: none;
+  border-radius: 0;
+  border: none;
+  border-bottom: 2px solid #6a5030;
+}
+
+@media (prefers-color-scheme: dark) {
+  .stack-card__embed > .card,
+  .stack-card__embed > .file-card {
+    border-color: transparent;
+  }
+
+  .stack-card__embed > .stack-card {
+    border-bottom-color: #504030;
+  }
+}
+
+/* Fallback when a member card is not in cardsById */
+.stack-card__missing {
+  font-size: 0.75rem;
+  color: #a84830;
+  margin: 0;
+  padding: 0.625rem 1rem;
+  font-style: italic;
+}
+
+/* Empty stack */
+.stack-card__empty {
+  font-size: 0.75rem;
+  color: #8a7060;
+  margin: 0;
+  padding: 0.625rem 1rem;
+  font-style: italic;
+}
+
+@media (prefers-color-scheme: dark) {
+  .stack-card__missing {
+    color: #d06848;
+  }
+
+  .stack-card__empty {
+    color: #6a6058;
+  }
+}
+
+/* Cycle controls (collapsed view) */
+
+.stack-card__cycle-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-top: 1px solid rgba(44, 24, 16, 0.1);
+  background: rgba(44, 24, 16, 0.02);
+}
+
+.stack-card__cycle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid rgba(44, 24, 16, 0.25);
+  border-radius: 0.25rem;
+  background: rgba(255, 255, 255, 0.4);
+  color: #2c1810;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+  flex-shrink: 0;
+}
+
+.stack-card__cycle-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(44, 24, 16, 0.5);
+}
+
+.stack-card__cycle-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.stack-card__cycle-count {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #5a4030;
+  letter-spacing: 0.04em;
+  min-width: 2.5rem;
+  text-align: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  .stack-card__cycle-controls {
+    border-top-color: rgba(200, 196, 168, 0.08);
+    background: rgba(255, 255, 240, 0.01);
+  }
+
+  .stack-card__cycle-count {
+    color: #a09080;
+  }
+
+  .stack-card__cycle-btn {
+    background: rgba(255, 255, 240, 0.05);
+    border-color: rgba(200, 196, 168, 0.22);
+    color: #c8c4b0;
+  }
+
+  .stack-card__cycle-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 240, 0.1);
+    border-color: rgba(200, 196, 168, 0.5);
+  }
+}
+
+/* Expanded view */
+
+.stack-card__members {
+  display: flex;
+  flex-direction: column;
+}
+
+.stack-card__member-wrap {
+  border-bottom: 1px solid rgba(44, 24, 16, 0.1);
+}
+
+/* Reorder bar below each member card in expanded view */
+
+.stack-card__reorder-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.2rem;
+  padding: 0.2rem 0.5rem;
+  background: rgba(44, 24, 16, 0.03);
+  border-top: 1px solid rgba(44, 24, 16, 0.07);
+}
+
+.stack-card__reorder-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  padding: 0;
+  border: 1px solid rgba(44, 24, 16, 0.2);
+  border-radius: 0.2rem;
+  background: rgba(255, 255, 255, 0.3);
+  color: rgba(44, 24, 16, 0.5);
+  font-size: 0.5rem;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.stack-card__reorder-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.7);
+  color: #2c1810;
+}
+
+.stack-card__reorder-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.stack-card__dissolve {
+  display: block;
+  width: 100%;
+  padding: 0.25rem 0.75rem;
+  border: none;
+  border-top: 1px solid rgba(168, 72, 48, 0.2);
+  background: rgba(168, 72, 48, 0.04);
+  color: #a84830;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.stack-card__dissolve:hover {
+  background: rgba(168, 72, 48, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .stack-card__member-wrap {
+    border-bottom-color: rgba(200, 196, 168, 0.08);
+  }
+
+  .stack-card__reorder-bar {
+    background: rgba(255, 255, 240, 0.02);
+    border-top-color: rgba(200, 196, 168, 0.06);
+  }
+
+  .stack-card__reorder-btn {
+    background: rgba(255, 255, 240, 0.04);
+    border-color: rgba(200, 196, 168, 0.18);
+    color: rgba(200, 196, 168, 0.45);
+  }
+
+  .stack-card__reorder-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 240, 0.1);
+    color: #c8c4b0;
+  }
+
+  .stack-card__dissolve {
+    border-top-color: rgba(208, 104, 72, 0.2);
+    background: rgba(208, 104, 72, 0.05);
+    color: #d06848;
+  }
+
+  .stack-card__dissolve:hover {
+    background: rgba(208, 104, 72, 0.12);
+  }
+}
+
+/* Expand / collapse toggle */
+
+.stack-card__expand-toggle {
+  display: block;
+  width: 100%;
+  padding: 0.3rem 1rem;
+  border: none;
+  border-top: 1px solid rgba(44, 24, 16, 0.1);
+  background: rgba(44, 24, 16, 0.03);
+  color: #8a7060;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.stack-card__expand-toggle:hover {
+  background: rgba(44, 24, 16, 0.07);
+  color: #2c1810;
+}
+
+@media (prefers-color-scheme: dark) {
+  .stack-card__expand-toggle {
+    border-top-color: rgba(200, 196, 168, 0.08);
+    background: rgba(255, 255, 240, 0.02);
+    color: #6a6058;
+  }
+
+  .stack-card__expand-toggle:hover {
+    background: rgba(255, 255, 240, 0.06);
+    color: #a09080;
+  }
+}

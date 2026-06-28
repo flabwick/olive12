@@ -1,9 +1,16 @@
 .file-card {
+  position: relative;
   background: var(--card-bg, #fdf6ed);
   border: 1.5px solid var(--card-border, #d4c5a9);
   border-radius: 0.5rem;
   overflow: hidden;
 }
+
+.file-card--selected {
+  border-color: #4a7c59;
+  box-shadow: 0 0 0 2px rgba(74, 124, 89, 0.3);
+}
+
 
 .file-card--hidden {
   opacity: 0.45;

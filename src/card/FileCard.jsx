@@ -28,12 +28,13 @@ export function FileCard({
   location = 'none',
   foldState = false,
   hiddenState = false,
+  selected = false,
   onToggleFold,
   onToggleHide,
+  onToggleSelect,
   onClose,
   onUpdate,
   onSaveToShelf,
-  onSendToDock,
   onSendToTab,
 }) {
   const [editing, setEditing] = useState(false)
@@ -74,7 +75,7 @@ export function FileCard({
 
   return (
     <div
-      className={`file-card${hiddenState ? ' file-card--hidden' : ''}`}
+      className={`file-card${hiddenState ? ' file-card--hidden' : ''}${selected ? ' file-card--selected' : ''}`}
       onBlur={editing ? commitTitle : undefined}
       onKeyDown={editing ? handleKeyDown : undefined}
     >
@@ -86,11 +87,12 @@ export function FileCard({
         onTitleClick={onUpdate ? () => setEditing(true) : undefined}
         folded={foldState}
         hidden={hiddenState}
+        selected={selected}
+        onToggleSelect={onToggleSelect}
         location={location}
         onSaveToShelf={onSaveToShelf}
         onToggleFold={onToggleFold}
         onToggleHide={onToggleHide}
-        onSendToDock={onSendToDock}
         onSendToTab={onSendToTab}
         onClose={onClose}
       />

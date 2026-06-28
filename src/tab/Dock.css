@@ -254,6 +254,40 @@
   }
 }
 
+/* Card selection / move states */
+.dock--card-selected,
+.dock--card-move {
+  gap: 0.5rem;
+  justify-content: flex-start;
+}
+
+.dock__card-name {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--olive-text, #2c1810);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
+  max-width: 200px;
+}
+
+.dock__card-name--moving {
+  color: var(--olive-text-mid, #6b5040);
+  font-style: italic;
+}
+
+@media (prefers-color-scheme: dark) {
+  .dock__card-name {
+    color: #e4e0d0;
+  }
+
+  .dock__card-name--moving {
+    color: #908870;
+  }
+}
+
 /* Icon + plus composite */
 .dock__icon-plus {
   display: flex;

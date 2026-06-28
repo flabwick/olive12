@@ -5,7 +5,7 @@ import { computeDockState } from './dockStateMachine'
 import { addDockCard, getDockCardIds, removeDockCard } from './dockCardStorage'
 import { getAllTabCards } from './tabStorage'
 
-export function useDock({ cardsById = {}, activeEditorCardId = null, activeSurface = null } = {}) {
+export function useDock({ cardsById = {}, activeEditorCardId = null, activeSurface = null, selectedCardCount = 0, moveCardId = null } = {}) {
   const [dockCardIds, setDockCardIds] = useState([])
   const [activeDockCardId, setActiveDockCardId] = useState(null)
 
@@ -17,7 +17,7 @@ export function useDock({ cardsById = {}, activeEditorCardId = null, activeSurfa
     .map((id) => ({ cardId: id, card: cardsById[id] }))
     .filter((e) => e.card !== undefined)
 
-  const dockState = computeDockState({ activeDockCardId, activeEditorCardId, activeSurface })
+  const dockState = computeDockState({ activeDockCardId, activeEditorCardId, activeSurface, selectedCardCount, moveCardId })
 
   const openDockCard = useCallback((cardId) => {
     setActiveDockCardId((prev) => (prev === cardId ? null : cardId))

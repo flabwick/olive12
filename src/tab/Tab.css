@@ -26,3 +26,111 @@
 .tab__item {
   display: block;
 }
+
+.tab__slot {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tab__insert-btn {
+  display: block;
+  width: 100%;
+  padding: 0.3rem 1rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #5a8a48;
+  background: transparent;
+  border: none;
+  border-top: 1px dashed rgba(74, 106, 58, 0.35);
+  border-bottom: 1px dashed rgba(74, 106, 58, 0.35);
+  cursor: pointer;
+  text-align: left;
+}
+
+.tab__insert-btn:hover {
+  background: rgba(74, 106, 58, 0.08);
+  border-color: rgba(74, 106, 58, 0.6);
+  color: #3a7a28;
+}
+
+.tab__card-action {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.3rem 0.625rem;
+  background: #f0e4c8;
+  border: 1.5px solid #c8ae78;
+  border-top: none;
+  border-radius: 0 0 0.4375rem 0.4375rem;
+  margin-top: -2px;
+}
+
+.tab__card-action-btn {
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid rgba(44, 24, 16, 0.25);
+  border-radius: 0.25rem;
+  background: rgba(255, 255, 255, 0.5);
+  color: #5a4030;
+  cursor: pointer;
+  line-height: 1.5;
+}
+
+.tab__card-action-btn:hover {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(44, 24, 16, 0.45);
+}
+
+.tab__card-action-btn--stack {
+  color: #4a6a3a;
+  border-color: rgba(74, 106, 58, 0.4);
+  background: rgba(74, 106, 58, 0.06);
+}
+
+.tab__card-action-btn--stack:hover {
+  background: rgba(74, 106, 58, 0.14);
+  border-color: rgba(74, 106, 58, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tab__insert-btn {
+    color: #6a9a58;
+    border-color: rgba(106, 154, 88, 0.25);
+  }
+
+  .tab__insert-btn:hover {
+    background: rgba(106, 154, 88, 0.1);
+    border-color: rgba(106, 154, 88, 0.5);
+    color: #8abd70;
+  }
+
+  .tab__card-action {
+    background: #252018;
+    border-color: #3a3628;
+  }
+
+  .tab__card-action-btn {
+    background: rgba(255, 255, 240, 0.05);
+    border-color: rgba(200, 196, 168, 0.2);
+    color: #a09080;
+  }
+
+  .tab__card-action-btn:hover {
+    background: rgba(255, 255, 240, 0.1);
+    border-color: rgba(200, 196, 168, 0.4);
+  }
+
+  .tab__card-action-btn--stack {
+    color: #6a9a58;
+    border-color: rgba(106, 154, 88, 0.35);
+    background: rgba(106, 154, 88, 0.06);
+  }
+
+  .tab__card-action-btn--stack:hover {
+    background: rgba(106, 154, 88, 0.12);
+    border-color: rgba(106, 154, 88, 0.55);
+  }
+}

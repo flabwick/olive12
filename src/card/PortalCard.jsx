@@ -9,6 +9,7 @@ export function PortalCard({
   foldState = false,
   hiddenState = false,
   flipped = false,
+  selected = false,
   location,
   folders,
   onToggleFold,
@@ -19,6 +20,7 @@ export function PortalCard({
   onClose,
   onUpdate,
   onLocate,
+  onToggleSelect,
   indexEntry,
   indexLoading = false,
 }) {
@@ -49,8 +51,10 @@ export function PortalCard({
           location={location}
           foldState={foldState}
           hiddenState={hiddenState}
+          selected={selected}
           onToggleFold={onToggleFold}
           onToggleHide={onToggleHide}
+          onToggleSelect={onToggleSelect}
           onClose={onClose}
           onUpdate={onUpdate}
         />
@@ -71,12 +75,14 @@ export function PortalCard({
         foldState={foldState}
         hiddenState={hiddenState}
         flipped={flipped}
+        selected={selected}
         location={location}
         folders={folders}
         indexEntry={indexEntry}
         indexLoading={indexLoading}
         onToggleFold={onToggleFold}
         onToggleHide={onToggleHide}
+        onToggleSelect={onToggleSelect}
         onFlip={onFlip}
         onMoveUp={onMoveUp}
         onMoveDown={onMoveDown}
