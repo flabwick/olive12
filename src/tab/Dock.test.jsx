@@ -42,7 +42,12 @@ describe('Dock — BASE state', () => {
     expect(onSettings).toHaveBeenCalledOnce()
   })
 
-  it('active pill has active class', () => {
+  it('renders AI prompt button in BASE state', () => {
+    wrap(<Dock dockState={DOCK_STATE.BASE} />)
+    expect(screen.getByRole('button', { name: 'AI prompt' })).toBeInTheDocument()
+  })
+
+  it('active pill has active class and shows close icon', () => {
     wrap(
       <Dock
         dockState={DOCK_STATE.BASE}
@@ -50,7 +55,7 @@ describe('Dock — BASE state', () => {
         activeDockCardId="c1"
       />
     )
-    const activePill = screen.getByText('First card').closest('button')
+    const activePill = screen.getByRole('button', { name: 'Close card panel' })
     expect(activePill).toHaveClass('dock__pill--active')
     const inactivePill = screen.getByText('2').closest('button')
     expect(inactivePill).not.toHaveClass('dock__pill--active')
@@ -72,6 +77,57 @@ describe('Dock — BASE state', () => {
   it('does not render any formatting toolbar buttons', () => {
     wrap(<Dock dockState={DOCK_STATE.BASE} dockCardEntries={SAMPLE_ENTRIES} />)
     expect(screen.queryByRole('button', { name: /Bold/i })).not.toBeInTheDocument()
+  })
+
+  it('active pill shows close icon instead of label', () => {
+    wrap(
+      <Dock
+        dockState={DOCK_STATE.BASE}
+        dockCardEntries={SAMPLE_ENTRIES}
+        activeDockCardId="c1"
+      />
+    )
+    expect(screen.getByRole('button', { name: 'Close card panel' })).toBeInTheDocument()
+    expect(screen.queryByText('First card')).not.toBeInTheDocument()
+  })
+
+  it('inactive pills still show their label', () => {
+    wrap(
+      <Dock
+        dockState={DOCK_STATE.BASE}
+        dockCardEntries={SAMPLE_ENTRIES}
+        activeDockCardId="c1"
+      />
+    )
+    expect(screen.getByText('2')).toBeInTheDocument()
+  })
+
+  it('clicking the active pill calls onCloseDockCard', async () => {
+    const onCloseDockCard = vi.fn()
+    wrap(
+      <Dock
+        dockState={DOCK_STATE.BASE}
+        dockCardEntries={SAMPLE_ENTRIES}
+        activeDockCardId="c1"
+        onCloseDockCard={onCloseDockCard}
+      />
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Close card panel' }))
+    expect(onCloseDockCard).toHaveBeenCalledOnce()
+  })
+
+  it('clicking an inactive pill still calls onOpenDockCard', async () => {
+    const onOpenDockCard = vi.fn()
+    wrap(
+      <Dock
+        dockState={DOCK_STATE.BASE}
+        dockCardEntries={SAMPLE_ENTRIES}
+        activeDockCardId="c1"
+        onOpenDockCard={onOpenDockCard}
+      />
+    )
+    await userEvent.click(screen.getByText('2'))
+    expect(onOpenDockCard).toHaveBeenCalledWith('c2')
   })
 })
 
@@ -168,23 +224,23 @@ describe('Dock — vault browse state', () => {
     expect(screen.getByRole('button', { name: 'New card' })).toBeInTheDocument()
   })
 
-  it('shows Shelf, Library and Brain tab buttons', () => {
+  it('shows Inbox, Vault and Index tab buttons', () => {
     wrap(<Dock dockState={DOCK_STATE.BASE} vaultOpen vaultTab="shelf" />)
-    expect(screen.getByRole('button', { name: 'Shelf' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Library' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Brain' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Inbox' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Vault' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Index' })).toBeInTheDocument()
   })
 
   it('marks the active tab button as active', () => {
     wrap(<Dock dockState={DOCK_STATE.BASE} vaultOpen vaultTab="library" />)
-    expect(screen.getByRole('button', { name: 'Library' })).toHaveClass('dock__vault-tab--active')
-    expect(screen.getByRole('button', { name: 'Shelf' })).not.toHaveClass('dock__vault-tab--active')
+    expect(screen.getByRole('button', { name: 'Vault' })).toHaveClass('dock__vault-tab--active')
+    expect(screen.getByRole('button', { name: 'Inbox' })).not.toHaveClass('dock__vault-tab--active')
   })
 
   it('calls onVaultTabChange when a tab button is clicked', async () => {
     const onVaultTabChange = vi.fn()
     wrap(<Dock dockState={DOCK_STATE.BASE} vaultOpen vaultTab="shelf" onVaultTabChange={onVaultTabChange} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Library' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Vault' }))
     expect(onVaultTabChange).toHaveBeenCalledWith('library')
   })
 
@@ -512,7 +568,7 @@ describe('Dock — folder pick mode', () => {
         onClearVaultItem={vi.fn()}
       />,
     )
-    expect(screen.getByText(/→ Library/)).toBeInTheDocument()
+    expect(screen.getByText(/→ Vault/)).toBeInTheDocument()
   })
 
   it('shows Shelf as destination when on shelf tab', () => {
@@ -526,7 +582,7 @@ describe('Dock — folder pick mode', () => {
         onClearVaultItem={vi.fn()}
       />,
     )
-    expect(screen.getByText(/→ Shelf/)).toBeInTheDocument()
+    expect(screen.getByText(/→ Inbox/)).toBeInTheDocument()
   })
 
   it('shows folder name as destination when moveTarget is set', () => {
@@ -598,5 +654,17 @@ describe('Dock — TAB_EDITOR state', () => {
   it('does not render Settings button', () => {
     wrap(<Dock dockState={DOCK_STATE.TAB_EDITOR} />)
     expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Dock — CARD_SELECTED state', () => {
+  it('renders AI prompt button', () => {
+    wrap(<Dock dockState={DOCK_STATE.CARD_SELECTED} selectedCardCount={1} selectedCardTitle="My card" />)
+    expect(screen.getByRole('button', { name: 'AI prompt' })).toBeInTheDocument()
+  })
+
+  it('renders AI prompt button with multiple cards selected', () => {
+    wrap(<Dock dockState={DOCK_STATE.CARD_SELECTED} selectedCardCount={3} />)
+    expect(screen.getByRole('button', { name: 'AI prompt' })).toBeInTheDocument()
   })
 })

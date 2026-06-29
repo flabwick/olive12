@@ -46,6 +46,7 @@ function AppShell({ userId }) {
     renameTab,
     saveTabToShelf,
     moveTabToLibrary,
+    addCard,
     addTabCard,
     addToCardsById,
     addPortalCard,
@@ -263,6 +264,11 @@ function AppShell({ userId }) {
   const singleSelectedCard = singleSelectedId ? cardsById[singleSelectedId] : null
   const movingCard = moveCardId ? cardsById[moveCardId] : null
   const dockActionCardId = moveCardId ?? singleSelectedId
+
+  function handleMoveToDock(cardId) {
+    addToDock(cardId)
+    detachCardFromTab(cardId)
+  }
 
   function handleDockFromMove() {
     if (!dockActionCardId) return
@@ -529,6 +535,8 @@ function AppShell({ userId }) {
           setStackTopCard={setStackTopCard}
           onReorderStackMember={reorderStackMembers}
           onDissolveStack={dissolveStack}
+          onAddCard={addCard}
+          onMoveToDock={handleMoveToDock}
         />
       </div>
       <div className="app-shell__dock-area">
@@ -614,6 +622,7 @@ function AppShell({ userId }) {
           activeDockCardId={activeDockCardId}
           onAddDockCard={handleAddDockCard}
           onOpenDockCard={handleOpenDockCard}
+          onCloseDockCard={closeDockCard}
           onFolderOpen={handleFolderOpen}
           onSettings={handleSettings}
           onEmbedOpen={handleEmbedOpen}

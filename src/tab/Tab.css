@@ -134,3 +134,35 @@
     border-color: rgba(106, 154, 88, 0.55);
   }
 }
+
+.tab__actions-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2, 6px);
+  margin-top: var(--space-4, 12px);
+}
+
+.tab__actions-row .add-card-btn {
+  flex: 1;
+  margin-top: 0;
+}
+
+.tab__ai-btn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  background: none;
+  border: 1.5px dashed var(--color-border-faint, #ddd);
+  border-radius: var(--radius-card, 6px);
+  color: var(--color-text-faint, #aaa);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.tab__ai-btn:hover {
+  border-color: var(--color-primary, #4a90d9);
+  color: var(--color-primary, #4a90d9);
+}

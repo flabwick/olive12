@@ -25,7 +25,7 @@ describe('LibraryView', () => {
 
   it('shows empty state when no content', () => {
     render(<LibraryView />)
-    expect(screen.getByText('Nothing in library yet.')).toBeInTheDocument()
+    expect(screen.getByText('Nothing in your vault yet.')).toBeInTheDocument()
   })
 
   it('renders root-level cards (no folder)', () => {

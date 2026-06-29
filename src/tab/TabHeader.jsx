@@ -37,9 +37,9 @@ export function TabHeader({ name, savedLocation, onRename, onSaveToShelf, onMove
     : savedLocation === 'shelf' ? !!onMoveToLibrary
     : savedLocation === 'library'
 
-  const saveLabel = savedLocation === 'none' ? 'Save tab to Shelf'
-    : savedLocation === 'shelf' ? 'Tab saved to Shelf — click to move to Library'
-    : 'Tab in Library'
+  const saveLabel = savedLocation === 'none' ? 'Save tab to Inbox'
+    : savedLocation === 'shelf' ? 'Tab saved to Inbox — click to move to Vault'
+    : 'Tab in Vault'
 
   const saveDisabled = savedLocation === 'library'
 

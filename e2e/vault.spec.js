@@ -12,11 +12,13 @@ async function signIn(page) {
   await page.waitForSelector('[aria-label="Tab overview"]', { timeout: 10000 })
 }
 
+const VAULT_TAB_LABELS = { shelf: 'Inbox', library: 'Vault', brain: 'Index' }
+
 async function openVaultPanel(page, tab = 'shelf') {
   await page.click('[aria-label="Library"]')
   await expect(page.getByRole('dialog', { name: 'Vault and Brain' })).toBeVisible()
   if (tab !== 'shelf') {
-    await page.getByRole('tab', { name: tab.charAt(0).toUpperCase() + tab.slice(1) }).click()
+    await page.getByRole('button', { name: VAULT_TAB_LABELS[tab] }).click()
   }
 }
 
@@ -96,7 +98,7 @@ test.describe('Vault: move card from shelf to library via context menu', () => {
     await expect(page.getByText('Library bound card')).not.toBeVisible()
 
     // Switch to library tab to confirm it landed there
-    await page.getByRole('tab', { name: 'Library' }).click()
+    await page.getByRole('button', { name: 'Vault' }).click()
     await expect(page.getByText('Library bound card')).toBeVisible()
   })
 })

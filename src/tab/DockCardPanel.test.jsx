@@ -32,10 +32,11 @@ describe('DockCardPanel', () => {
     expect(screen.getByRole('complementary', { name: 'Dock card' })).toBeInTheDocument()
   })
 
-  it('calls onClose when the card header close button is clicked', async () => {
+  it('calls onClose after confirming delete on the card header close button', async () => {
     const onClose = vi.fn()
     wrap(<DockCardPanel card={SAMPLE_CARD} cardId="c1" onClose={onClose} onUpdate={() => {}} />)
     await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm delete' }))
     expect(onClose).toHaveBeenCalledOnce()
   })
 

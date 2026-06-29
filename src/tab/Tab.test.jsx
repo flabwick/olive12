@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { Tab } from './Tab'
@@ -123,10 +123,11 @@ describe('Tab', () => {
       expect(screen.getByRole('button', { name: 'Remove card' })).toBeInTheDocument()
     })
 
-    it('calls onRemove with the card id when X is clicked', async () => {
+    it('calls onRemove with the card id after confirming delete', async () => {
       const onRemove = vi.fn()
       render(<Tab entries={[makeEntry()]} onRemove={onRemove} />)
       await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Confirm delete' }))
       expect(onRemove).toHaveBeenCalledWith('card-1')
     })
   })
@@ -245,6 +246,78 @@ describe('Tab', () => {
       await userEvent.type(textarea, 'Updated')
       await userEvent.click(screen.getByRole('button', { name: 'Outside' }))
       expect(onUpdate).toHaveBeenCalledWith('card-1', { title: 'Title', body: 'Updated' })
+    })
+  })
+
+  describe('move to dock', () => {
+    it('renders Move to dock button when onMoveToDock is provided', () => {
+      render(<Tab entries={[makeEntry()]} onMoveToDock={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Move to dock' })).toBeInTheDocument()
+    })
+
+    it('does not render Move to dock button when onMoveToDock is not provided', () => {
+      render(<Tab entries={[makeEntry()]} />)
+      expect(screen.queryByRole('button', { name: 'Move to dock' })).not.toBeInTheDocument()
+    })
+
+    it('calls onMoveToDock with card id when clicked', async () => {
+      const onMoveToDock = vi.fn()
+      render(<Tab entries={[makeEntry()]} onMoveToDock={onMoveToDock} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Move to dock' }))
+      expect(onMoveToDock).toHaveBeenCalledWith('card-1')
+    })
+  })
+
+  describe('AddCardButton', () => {
+    it('renders AddCardButton when onAddCard is provided', () => {
+      render(<Tab entries={[makeEntry()]} onAddCard={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Add new card' })).toBeInTheDocument()
+    })
+
+    it('renders AI prompt button alongside AddCardButton', () => {
+      render(<Tab entries={[makeEntry()]} onAddCard={() => {}} />)
+      expect(screen.getByRole('button', { name: 'AI prompt' })).toBeInTheDocument()
+    })
+
+    it('does not render AI prompt button when onAddCard is not provided', () => {
+      render(<Tab entries={[makeEntry()]} />)
+      expect(screen.queryByRole('button', { name: 'AI prompt' })).not.toBeInTheDocument()
+    })
+
+    it('does not render AddCardButton when onAddCard is not provided', () => {
+      render(<Tab entries={[makeEntry()]} />)
+      expect(screen.queryByRole('button', { name: 'Add new card' })).not.toBeInTheDocument()
+    })
+
+    it('renders AddCardButton in empty state when onAddCard is provided', () => {
+      render(<Tab entries={[]} onAddCard={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Add new card' })).toBeInTheDocument()
+    })
+
+    it('clicking AddCardButton calls onAddCard', async () => {
+      const onAddCard = vi.fn().mockResolvedValue({ id: 'new-card' })
+      render(<Tab entries={[makeEntry()]} onAddCard={onAddCard} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Add new card' }))
+      expect(onAddCard).toHaveBeenCalled()
+    })
+
+    it('card matching returned id gets autoFocus (enters editing mode)', async () => {
+      const onAddCard = vi.fn().mockResolvedValue({ id: 'card-1' })
+      render(<Tab entries={[makeEntry()]} onAddCard={onAddCard} onUpdate={() => {}} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Add new card' }))
+      await waitFor(() => {
+        expect(screen.getByRole('textbox', { name: 'Card title' })).toBeInTheDocument()
+      })
+    })
+
+    it('clears focusCardId after 300ms to prevent re-focus on re-render', () => {
+      vi.useFakeTimers()
+      const onAddCard = vi.fn().mockResolvedValue({ id: 'card-1' })
+      render(<Tab entries={[makeEntry()]} onAddCard={onAddCard} onUpdate={() => {}} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Add new card' }))
+      expect(onAddCard).toHaveBeenCalledOnce()
+      vi.advanceTimersByTime(400)
+      vi.useRealTimers()
     })
   })
 })

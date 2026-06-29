@@ -13,7 +13,7 @@ const baseProps = {
 describe('FolderPanel', () => {
   it('shows shelf empty state by default', () => {
     render(<FolderPanel {...baseProps} />)
-    expect(screen.getByText('Nothing saved to shelf yet.')).toBeInTheDocument()
+    expect(screen.getByText('Nothing in your inbox yet.')).toBeInTheDocument()
   })
 
   it('shows shelf card titles when provided', () => {
@@ -30,7 +30,7 @@ describe('FolderPanel', () => {
 
   it('shows library view when activeTab is library', () => {
     render(<FolderPanel {...baseProps} activeTab="library" />)
-    expect(screen.getByText('Nothing in library yet.')).toBeInTheDocument()
+    expect(screen.getByText('Nothing in your vault yet.')).toBeInTheDocument()
   })
 
   it('shows brain feed when activeTab is brain', () => {
@@ -40,12 +40,12 @@ describe('FolderPanel', () => {
 
   it('opens on the initialTab when provided', () => {
     render(<FolderPanel {...baseProps} initialTab="library" />)
-    expect(screen.getByText('Nothing in library yet.')).toBeInTheDocument()
+    expect(screen.getByText('Nothing in your vault yet.')).toBeInTheDocument()
   })
 
   it('activeTab prop overrides initialTab', () => {
     render(<FolderPanel {...baseProps} initialTab="shelf" activeTab="library" />)
-    expect(screen.getByText('Nothing in library yet.')).toBeInTheDocument()
+    expect(screen.getByText('Nothing in your vault yet.')).toBeInTheDocument()
   })
 
   it('highlights the matching shelf card', () => {

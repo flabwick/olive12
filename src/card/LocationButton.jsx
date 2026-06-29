@@ -10,7 +10,7 @@ export function LocationButton({ location = 'none', folders = [], onSaveToShelf,
       <button
         type="button"
         className="location-btn location-btn--add"
-        aria-label="Save to Shelf"
+        aria-label="Save to Inbox"
         onClick={onSaveToShelf}
       >
         +
@@ -24,7 +24,7 @@ export function LocationButton({ location = 'none', folders = [], onSaveToShelf,
         <button
           type="button"
           className="location-btn location-btn--shelf"
-          aria-label="Saved to Shelf — click to move to Library"
+          aria-label="Saved to Inbox — click to move to Vault"
           onClick={() => setOverlayOpen(true)}
         >
           ✓
@@ -48,7 +48,7 @@ export function LocationButton({ location = 'none', folders = [], onSaveToShelf,
       <button
         type="button"
         className="location-btn location-btn--library"
-        aria-label="In Library"
+        aria-label="In Vault"
         disabled
       >
         ✓

@@ -44,10 +44,11 @@ describe('FileCard', () => {
     expect(screen.getByRole('button', { name: 'Remove card' })).toBeInTheDocument()
   })
 
-  it('calls onClose when Remove card is clicked', async () => {
+  it('calls onClose after confirming delete', async () => {
     const onClose = vi.fn()
     render(<FileCard {...defaultProps} onClose={onClose} />)
     await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm delete' }))
     expect(onClose).toHaveBeenCalledOnce()
   })
 

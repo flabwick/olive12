@@ -52,7 +52,7 @@ export function CardBack({
     <div className="card-back">
       {!showWiki && (
         <p className="card-back__wiki-hint">
-          Wiki index appears after promoting to library (current: {location})
+          Wiki index appears after promoting to vault (current: {location})
         </p>
       )}
 
@@ -97,7 +97,7 @@ export function CardBack({
             <dt>cardId</dt>
             <dd>{cardId}</dd>
             <dt>location</dt>
-            <dd>{location}{showWiki ? '' : ' (wiki hidden — need library)'}</dd>
+            <dd>{location}{showWiki ? '' : ' (wiki hidden — need vault)'}</dd>
             <dt>index in state</dt>
             <dd>{indexEntry ? 'yes' : 'no'}</dd>
             <dt>indexLoading</dt>

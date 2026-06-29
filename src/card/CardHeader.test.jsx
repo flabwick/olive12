@@ -113,11 +113,51 @@ describe('CardHeader', () => {
       expect(screen.queryByRole('button', { name: 'Remove card' })).not.toBeInTheDocument()
     })
 
-    it('calls onClose when Remove card button is clicked', async () => {
+    it('clicking Remove card shows delete confirmation instead of calling onClose', async () => {
       const onClose = vi.fn()
       render(<CardHeader title="A" onClose={onClose} />)
       await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
+      expect(onClose).not.toHaveBeenCalled()
+      expect(screen.getByText('Delete forever?')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Confirm delete' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Cancel delete' })).toBeInTheDocument()
+    })
+
+    it('confirming delete calls onClose', async () => {
+      const onClose = vi.fn()
+      render(<CardHeader title="A" onClose={onClose} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Confirm delete' }))
       expect(onClose).toHaveBeenCalledOnce()
+    })
+
+    it('cancelling delete hides the confirmation and does not call onClose', async () => {
+      const onClose = vi.fn()
+      render(<CardHeader title="A" onClose={onClose} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel delete' }))
+      expect(onClose).not.toHaveBeenCalled()
+      expect(screen.queryByText('Delete forever?')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Remove card' })).toBeInTheDocument()
+    })
+  })
+
+  describe('send to dock', () => {
+    it('renders Move to dock button when onSendToDock is provided', () => {
+      render(<CardHeader title="A" onSendToDock={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Move to dock' })).toBeInTheDocument()
+    })
+
+    it('does not render Move to dock button when onSendToDock is absent', () => {
+      render(<CardHeader title="A" />)
+      expect(screen.queryByRole('button', { name: 'Move to dock' })).not.toBeInTheDocument()
+    })
+
+    it('calls onSendToDock when Move to dock is clicked', async () => {
+      const onSendToDock = vi.fn()
+      render(<CardHeader title="A" onSendToDock={onSendToDock} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Move to dock' }))
+      expect(onSendToDock).toHaveBeenCalledOnce()
     })
   })
 

@@ -101,3 +101,12 @@ export const HiddenCard = {
     onClose: () => {},
   },
 }
+
+export const SendToDock = {
+  args: {
+    title: 'Card with move-to-dock button',
+    onSendToDock: () => {},
+    onToggleHide: () => {},
+    onClose: () => {},
+  },
+}

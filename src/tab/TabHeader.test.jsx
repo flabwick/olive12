@@ -62,20 +62,20 @@ describe('TabHeader', () => {
   it('save button with savedLocation none calls onSaveToShelf', () => {
     const onSaveToShelf = vi.fn()
     render(<TabHeader name="Tab" savedLocation="none" onSaveToShelf={onSaveToShelf} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Save tab to Shelf' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save tab to Inbox' }))
     expect(onSaveToShelf).toHaveBeenCalledOnce()
   })
 
   it('save button with savedLocation shelf calls onMoveToLibrary', () => {
     const onMoveToLibrary = vi.fn()
     render(<TabHeader name="Tab" savedLocation="shelf" onSaveToShelf={vi.fn()} onMoveToLibrary={onMoveToLibrary} />)
-    fireEvent.click(screen.getByRole('button', { name: /move to Library/i }))
+    fireEvent.click(screen.getByRole('button', { name: /move to Vault/i }))
     expect(onMoveToLibrary).toHaveBeenCalledOnce()
   })
 
   it('save button with savedLocation library is disabled', () => {
     render(<TabHeader name="Tab" savedLocation="library" onSaveToShelf={vi.fn()} onMoveToLibrary={vi.fn()} />)
-    expect(screen.getByRole('button', { name: 'Tab in Library' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Tab in Vault' })).toBeDisabled()
   })
 
   it('no buttons rendered when no callbacks provided and savedLocation is none', () => {

@@ -186,7 +186,7 @@ export function LibraryView({
           />
         ))}
         {folders.length === 0 && cards.length === 0 && tabs.length === 0 && (
-          <p className="vault-library-view__empty">Nothing in library yet.</p>
+          <p className="vault-library-view__empty">Nothing in your vault yet.</p>
         )}
       </div>
     </div>

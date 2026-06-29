@@ -11,7 +11,7 @@ describe('LocationButton', () => {
   describe('location = none', () => {
     it('renders the + button when onSaveToShelf is provided', () => {
       render(<LocationButton location="none" folders={[]} onSaveToShelf={() => {}} />)
-      expect(screen.getByRole('button', { name: 'Save to Shelf' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save to Inbox' })).toBeInTheDocument()
     })
 
     it('renders nothing when onSaveToShelf is not provided', () => {
@@ -22,7 +22,7 @@ describe('LocationButton', () => {
     it('calls onSaveToShelf when the + button is clicked', async () => {
       const onSaveToShelf = vi.fn()
       render(<LocationButton location="none" folders={[]} onSaveToShelf={onSaveToShelf} />)
-      await userEvent.click(screen.getByRole('button', { name: 'Save to Shelf' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Save to Inbox' }))
       expect(onSaveToShelf).toHaveBeenCalledOnce()
     })
   })
@@ -31,25 +31,25 @@ describe('LocationButton', () => {
     it('renders the ✓ button', () => {
       render(<LocationButton location="shelf" folders={[]} onMoveToLibrary={() => {}} />)
       expect(
-        screen.getByRole('button', { name: 'Saved to Shelf — click to move to Library' }),
+        screen.getByRole('button', { name: 'Saved to Inbox — click to move to Vault' }),
       ).toBeInTheDocument()
     })
 
     it('clicking ✓ opens the folder picker overlay', async () => {
       render(<LocationButton location="shelf" folders={[]} onMoveToLibrary={() => {}} />)
       await userEvent.click(
-        screen.getByRole('button', { name: 'Saved to Shelf — click to move to Library' }),
+        screen.getByRole('button', { name: 'Saved to Inbox — click to move to Vault' }),
       )
-      expect(screen.getByRole('dialog', { name: 'Move to Library' })).toBeInTheDocument()
+      expect(screen.getByRole('dialog', { name: 'Move to Vault' })).toBeInTheDocument()
     })
 
-    it('selecting Library root calls onMoveToLibrary with null', async () => {
+    it('selecting Vault root calls onMoveToLibrary with null', async () => {
       const onMoveToLibrary = vi.fn()
       render(<LocationButton location="shelf" folders={[]} onMoveToLibrary={onMoveToLibrary} />)
       await userEvent.click(
-        screen.getByRole('button', { name: 'Saved to Shelf — click to move to Library' }),
+        screen.getByRole('button', { name: 'Saved to Inbox — click to move to Vault' }),
       )
-      await userEvent.click(screen.getByRole('button', { name: 'Library root' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Vault root' }))
       expect(onMoveToLibrary).toHaveBeenCalledWith(null)
     })
 
@@ -59,7 +59,7 @@ describe('LocationButton', () => {
         <LocationButton location="shelf" folders={folders} onMoveToLibrary={onMoveToLibrary} />,
       )
       await userEvent.click(
-        screen.getByRole('button', { name: 'Saved to Shelf — click to move to Library' }),
+        screen.getByRole('button', { name: 'Saved to Inbox — click to move to Vault' }),
       )
       await userEvent.click(screen.getByRole('button', { name: 'Work' }))
       expect(onMoveToLibrary).toHaveBeenCalledWith('f1')
@@ -69,7 +69,7 @@ describe('LocationButton', () => {
       const onMoveToLibrary = vi.fn()
       render(<LocationButton location="shelf" folders={[]} onMoveToLibrary={onMoveToLibrary} />)
       await userEvent.click(
-        screen.getByRole('button', { name: 'Saved to Shelf — click to move to Library' }),
+        screen.getByRole('button', { name: 'Saved to Inbox — click to move to Vault' }),
       )
       await userEvent.click(screen.getByRole('button', { name: 'Close' }))
       expect(onMoveToLibrary).not.toHaveBeenCalled()
@@ -80,7 +80,7 @@ describe('LocationButton', () => {
   describe('location = library', () => {
     it('renders a disabled ✓ button', () => {
       render(<LocationButton location="library" folders={[]} />)
-      const btn = screen.getByRole('button', { name: 'In Library' })
+      const btn = screen.getByRole('button', { name: 'In Vault' })
       expect(btn).toBeInTheDocument()
       expect(btn).toBeDisabled()
     })

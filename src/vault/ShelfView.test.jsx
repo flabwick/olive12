@@ -25,7 +25,7 @@ describe('ShelfView', () => {
 
   it('shows empty state when no cards or tabs', () => {
     render(<ShelfView />)
-    expect(screen.getByText('Nothing saved to shelf yet.')).toBeInTheDocument()
+    expect(screen.getByText('Nothing in your inbox yet.')).toBeInTheDocument()
   })
 
   it('does not render section headings', () => {

@@ -12,12 +12,12 @@ const folders = [
 describe('FolderPickerOverlay', () => {
   it('renders a dialog with role and name', () => {
     render(<FolderPickerOverlay folders={[]} onSelect={() => {}} onDismiss={() => {}} />)
-    expect(screen.getByRole('dialog', { name: 'Move to Library' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Move to Vault' })).toBeInTheDocument()
   })
 
-  it('renders a Library root option', () => {
+  it('renders a Vault root option', () => {
     render(<FolderPickerOverlay folders={[]} onSelect={() => {}} onDismiss={() => {}} />)
-    expect(screen.getByRole('button', { name: 'Library root' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Vault root' })).toBeInTheDocument()
   })
 
   it('renders a button for each folder', () => {
@@ -27,10 +27,10 @@ describe('FolderPickerOverlay', () => {
     expect(screen.getByRole('button', { name: 'Projects' })).toBeInTheDocument()
   })
 
-  it('calls onSelect with null when Library root is clicked', async () => {
+  it('calls onSelect with null when Vault root is clicked', async () => {
     const onSelect = vi.fn()
     render(<FolderPickerOverlay folders={[]} onSelect={onSelect} onDismiss={() => {}} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Library root' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Vault root' }))
     expect(onSelect).toHaveBeenCalledWith(null)
   })
 

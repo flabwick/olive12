@@ -42,11 +42,11 @@ test.describe('Tab management flow', () => {
     // Verify the rename took effect
     await expect(page.locator('.tab-header__title')).toHaveText('My New Tab')
 
-    // Save the new tab to shelf
-    await page.click('[aria-label="Save tab to Shelf"]')
+    // Save the new tab to inbox
+    await page.click('[aria-label="Save tab to Inbox"]')
 
-    // Verify the button changed to shelf state
-    await expect(page.locator('[aria-label="Tab saved to Shelf — click to move to Library"]')).toBeVisible()
+    // Verify the button changed to inbox state
+    await expect(page.locator('[aria-label="Tab saved to Inbox — click to move to Vault"]')).toBeVisible()
 
     // Open the tab switcher again
     await page.click('[aria-label="Tab overview"]')
@@ -63,8 +63,8 @@ test.describe('Tab management flow', () => {
     // Verify the remaining tab is our renamed one
     await expect(page.locator('.tab-header__title')).toHaveText('My New Tab')
 
-    // Verify the saved location badge is still shelf
-    await expect(page.locator('[aria-label="Tab saved to Shelf — click to move to Library"]')).toBeVisible()
+    // Verify the saved location badge is still inbox
+    await expect(page.locator('[aria-label="Tab saved to Inbox — click to move to Vault"]')).toBeVisible()
   })
 
   test('open vault panel → shelf tab → click Open in tab → portal card appears in active tab', async ({ page }) => {
@@ -105,7 +105,7 @@ test.describe('Tab management flow', () => {
     await page.click('[aria-label="Library"]')
     await expect(page.getByRole('dialog', { name: 'Vault and Brain' })).toBeVisible()
 
-    await page.getByRole('tab', { name: 'Brain' }).click()
+    await page.getByRole('button', { name: 'Index' }).click()
     await expect(page.getByText('No issues found.')).toBeVisible()
   })
 })

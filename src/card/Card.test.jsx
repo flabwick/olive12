@@ -96,10 +96,19 @@ describe('Card', () => {
     expect(screen.getByRole('button', { name: 'Remove card' })).toBeInTheDocument()
   })
 
-  it('calls onClose when Remove card button is clicked', async () => {
+  it('clicking Remove card shows confirmation, not immediate delete', async () => {
     const onClose = vi.fn()
     render(<Card title="A" body="B" onClose={onClose} />)
     await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByText('Delete forever?')).toBeInTheDocument()
+  })
+
+  it('calls onClose after confirming delete', async () => {
+    const onClose = vi.fn()
+    render(<Card title="A" body="B" onClose={onClose} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm delete' }))
     expect(onClose).toHaveBeenCalledOnce()
   })
 
@@ -321,6 +330,32 @@ describe('Card', () => {
     it('Save card button visible when card is folded', () => {
       render(<Card title="T" body="B" location="none" foldState={true} onSaveToShelf={() => {}} />)
       expect(screen.getByRole('button', { name: 'Save card' })).toBeInTheDocument()
+    })
+  })
+
+  describe('send to dock', () => {
+    it('renders Move to dock button when onSendToDock is provided', () => {
+      render(<Card title="T" body="B" onSendToDock={() => {}} />)
+      expect(screen.getByRole('button', { name: 'Move to dock' })).toBeInTheDocument()
+    })
+
+    it('calls onSendToDock when Move to dock is clicked', async () => {
+      const onSendToDock = vi.fn()
+      render(<Card title="T" body="B" onSendToDock={onSendToDock} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Move to dock' }))
+      expect(onSendToDock).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('autoFocus', () => {
+    it('enters editing mode when autoFocus is true', () => {
+      render(<Card title="New" body="" onUpdate={() => {}} autoFocus={true} />)
+      expect(screen.getByRole('textbox', { name: 'Card title' })).toBeInTheDocument()
+    })
+
+    it('does not enter editing mode when autoFocus is false (default)', () => {
+      render(<Card title="Title" body="Body" onUpdate={() => {}} />)
+      expect(screen.queryByRole('textbox', { name: 'Card title' })).not.toBeInTheDocument()
     })
   })
 })

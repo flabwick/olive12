@@ -204,6 +204,25 @@
   padding-right: 0.25rem;
 }
 
+.card-header__delete-warning {
+  font-size: 0.7rem;
+  color: var(--olive-text, #2c1810);
+  white-space: nowrap;
+  opacity: 0.75;
+  margin-right: 0.25rem;
+}
+
+.card-header__control--confirm-delete {
+  color: #b03000;
+  border-color: #b03000;
+}
+
+.card-header__control--confirm-delete:hover {
+  background: #b03000;
+  color: #fff;
+  border-color: #b03000;
+}
+
 @media (prefers-color-scheme: dark) {
   .card-header__control {
     border-color: rgba(200, 196, 168, 0.2);

@@ -1,8 +1,17 @@
-import { Fragment } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Card } from '../card/Card'
+
+function LightningIcon() {
+  return (
+    <svg width="11" height="13" viewBox="0 0 13 15" fill="none" aria-hidden="true">
+      <path d="M6.5 1L1.5 8H6L5 14L11.5 6H7L6.5 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  )
+}
 import { FileCard } from '../card/FileCard'
 import { PortalCard } from '../card/PortalCard'
 import { StackCard } from '../stack/StackCard'
+import { AddCardButton } from './AddCardButton'
 import './Tab.css'
 
 export function Tab({
@@ -30,15 +39,41 @@ export function Tab({
   setStackTopCard,
   onReorderStackMember,
   onDissolveStack,
+  onAddCard,
+  onMoveToDock,
 }) {
+  const [focusCardId, setFocusCardId] = useState(null)
+
+  useEffect(() => {
+    if (!focusCardId) return
+    const timer = setTimeout(() => setFocusCardId(null), 300)
+    return () => clearTimeout(timer)
+  }, [focusCardId])
+
+  async function handleAddCard() {
+    if (!onAddCard) return
+    const card = await onAddCard()
+    if (card?.id) setFocusCardId(card.id)
+  }
+
   // Move mode: explicitly activated by clicking "Move" on a selected card
   const inMoveMode = moveCardId != null && entries.some((e) => e.card.id === moveCardId)
   const moveIndex = inMoveMode ? entries.findIndex((e) => e.card.id === moveCardId) : -1
+
+  const tabActions = onAddCard ? (
+    <div className="tab__actions-row">
+      <AddCardButton onClick={handleAddCard} />
+      <button type="button" className="tab__ai-btn" aria-label="AI prompt">
+        <LightningIcon />
+      </button>
+    </div>
+  ) : null
 
   if (entries.length === 0) {
     return (
       <div className="tab tab--empty">
         <p className="tab__empty-message">No cards yet.</p>
+        {tabActions}
       </div>
     )
   }
@@ -161,6 +196,8 @@ export function Tab({
                 {...selectionProps}
                 onUpdate={onUpdate ? (fields) => onUpdate(entry.card.id, fields) : undefined}
                 onSaveToShelf={onSaveToShelf ? () => onSaveToShelf(entry.card.id) : undefined}
+                onSendToDock={onMoveToDock ? () => onMoveToDock(entry.card.id) : undefined}
+                autoFocus={entry.card.id === focusCardId}
               />
             )
           }
@@ -235,6 +272,7 @@ export function Tab({
           </li>
         )}
       </ul>
+      {tabActions}
     </>
   )
 }

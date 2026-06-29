@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import './CardHeader.css'
 
 function CaretIcon({ folded }) {
@@ -63,6 +64,15 @@ function SendToTabIcon() {
   )
 }
 
+function MoveToDockIcon() {
+  return (
+    <svg viewBox="0 0 10 12" width="9" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="1" y1="11" x2="9" y2="11" />
+      <path d="M5 1v7M2 5.5l3 3 3-3" />
+    </svg>
+  )
+}
+
 function CloseIcon() {
   return (
     <svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
@@ -98,9 +108,11 @@ export function CardHeader({
   onToggleSelect,
   onFlip,
   onSendToTab,
+  onSendToDock,
   onClose,
 }) {
-  const hasControls = onSaveToShelf || onToggleHide || onFlip || onSendToTab || onClose
+  const [pendingClose, setPendingClose] = useState(false)
+  const hasControls = onSaveToShelf || onToggleHide || onFlip || onSendToTab || onSendToDock || onClose
 
   return (
     <div className="card-header">
@@ -154,6 +166,28 @@ export function CardHeader({
 
       {hasControls && (
         <div className="card-header__controls">
+          {pendingClose ? (
+            <>
+              <span className="card-header__delete-warning">Delete forever?</span>
+              <button
+                type="button"
+                className="card-header__control card-header__control--confirm-delete"
+                onClick={onClose}
+                aria-label="Confirm delete"
+              >
+                <CloseIcon />
+              </button>
+              <button
+                type="button"
+                className="card-header__control"
+                onClick={() => setPendingClose(false)}
+                aria-label="Cancel delete"
+              >
+                ‹
+              </button>
+            </>
+          ) : (
+          <>
           {onSaveToShelf && (
             location !== 'none' ? (
               <button
@@ -195,6 +229,16 @@ export function CardHeader({
               <SendToTabIcon />
             </button>
           )}
+          {onSendToDock && (
+            <button
+              type="button"
+              className="card-header__control"
+              onClick={onSendToDock}
+              aria-label="Move to dock"
+            >
+              <MoveToDockIcon />
+            </button>
+          )}
           {onFlip && (
             <button
               type="button"
@@ -209,11 +253,13 @@ export function CardHeader({
             <button
               type="button"
               className="card-header__control card-header__control--close"
-              onClick={onClose}
+              onClick={() => setPendingClose(true)}
               aria-label="Remove card"
             >
               <CloseIcon />
             </button>
+          )}
+          </>
           )}
         </div>
       )}

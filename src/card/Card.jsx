@@ -25,9 +25,11 @@ export function Card({
   onUpdate,
   onClose,
   onSaveToShelf,
+  onSendToDock,
   indexEntry,
   indexLoading = false,
   editorSurface = 'tab',
+  autoFocus = false,
 }) {
   const [editing, setEditing] = useState(false)
   const [draftTitle, setDraftTitle] = useState(title)
@@ -62,6 +64,12 @@ export function Card({
     // body focus is handled by RichTextEditor's editable-change effect
     // 'back' focus is handled by CardBack's internal useEffect
   }, [editing])
+
+  useEffect(() => {
+    if (!autoFocus) return
+    focusTargetRef.current = 'title'
+    setEditing(true)
+  }, [autoFocus])
 
   // If content outgrows a manual resize, expand back to fit — cards are not height-capped.
   // Only re-check when content changes, not on every drag frame (bodyHeight in deps
@@ -137,6 +145,7 @@ export function Card({
         onToggleSelect={onToggleSelect}
         location={location}
         onSaveToShelf={onSaveToShelf}
+        onSendToDock={onSendToDock}
         onToggleFold={onToggleFold}
         onToggleHide={onToggleHide}
         onFlip={onFlip ? () => flushAndThen(onFlip) : undefined}

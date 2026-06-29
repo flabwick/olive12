@@ -231,6 +231,7 @@ function DockBtn({ active, danger, primary, label, title, onMouseDown, onClick, 
 }
 
 const VAULT_TAB_ICONS = { shelf: ShelfIcon, library: LibraryIcon, brain: BrainIcon }
+const VAULT_TAB_LABELS = { shelf: 'Inbox', library: 'Vault', brain: 'Index' }
 
 
 function FormattingToolbar({
@@ -358,6 +359,7 @@ export function Dock({
   activeDockCardId = null,
   onAddDockCard,
   onOpenDockCard,
+  onCloseDockCard,
   onFolderOpen,
   onSettings,
   onEmbedOpen,
@@ -410,9 +412,9 @@ export function Dock({
   }
 
   function pickDestLabel() {
-    if (vaultTab === 'shelf') return 'Shelf'
+    if (vaultTab === 'shelf') return 'Inbox'
     if (moveTarget) return moveTarget.name
-    return 'Library'
+    return 'Vault'
   }
 
   if (dockState === DOCK_STATE.DOCK_EDITOR || dockState === DOCK_STATE.TAB_EDITOR) {
@@ -471,6 +473,9 @@ export function Dock({
             <StackCardsIcon />
           </DockBtn>
         )}
+        <DockBtn label="AI prompt">
+          <LightningIcon />
+        </DockBtn>
         <span className="dock__sep" aria-hidden="true" />
         <DockBtn label="Clear selection" onClick={onClearSelection}>✕</DockBtn>
       </div>
@@ -493,7 +498,7 @@ export function Dock({
                 key={tab}
                 type="button"
                 className={`dock__vault-tab${vaultTab === tab ? ' dock__vault-tab--active' : ''}`}
-                aria-label={tab.charAt(0).toUpperCase() + tab.slice(1)}
+                aria-label={VAULT_TAB_LABELS[tab]}
                 aria-pressed={vaultTab === tab}
                 onClick={() => handleTabClick(tab)}
               >
@@ -606,16 +611,18 @@ export function Dock({
     <div className="dock dock--base" role="toolbar" aria-label="Tab actions">
       <div className="dock__pills">
         {dockCardEntries.map((entry, i) => {
+          const isActive = activeDockCardId === entry.cardId
           const label = entry.card.title?.trim().slice(0, 14) || String(i + 1)
           return (
             <button
               key={entry.cardId}
               type="button"
-              className={`dock__pill${activeDockCardId === entry.cardId ? ' dock__pill--active' : ''}`}
-              onClick={() => onOpenDockCard?.(entry.cardId)}
+              className={`dock__pill${isActive ? ' dock__pill--active' : ''}`}
+              onClick={() => isActive ? onCloseDockCard?.() : onOpenDockCard?.(entry.cardId)}
               title={entry.card.title || undefined}
+              aria-label={isActive ? 'Close card panel' : undefined}
             >
-              {label}
+              {isActive ? '✕' : label}
             </button>
           )
         })}
@@ -627,6 +634,13 @@ export function Dock({
         onClick={onAddDockCard}
       >
         +
+      </button>
+      <button
+        type="button"
+        className="dock__btn dock__lightning-btn"
+        aria-label="AI prompt"
+      >
+        <LightningIcon />
       </button>
       <span className="dock__divider" aria-hidden="true" />
       <div className="dock__actions">

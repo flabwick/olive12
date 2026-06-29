@@ -13,11 +13,11 @@ export function FolderPickerOverlay({ folders = [], onSelect, onDismiss }) {
       <div
         className="folder-picker"
         role="dialog"
-        aria-label="Move to Library"
+        aria-label="Move to Vault"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="folder-picker__header">
-          <span className="folder-picker__title">Move to Library</span>
+          <span className="folder-picker__title">Move to Vault</span>
           <button
             type="button"
             className="folder-picker__close"
@@ -35,7 +35,7 @@ export function FolderPickerOverlay({ folders = [], onSelect, onDismiss }) {
               className="folder-picker__option folder-picker__option--root"
               onClick={() => onSelect(null)}
             >
-              Library root
+              Vault root
             </button>
           </li>
           {flat.map(({ folder, depth }) => (

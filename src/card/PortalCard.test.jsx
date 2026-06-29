@@ -63,10 +63,11 @@ describe('PortalCard', () => {
     expect(heading.closest('.card')).toHaveClass('card--hidden')
   })
 
-  it('calls onClose when Remove card button is clicked', async () => {
+  it('calls onClose after confirming delete', async () => {
     const onClose = vi.fn()
     render(<PortalCard config={resolvedConfig} cardsById={cardsById} onClose={onClose} />)
     await userEvent.click(screen.getByRole('button', { name: 'Remove card' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm delete' }))
     expect(onClose).toHaveBeenCalledOnce()
   })
 

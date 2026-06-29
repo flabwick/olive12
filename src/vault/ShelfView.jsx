@@ -16,7 +16,7 @@ export function ShelfView({
   onRenameCancel,
 }) {
   if (cards.length === 0 && tabs.length === 0) {
-    return <p className="vault-shelf-view__empty">Nothing saved to shelf yet.</p>
+    return <p className="vault-shelf-view__empty">Nothing in your inbox yet.</p>
   }
 
   return (
