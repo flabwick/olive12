@@ -1,170 +1,203 @@
-# Prompt — implementation
+# AI Integration
 
-AI card creation via the Dock Prompt UI: context assembly, prompt building, the Supabase Edge Function calling OpenRouter with streaming SSE, and the `runDockPrompt` orchestration in `useTabs`.
+## What it does
 
-## File map
+Lightning bolt buttons appear in four locations across the app. Clicking one transforms the dock bar into a minimal inline prompt: a tick on the left (in the same position as the bolt), a text input, and an ✕ on the right. The user optionally types instructions and confirms. The AI generates a card, streams content into it in real time, and the dock returns to its normal state.
+
+What happens to the generated card depends on where the bolt was clicked:
+
+- **Tab bolt / Dock BASE bolt** — a new standalone card is added to the current tab, visible immediately as an empty card that fills in as the stream arrives.
+- **Formatting toolbar bolt** (while editing a card) — a new card is created and **embedded inline** within the card being edited. The embedded card appears in the editor at the cursor position before streaming starts, then fills in live. The editor keeps focus throughout.
+
+---
+
+## Entry points
+
+| Location | `entryPoint` | Outcome | Default prompt (one-click, no text) |
+|---|---|---|---|
+| Tab header, left of Add Card | `TAB_NEW_CARD` | New standalone card in tab | "Create a useful new card that fits the theme of the existing cards in this tab." |
+| Dock BASE state, leftmost | `DOCK_NEW_CARD` | New standalone card in tab | "Create a useful reference card to pin to the dock." |
+| Formatting toolbar, leftmost | `DOCK_PROMPT` | Embedded card in editor | "Create a useful card to embed here." |
+| CARD_SELECTED state | `DOCK_PROMPT` | Embedded card in editor | no-op without text |
+
+The entry point is a string that travels all the way from the button click through `runAI` → `runDockPrompt` → the edge function request body. The edge function uses it to select the appropriate system message. Nothing in the pipeline hard-codes "use this prompt for this location" anywhere else.
+
+**Lightning bolt styling:** All bolts share `.dock__lightning-btn` (amber background, gold border) regardless of which component they're in. `DockBtn` accepts a `lightning` prop that appends the class. The Tab bolt uses `.tab__ai-btn` with the same colour values.
+
+**Formatting toolbar bolt specifically** uses `onMouseDown` + `e.preventDefault()` instead of `onClick`. Without this, clicking the bolt blurs the editor, which triggers a dock state transition from `DOCK_EDITOR` → `BASE`, which unmounts the toolbar before the `click` event fires — so `onAIPrompt` never gets called. Preventing the default on mousedown keeps the editor focused and the toolbar mounted.
+
+---
+
+## The inline dock prompt
+
+Clicking any bolt sets `promptOpen = true` in App, which makes the Dock ignore its normal state machine and render the prompt row instead:
 
 ```
-src/
-  prompt/
-    assembleContext.js          # Pure: filters tab entries to visible contextCards
-    assembleContext.test.js     # [TEST] 6 tests
-    buildPrompt.js              # Pure: builds OpenRouter messages array
-    buildPrompt.test.js         # [TEST] 7 tests
-    parseDockPromptContent.js   # Pure: parse title/body from model plain-text response
-    parseDockPromptContent.test.js # [TEST]
-    streamParser.js             # Pure: parse SSE line → delta string | null
-    streamParser.test.js        # [TEST]
-    DockPrompt.jsx              # Dumb: prompt textarea + send + cancel + error
-    DockPrompt.css
-    DockPrompt.test.jsx         # [TEST] 9 tests
-    DockPrompt.stories.jsx      # [STORY]
-  tab/
-    Dock.jsx                    # 2-state toolbar — lightning button (AI prompt toggle, not yet wired to DockPrompt)
-    useTabs.js                  # runDockPrompt, promptLoading, promptError live here
-supabase/
-  functions/
-    dock-prompt/
-      index.ts                  # Deno Edge Function: OpenRouter SSE streaming call
+[✓]  [────────── text input (flex:1) ──────────]  [✕]
 ```
 
-## Flow
+The tick is on the left — spatially identical to the bolt that opened it, so the two-click gesture (open, confirm) lands in the same place. Enter confirms; Escape cancels. The input autofocuses.
+
+The Dock stores the typed text in local state (`localPromptText`), which is reset when `promptOpen` becomes false. No text state leaks between invocations.
+
+**For DOCK_PROMPT specifically:** `handleOpenAIPrompt` saves a reference to `activeEditor` into `savedEditorRef` before `setPromptOpen(true)` is called. By the time the component re-renders and the prompt input steals focus, `activeEditor` would have cleared (the editor blurred). The saved ref is used on confirm to insert the embedded card, and on dismiss to refocus the editor so the dock returns to `DOCK_EDITOR`/`TAB_EDITOR` state.
+
+---
+
+## What gets sent to the AI
+
+Every request sends the same context regardless of entry point:
+
+**Context cards** (`assembleContext(entries)`) — every card in the current tab that is not hidden, as `{ id, title, body }` in position order. Hidden cards (eye-off toggle) are excluded; folded cards are included (folding is a display affordance, not a context exclusion).
+
+**Effective prompt** — resolved by `runAI`:
+- Non-empty user text → used as-is
+- Empty text, `TAB_NEW_CARD` → default new-card-for-tab prompt
+- Empty text, `DOCK_NEW_CARD` → default reference card prompt
+- Empty text, `DOCK_PROMPT` with embed callback → default embed prompt
+- Empty text, `DOCK_PROMPT` without callback → no-op, returns `false`
+
+**Entry point** — sent as `entryPoint` in the request body so the edge function can select the right system message.
+
+---
+
+## The response format
+
+The model is instructed to respond with this exact structure and nothing else:
 
 ```
-User types prompt → DockPrompt.onSubmit
-  → AppShell.handlePromptSubmit
-    → useTabs.runDockPrompt(promptText)
-      → assembleContext(entries)         # filter hidden cards
-      → supabase.functions.invoke(       # call edge function
-          'dock-prompt',
-          { prompt, contextCards }
-        )
-        → OpenRouter (llama-3.2-3b)
-        ← { title, body }
-      → addCard({ title, body })         # card appears in tab
-      ← true (closes DockPrompt)
+<card>
+<type>text</type>
+<title>Card title here (max 80 characters)</title>
+<body>
+Body content as plain text.
+</body>
+</card>
 ```
 
-## Pure logic
+**Why tags, not JSON:** Small models reliably produce XML-like tag output. JSON caused the model to enter "tool call mode" and return `content: null`.
 
-### `assembleContext(entries)` → `contextCard[]`
+**Why structured at all:** The previous format (title on first line, body below) was parsed inline in the streaming loop with special-case newline logic. It couldn't distinguish fields from content, was fragile to model variation, and would require prompt changes to add new fields. The tag format keeps parsing in a dedicated pure function (`parseCardStream`), is streamable (body content is emitted before `</body>` arrives), and is extensible: adding a new field like `<operation>` or `<targetCardId>` only requires a parser change, not a prompt format change.
 
-Takes the `entries` array from `useTabs` (each entry is `{ card, position, foldState, hiddenState }`). Returns `[{ id, title, body }]` for every non-hidden card, in position order.
+**`type` is always `text` for now** but is present in the format because future card types (file attachments, portals, stacks) will need different handling. The type field makes that a parsing branch rather than a format redesign.
 
-- Hidden cards (`hiddenState: true`) are excluded — they are opted out of AI context.
-- Folded cards (`foldState: true`) are **included** — folding is a display affordance, not a context exclusion.
+---
 
-### `buildPrompt(prompt, contextCards)` → `messages[]`
+## Parsing the stream
 
-Builds the OpenRouter chat completions messages array. **Mirrored inside the edge function** — keep both in sync if the wording changes.
+`parseCardStream(accumulated)` is a pure function that takes the full accumulated text received so far and returns `{ type, title, body, done }`. It is called repeatedly on the growing string as SSE deltas arrive.
 
-Returns two messages:
+- **`type` and `title`** are `null` until their closing tags arrive. Once `</type>` or `</title>` is seen the value is extracted and stays fixed.
+- **`body`** is `null` until `<body>` opens. Once it does, body content streams live — `body` is the text between `<body>` and wherever the stream currently is. Any trailing partial closing tag (e.g. `</bo` at a chunk boundary) is stripped by finding the last unmatched `<` in the string.
+- **`done`** becomes `true` when `</body>` or `</card>` appears. The streaming loop breaks immediately when `done` is true, without waiting for the SSE `[DONE]` sentinel.
+
+`parseCardStream` never mutates state; the streaming loop in `runDockPrompt` calls it each iteration and schedules a batched UI update via `requestAnimationFrame` when title or body is available. On loop exit, a final call to `parseCardStream` writes the definitive values. If the model ignores the format entirely, all fields remain `null` and the card gets `title: 'Response', body: ''`.
+
+The raw SSE envelope is still handled by the existing `parseStreamChunk` (which extracts the delta string from an OpenRouter `data:` line). `parseCardStream` only sees the accumulated plain-text output, not the SSE framing.
+
+---
+
+## Embed vs. standalone creation
+
+`runDockPrompt(promptText, onCardCreated, entryPoint)` handles both cases through one parameter:
+
+**`onCardCreated` is null (tab mode)**
+`addCard()` is called, which creates the card in the DB *and* adds a `tabCard` entry — the card appears in the tab immediately as an empty item, then fills in.
+
+**`onCardCreated` is a function (embed mode)**
+`createCard()` + `putCard()` + `setCardsById()` are called directly — the card is saved to the DB and is available in React state, but no `tabCard` entry is created so it does not appear in the tab list. `onCardCreated(card.id)` is then called, which (in App) runs:
 
 ```js
-[
-  {
-    role: 'system',
-    content: 'You are an AI assistant embedded in a note-taking app. Write a short title on the first line (max 80 characters). Leave one blank line. Then write your full response as plain text. No JSON, no markdown, no labels — just the title, a blank line, then the content.',
-  },
-  {
-    role: 'user',
-    content: `Context cards:\n\n${contextBlock}\n\n---\n\nPrompt: ${prompt}`,
-  },
-]
+editor.chain().focus().insertContent({ type: 'embeddedCard', attrs: { cardId } }).run()
 ```
 
-Context cards are formatted as bold headings + body, separated by `---` dividers. Cards with no title use `Card N` as the heading. Empty card list renders `(no cards in the current tab)`.
+This inserts the embedded card node at the editor cursor position and refocuses the editor, so the dock returns to `DOCK_EDITOR` state. Streaming then fills in the card's title and body live — the embedded card renders those updates in place.
 
-**Why plain text, not JSON:** Small models (including llama-3.2-3b) enter tool-call mode when asked for JSON output, returning `content: null`. The plain-text format with title-on-first-line avoids this entirely.
+---
 
-### `parseDockPromptContent(content)` — `src/prompt/parseDockPromptContent.js`
+## System messages
 
-Client-side parser for the model's plain-text response. Mirrored in the edge function.
+Each entry point gets a distinct system message that frames what the model should create. All three share the same `FORMAT_RULE` suffix (the tag format instruction). Both `buildPrompt.js` (client, used in tests) and the edge function's `buildMessages` define the same `SYSTEM_MESSAGES` map — if the wording changes, update both.
 
-- Title = line 1 only (trimmed, max 80 chars). Falls back to `'Response'` if blank or line is too long.
-- Body = everything after line 1 (blank lines between title and body are skipped).
-- Handles edge cases: single-line response, model that skips the title format and starts with a long paragraph.
+**TAB_NEW_CARD** — "study the context cards to understand what this tab is about, then create content that fits and extends it — something genuinely useful given what's already there"
 
-### `parseStreamChunk(line)` — `src/prompt/streamParser.js`
+**DOCK_NEW_CARD** — "a compact reference card to keep pinned at the bottom of their screen while they work… a focused, reusable reference — something worth keeping at hand. Keep it concise"
 
-Parses a single SSE `data:` line from the OpenRouter streaming API. Returns the delta content string, or `null` for non-content lines (`[DONE]`, non-data lines, parse errors).
+**DOCK_PROMPT** — "the user is editing a card and wants to embed a new card inline within it… a self-contained embedded reference — something that enriches the surrounding card when read in context"
 
-## Edge Function — `supabase/functions/dock-prompt/index.ts`
+Unknown entry points fall back to `TAB_NEW_CARD`.
 
-### Model config
+---
 
-```ts
-const MODEL_CONFIG = {
-  model: 'meta-llama/llama-3.2-3b-instruct',
-  temperature: 0.7,
-  maxTokens: 2000,
-}
-```
+## Edge function
 
-This is the only place model selection lives. Change it here and redeploy.
+`supabase/functions/dock-prompt/index.ts` receives `{ prompt, contextCards, entryPoint }`, builds the messages array via its local `buildMessages` (mirroring `buildPrompt.js`), and streams the OpenRouter response back as SSE.
 
-### Request / response
-
-Request body (from client): `{ prompt: string, contextCards: [{ id, title, body }] }`
-
-The function streams SSE back to the client (`text/event-stream`). Each data line contains an OpenRouter chunk with `choices[0].delta.content`. The client uses `parseStreamChunk` to accumulate these into the final title+body.
-
-Error responses: `{ error: string, detail?: string }` at status 400, 500, or 502. All responses include CORS headers.
-
-### Deploying
+Model: `meta-llama/llama-3.3-70b-instruct`. The only place model selection lives is `MODEL_CONFIG.model` in the edge function. `entryPoint` defaults to `'TAB_NEW_CARD'` if omitted (backwards compatible with any client that doesn't send it).
 
 ```bash
 supabase secrets set OPENROUTER_API_KEY=<your-key>
 supabase functions deploy dock-prompt
 ```
 
-## Hook — `runDockPrompt` in useTabs
+---
 
-`runDockPrompt(promptText)` uses raw `fetch` (not `supabase.functions.invoke`) for streaming. Flow:
+## File map
 
-1. Creates an empty card immediately so it appears in the tab at once.
-2. Opens SSE stream from `dock-prompt`.
-3. Accumulates delta text via `parseStreamChunk`; once first `\n` is found, extracts title and sets it.
-4. Subsequent deltas update the body in batches via `requestAnimationFrame`.
-5. On stream end, applies final title+body (via `parseDockPromptContent` logic inline).
-6. Falls back to JSON parsing if no SSE deltas were received (legacy function format).
+```
+src/
+  ai/
+    assembleContext.js            Pure: tab entries → visible contextCards [{id,title,body}]
+    assembleContext.test.js       [TEST]
+    buildPrompt.js                Pure: entryPoint → SYSTEM_MESSAGES[entryPoint] + FORMAT_RULE + context block
+    buildPrompt.test.js           [TEST]
+    parseCardStream.js            Pure: accumulated SSE text → {type, title, body, done} (incremental)
+    parseCardStream.test.js       [TEST]
+    streamParser.js               Pure: one SSE data: line → delta string | null
+    streamParser.test.js          [TEST]
+    parseDockPromptContent.js     Superseded (old first-line format). Not used in production.
+    parseDockPromptContent.test.js
+    AIPrompt.jsx / .css           Retired (floating panel approach). Not mounted anywhere.
+    AIPrompt.test.jsx / .stories.jsx
+  tab/
+    Dock.jsx                      Inline prompt mode render branch; TickIcon; bolt positioning;
+                                  onMouseDown fix for formatting toolbar bolt
+    Dock.css                      .dock__lightning-btn (amber), .dock--ai-prompt, .dock__ai-input
+    Tab.jsx                       Tab bolt, left of AddCardButton
+    Tab.css                       .tab__ai-btn (amber, solid border)
+    useTabs.js                    runDockPrompt (streaming + embed/tab paths), runAI (prompt resolution)
+    useTabs.test.js               [TEST]
+  App.jsx                         handleOpenAIPrompt / handlePromptSubmit / handlePromptDismiss;
+                                  promptOpen + aiEntryPoint state; savedEditorRef
+supabase/
+  functions/
+    dock-prompt/
+      index.ts                    Deno edge function: entryPoint → system message, OpenRouter SSE
+```
 
-Returns `true` on success, `false` on error. `promptLoading` and `promptError` are exposed from `useTabs`.
-
-## UI — DockPrompt component
-
-`DockPrompt({ onSubmit, onDismiss, loading = false, error = '' })` — dumb component, no internal async logic.
-
-- Textarea for the prompt text; starts empty on each open.
-- **Send** button: disabled when textarea is empty or `loading`. Trims and calls `onSubmit(trimmedText)`. Whitespace-only is a no-op.
-- **Cancel** button: calls `onDismiss`.
-- Error displayed with `role="alert"` when non-empty.
-- Rendered by `AppShell` when `promptOpen` is true (same slot as `FolderPanel`, mutually exclusive).
-
-## AppShell wiring
-
-`AppShell` owns `promptOpen` state. `handlePromptSubmit(text)` calls `runDockPrompt` and closes the panel on success.
-
-**Current status:** The Dock's lightning button (in DOCK_EDITOR and TAB_EDITOR states) toggles `lightningActive` for visual feedback, but is **not yet wired to `setPromptOpen`**. The `promptOpen` panel is not yet openable from the UI — that wiring is a separate slice.
+---
 
 ## Tests
 
-| File | What it covers |
+| File | Covers |
 |---|---|
-| `assembleContext.test.js` | Empty entries → []; maps to {id,title,body}; excludes hidden; includes folded; preserves order; all-hidden → [] |
-| `buildPrompt.test.js` | Two-element array; system message (plain-text instruction); user message contains prompt; card titles/bodies; placeholder when no cards; untitled → "Card N"; dividers between multiple cards |
-| `parseDockPromptContent.test.js` | Normal title+body; single line; body-only (title too long); blank → Response; title-only response |
-| `streamParser.test.js` | Returns delta content; null for [DONE]; null for non-data lines; null for parse errors |
-| `DockPrompt.test.jsx` | Renders textarea + buttons; Send disabled when empty; enables after typing; onSubmit with trimmed text; onDismiss; whitespace-only no-op; loading state; error alert present/absent |
-| `useTabs.test.js` (runDockPrompt) | Creates card; streaming updates card; returns true on success; sets promptError and returns false on error; excludes hidden cards |
-| `App.test.jsx` | Prompt panel wiring (when opened) |
+| `assembleContext.test.js` | Empty input; id/title/body mapping; hidden cards excluded; folded included; position order; all-hidden → [] |
+| `buildPrompt.test.js` | Two-element array; system contains `<card>` tags; user contains prompt; card content; no-cards placeholder; untitled → "Card N"; multi-card dividers; per-entry-point system text; unknown falls back |
+| `parseCardStream.test.js` | Complete response; all-null before tags; partial type/title; empty title → Response; body null before `<body>`; streaming body; partial closing tag stripped; lone `<` stripped; done on `</body>` and `</card>`; whitespace trimming; multi-line body; body null (not `''`) on just-opened `<body>` |
+| `streamParser.test.js` | Delta extraction; null for `[DONE]`; null for non-data lines; null for parse errors |
+| `useTabs.test.js (runDockPrompt)` | Card created then filled via parseCardStream; two-chunk streaming; graceful fallback when no format tags; fetch body contents; error handling; hidden-card exclusion; embed mode (onCardCreated called, card not in tab entries) |
+| `useTabs.test.js (runAI)` | Default prompts per entry point; DOCK_PROMPT text passthrough; DOCK_PROMPT empty no-op; DOCK_PROMPT + onCardCreated default prompt; callback passed to runDockPrompt; entryPoint in fetch body; success/error returns |
+
+---
 
 ## Not built yet
 
-- Lightning button → DockPrompt panel wiring (button exists; panel and logic ready)
-- Approve/deny UI before the card is created
-- Streaming cancel / abort
-- Job queue, credits, cost estimation
+- `CARD_EDIT` — rewrite the body of the card currently being edited (diff path)
+- `SELECTION_BATCH` — use selected cards as primary context
+- Dock card context — pinned dock cards not included in `contextCards`
+- Error display in inline mode — `aiError` is set but not surfaced in the dock prompt UI
+- Abort mid-stream
+- Approve/deny before a card is committed
+- Streaming progress indicator
 - Model picker or per-user model preference
-- Context scoping (currently all visible cards; no per-card opt-in)
-- Editing existing cards via AI
+- Context scoping beyond the hidden toggle

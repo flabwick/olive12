@@ -47,6 +47,13 @@ describe('Dock — BASE state', () => {
     expect(screen.getByRole('button', { name: 'AI prompt' })).toBeInTheDocument()
   })
 
+  it('calls onAIPrompt with DOCK_NEW_CARD when lightning button is clicked in BASE state', async () => {
+    const onAIPrompt = vi.fn()
+    wrap(<Dock dockState={DOCK_STATE.BASE} onAIPrompt={onAIPrompt} />)
+    await userEvent.click(screen.getByRole('button', { name: 'AI prompt' }))
+    expect(onAIPrompt).toHaveBeenCalledWith('DOCK_NEW_CARD')
+  })
+
   it('active pill has active class and shows close icon', () => {
     wrap(
       <Dock
@@ -131,6 +138,57 @@ describe('Dock — BASE state', () => {
   })
 })
 
+describe('Dock — AI prompt mode', () => {
+  it('renders input and Generate button when promptOpen is true', () => {
+    wrap(<Dock dockState={DOCK_STATE.BASE} promptOpen />)
+    expect(screen.getByRole('textbox', { name: 'AI instructions' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Generate' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+  })
+
+  it('calls onPromptDismiss when Cancel is clicked', async () => {
+    const onPromptDismiss = vi.fn()
+    wrap(<Dock dockState={DOCK_STATE.BASE} promptOpen onPromptDismiss={onPromptDismiss} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onPromptDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls onPromptSubmit with input text when Generate is clicked', async () => {
+    const onPromptSubmit = vi.fn()
+    wrap(<Dock dockState={DOCK_STATE.BASE} promptOpen onPromptSubmit={onPromptSubmit} />)
+    await userEvent.type(screen.getByRole('textbox', { name: 'AI instructions' }), 'summarise')
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    expect(onPromptSubmit).toHaveBeenCalledWith('summarise')
+  })
+
+  it('calls onPromptSubmit with empty string when Generate is clicked with no input', async () => {
+    const onPromptSubmit = vi.fn()
+    wrap(<Dock dockState={DOCK_STATE.BASE} promptOpen onPromptSubmit={onPromptSubmit} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    expect(onPromptSubmit).toHaveBeenCalledWith('')
+  })
+
+  it('calls onPromptSubmit when Enter is pressed', async () => {
+    const onPromptSubmit = vi.fn()
+    wrap(<Dock dockState={DOCK_STATE.BASE} promptOpen onPromptSubmit={onPromptSubmit} />)
+    await userEvent.type(screen.getByRole('textbox', { name: 'AI instructions' }), 'test{Enter}')
+    expect(onPromptSubmit).toHaveBeenCalledWith('test')
+  })
+
+  it('calls onPromptDismiss when Escape is pressed', async () => {
+    const onPromptDismiss = vi.fn()
+    wrap(<Dock dockState={DOCK_STATE.BASE} promptOpen onPromptDismiss={onPromptDismiss} />)
+    await userEvent.type(screen.getByRole('textbox', { name: 'AI instructions' }), '{Escape}')
+    expect(onPromptDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  it('hides normal dock UI when promptOpen is true', () => {
+    wrap(<Dock dockState={DOCK_STATE.BASE} promptOpen />)
+    expect(screen.queryByRole('button', { name: 'Pin new card' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Library' })).not.toBeInTheDocument()
+  })
+})
+
 describe('Dock — DOCK_EDITOR state', () => {
   it('renders Exit editor button', () => {
     wrap(<Dock dockState={DOCK_STATE.DOCK_EDITOR} />)
@@ -179,16 +237,11 @@ describe('Dock — DOCK_EDITOR state', () => {
     expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument()
   })
 
-  it('calls onLightningToggle when lightning button is clicked', async () => {
-    const onLightningToggle = vi.fn()
-    wrap(<Dock dockState={DOCK_STATE.DOCK_EDITOR} onLightningToggle={onLightningToggle} />)
+  it('calls onAIPrompt with DOCK_PROMPT when lightning button is clicked', async () => {
+    const onAIPrompt = vi.fn()
+    wrap(<Dock dockState={DOCK_STATE.DOCK_EDITOR} onAIPrompt={onAIPrompt} />)
     await userEvent.click(screen.getByRole('button', { name: 'AI prompt' }))
-    expect(onLightningToggle).toHaveBeenCalledOnce()
-  })
-
-  it('aria-pressed on lightning button reflects lightningActive', () => {
-    wrap(<Dock dockState={DOCK_STATE.DOCK_EDITOR} lightningActive={true} />)
-    expect(screen.getByRole('button', { name: 'AI prompt' })).toHaveAttribute('aria-pressed', 'true')
+    expect(onAIPrompt).toHaveBeenCalledWith('DOCK_PROMPT')
   })
 
   it('does not render Pin to dock button', () => {
@@ -666,5 +719,12 @@ describe('Dock — CARD_SELECTED state', () => {
   it('renders AI prompt button with multiple cards selected', () => {
     wrap(<Dock dockState={DOCK_STATE.CARD_SELECTED} selectedCardCount={3} />)
     expect(screen.getByRole('button', { name: 'AI prompt' })).toBeInTheDocument()
+  })
+
+  it('calls onAIPrompt with DOCK_PROMPT when lightning button is clicked in CARD_SELECTED state', async () => {
+    const onAIPrompt = vi.fn()
+    wrap(<Dock dockState={DOCK_STATE.CARD_SELECTED} selectedCardCount={1} selectedCardTitle="My card" onAIPrompt={onAIPrompt} />)
+    await userEvent.click(screen.getByRole('button', { name: 'AI prompt' }))
+    expect(onAIPrompt).toHaveBeenCalledWith('DOCK_PROMPT')
   })
 })

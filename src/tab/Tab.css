@@ -151,18 +151,37 @@
   flex-shrink: 0;
   width: 40px;
   height: 40px;
-  background: none;
-  border: 1.5px dashed var(--color-border-faint, #ddd);
+  background: #fceec8;
+  border: 2px solid #c89828;
   border-radius: var(--radius-card, 6px);
-  color: var(--color-text-faint, #aaa);
+  color: #a06008;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.15s, color 0.15s;
+  box-shadow: 2px 2px 0 #c8980e;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
 }
 
 .tab__ai-btn:hover {
-  border-color: var(--color-primary, #4a90d9);
-  color: var(--color-primary, #4a90d9);
+  background: #f5d888;
+  border-color: #a07010;
+  color: #6a3a00;
+  box-shadow: 3px 3px 0 #a07010;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tab__ai-btn {
+    background: #1e1a0e;
+    border-color: #8a6818;
+    color: #d4a030;
+    box-shadow: 2px 2px 0 #0a0a08;
+  }
+
+  .tab__ai-btn:hover {
+    background: #2c2410;
+    border-color: #c8980e;
+    color: #f0c040;
+    box-shadow: 3px 3px 0 #0a0a08;
+  }
 }

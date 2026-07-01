@@ -9,11 +9,36 @@ describe('buildPrompt', () => {
     expect(messages[1].role).toBe('user')
   })
 
-  it('system message instructs plain text output with title on first line', () => {
+  it('system message instructs structured tag format with no JSON', () => {
     const [system] = buildPrompt('test', [])
-    expect(system.content).toContain('title')
-    expect(system.content).toContain('first line')
+    expect(system.content).toContain('<card>')
+    expect(system.content).toContain('<title>')
+    expect(system.content).toContain('<body>')
     expect(system.content).not.toContain('JSON object')
+  })
+
+  it('TAB_NEW_CARD system message mentions fitting the tab theme', () => {
+    const [system] = buildPrompt('test', [], 'TAB_NEW_CARD')
+    expect(system.content).toContain('tab')
+    expect(system.content).toContain('Olive')
+  })
+
+  it('DOCK_NEW_CARD system message mentions a reference card for the dock', () => {
+    const [system] = buildPrompt('test', [], 'DOCK_NEW_CARD')
+    expect(system.content).toContain('pinned')
+    expect(system.content).toContain('concise')
+  })
+
+  it('DOCK_PROMPT system message mentions embedded card', () => {
+    const [system] = buildPrompt('test', [], 'DOCK_PROMPT')
+    expect(system.content).toContain('embed')
+    expect(system.content).toContain('inline')
+  })
+
+  it('unknown entryPoint falls back to TAB_NEW_CARD system message', () => {
+    const [systemDefault] = buildPrompt('test', [])
+    const [systemUnknown] = buildPrompt('test', [], 'UNKNOWN_ENTRY')
+    expect(systemUnknown.content).toBe(systemDefault.content)
   })
 
   it('user message contains the prompt', () => {

@@ -1225,8 +1225,8 @@ describe('useTabs', () => {
         .mockReturnValueOnce('ai-card')
       vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
       fetchMock.mockResolvedValue(makeStreamResponse([
-        'data: {"choices":[{"delta":{"content":"AI title"}}]}',
-        'data: {"choices":[{"delta":{"content":"\\n\\nAI body"}}]}',
+        'data: {"choices":[{"delta":{"content":"<card><type>text</type><title>AI title</title><body>\\n"}}]}',
+        'data: {"choices":[{"delta":{"content":"AI body\\n</body></card>"}}]}',
         'data: [DONE]',
       ]))
 
@@ -1253,8 +1253,8 @@ describe('useTabs', () => {
         .mockReturnValueOnce('ai-card')
       vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
       fetchMock.mockResolvedValue(makeStreamResponse([
-        'data: {"choices":[{"delta":{"content":"AI title"}}]}',
-        'data: {"choices":[{"delta":{"content":"\\n\\nAI body"}}]}',
+        'data: {"choices":[{"delta":{"content":"<card><type>text</type><title>AI title</title><body>\\n"}}]}',
+        'data: {"choices":[{"delta":{"content":"AI body\\n</body></card>"}}]}',
         'data: [DONE]',
       ]))
 
@@ -1273,7 +1273,7 @@ describe('useTabs', () => {
       vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
       vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
       fetchMock.mockResolvedValue(makeStreamResponse([
-        'data: {"choices":[{"delta":{"content":"Title\\n\\nBody"}}]}',
+        'data: {"choices":[{"delta":{"content":"<card><type>text</type><title>Title</title><body>Body</body></card>"}}]}',
         'data: [DONE]',
       ]))
 
@@ -1284,8 +1284,8 @@ describe('useTabs', () => {
       await act(async () => { returnValue = await result.current.runDockPrompt('test') })
 
       expect(returnValue).toBe(true)
-      expect(result.current.promptLoading).toBe(false)
-      expect(result.current.promptError).toBe('')
+      expect(result.current.aiLoading).toBe(false)
+      expect(result.current.aiError).toBe('')
     })
 
     it('sets promptError and returns false when fetch throws', async () => {
@@ -1300,15 +1300,15 @@ describe('useTabs', () => {
       await act(async () => { returnValue = await result.current.runDockPrompt('test') })
 
       expect(returnValue).toBe(false)
-      expect(result.current.promptError).toBe('Network failure')
-      expect(result.current.promptLoading).toBe(false)
+      expect(result.current.aiError).toBe('Network failure')
+      expect(result.current.aiLoading).toBe(false)
     })
 
-    it('uses accumulated text as title when stream never emits a newline', async () => {
+    it('falls back to Response/empty when response has no card tags', async () => {
       vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
       vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
       fetchMock.mockResolvedValue(makeStreamResponse([
-        'data: {"choices":[{"delta":{"content":"No newline here"}}]}',
+        'data: {"choices":[{"delta":{"content":"Some unstructured text with no tags"}}]}',
         'data: [DONE]',
       ]))
 
@@ -1318,7 +1318,7 @@ describe('useTabs', () => {
       await act(async () => { await result.current.runDockPrompt('test') })
 
       const card = result.current.entries[0].card
-      expect(card.title).toBe('No newline here')
+      expect(card.title).toBe('Response')
       expect(card.body).toBe('')
     })
 
@@ -1330,7 +1330,7 @@ describe('useTabs', () => {
         .mockReturnValueOnce('ai-card')
       vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
       fetchMock.mockResolvedValue(makeStreamResponse([
-        'data: {"choices":[{"delta":{"content":"T\\n\\nB"}}]}',
+        'data: {"choices":[{"delta":{"content":"<card><type>text</type><title>T</title><body>B</body></card>"}}]}',
         'data: [DONE]',
       ]))
 
@@ -1345,6 +1345,205 @@ describe('useTabs', () => {
       const bodyParsed = JSON.parse(fetchMock.mock.calls[0][1].body)
       expect(bodyParsed.contextCards).toHaveLength(1)
       expect(bodyParsed.contextCards[0].id).toBe('visible-card')
+    })
+
+    it('calls onCardCreated with the new card id and does not add card to tab entries', async () => {
+      vi.spyOn(crypto, 'randomUUID')
+        .mockReturnValueOnce('tab-uuid')
+        .mockReturnValueOnce('embed-card')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      fetchMock.mockResolvedValue(makeStreamResponse([
+        'data: {"choices":[{"delta":{"content":"<card><type>text</type><title>Title</title><body>Body</body></card>"}}]}',
+        'data: [DONE]',
+      ]))
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      const onCardCreated = vi.fn()
+      await act(async () => { await result.current.runDockPrompt('Embed this', onCardCreated) })
+
+      expect(onCardCreated).toHaveBeenCalledWith('embed-card')
+      // Card should NOT appear as a tab entry (not added via addCard/addTabCard)
+      expect(result.current.entries.some((e) => e.card.id === 'embed-card')).toBe(false)
+    })
+  })
+
+  describe('runAI', () => {
+    function makeStreamResponse(sseLines) {
+      const encoder = new TextEncoder()
+      const body = new ReadableStream({
+        start(controller) {
+          for (const line of sseLines) {
+            controller.enqueue(encoder.encode(line + '\n'))
+          }
+          controller.close()
+        },
+      })
+      return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+    }
+
+    let fetchMock
+
+    beforeEach(() => {
+      fetchMock = vi.fn()
+      vi.stubGlobal('requestAnimationFrame', (fn) => { fn(0); return 0 })
+      vi.stubGlobal('cancelAnimationFrame', () => {})
+      vi.stubGlobal('fetch', fetchMock)
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('TAB_NEW_CARD with empty userPrompt injects default prompt string', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      fetchMock.mockResolvedValue(makeStreamResponse([
+        'data: {"choices":[{"delta":{"content":"<card><type>text</type><title>Title</title><body>Body</body></card>"}}]}',
+        'data: [DONE]',
+      ]))
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.runAI({ entryPoint: 'TAB_NEW_CARD', userPrompt: '' }) })
+
+      const bodyParsed = JSON.parse(fetchMock.mock.calls[0][1].body)
+      expect(bodyParsed.prompt).toBe('Create a useful new card that fits the theme of the existing cards in this tab.')
+    })
+
+    it('DOCK_NEW_CARD with empty userPrompt injects default prompt string', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      fetchMock.mockResolvedValue(makeStreamResponse([
+        'data: {"choices":[{"delta":{"content":"<card><type>text</type><title>Title</title><body>Body</body></card>"}}]}',
+        'data: [DONE]',
+      ]))
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.runAI({ entryPoint: 'DOCK_NEW_CARD', userPrompt: '' }) })
+
+      const bodyParsed = JSON.parse(fetchMock.mock.calls[0][1].body)
+      expect(bodyParsed.prompt).toBe('Create a useful reference card to pin to the dock.')
+    })
+
+    it('sends entryPoint in fetch body', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      fetchMock.mockResolvedValue(makeStreamResponse([
+        'data: {"choices":[{"delta":{"content":"<card><type>text</type><title>Title</title><body>Body</body></card>"}}]}',
+        'data: [DONE]',
+      ]))
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.runAI({ entryPoint: 'DOCK_NEW_CARD', userPrompt: '' }) })
+
+      const bodyParsed = JSON.parse(fetchMock.mock.calls[0][1].body)
+      expect(bodyParsed.entryPoint).toBe('DOCK_NEW_CARD')
+    })
+
+    it('DOCK_PROMPT with non-empty userPrompt passes it through unchanged', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      fetchMock.mockResolvedValue(makeStreamResponse([
+        'data: {"choices":[{"delta":{"content":"<card><type>text</type><title>Title</title><body>Body</body></card>"}}]}',
+        'data: [DONE]',
+      ]))
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      await act(async () => { await result.current.runAI({ entryPoint: 'DOCK_PROMPT', userPrompt: 'Summarise everything' }) })
+
+      const bodyParsed = JSON.parse(fetchMock.mock.calls[0][1].body)
+      expect(bodyParsed.prompt).toBe('Summarise everything')
+    })
+
+    it('DOCK_PROMPT with empty userPrompt is a no-op and returns false', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      let returnValue
+      await act(async () => { returnValue = await result.current.runAI({ entryPoint: 'DOCK_PROMPT', userPrompt: '' }) })
+
+      expect(returnValue).toBe(false)
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('DOCK_PROMPT with empty userPrompt but onCardCreated uses default embed prompt', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      fetchMock.mockResolvedValue(makeStreamResponse([
+        'data: {"choices":[{"delta":{"content":"<card><type>text</type><title>Title</title><body>Body</body></card>"}}]}',
+        'data: [DONE]',
+      ]))
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      const onCardCreated = vi.fn()
+      await act(async () => { await result.current.runAI({ entryPoint: 'DOCK_PROMPT', userPrompt: '', onCardCreated }) })
+
+      const bodyParsed = JSON.parse(fetchMock.mock.calls[0][1].body)
+      expect(bodyParsed.prompt).toBe('Create a useful card to embed here.')
+      expect(onCardCreated).toHaveBeenCalled()
+    })
+
+    it('DOCK_PROMPT with onCardCreated passes callback through to runDockPrompt', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      fetchMock.mockResolvedValue(makeStreamResponse([
+        'data: {"choices":[{"delta":{"content":"<card><type>text</type><title>Title</title><body>Body</body></card>"}}]}',
+        'data: [DONE]',
+      ]))
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      const onCardCreated = vi.fn()
+      await act(async () => { await result.current.runAI({ entryPoint: 'DOCK_PROMPT', userPrompt: 'Write something', onCardCreated }) })
+
+      expect(onCardCreated).toHaveBeenCalledWith('uuid')
+      expect(result.current.entries.some((e) => e.card.id === 'uuid')).toBe(false)
+    })
+
+    it('returns true on success', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      fetchMock.mockResolvedValue(makeStreamResponse([
+        'data: {"choices":[{"delta":{"content":"<card><type>text</type><title>Title</title><body>Body</body></card>"}}]}',
+        'data: [DONE]',
+      ]))
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      let returnValue
+      await act(async () => { returnValue = await result.current.runAI({ entryPoint: 'TAB_NEW_CARD', userPrompt: '' }) })
+
+      expect(returnValue).toBe(true)
+    })
+
+    it('returns false on error', async () => {
+      vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid')
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+      fetchMock.mockRejectedValue(new Error('Network failure'))
+
+      const { result } = renderHook(() => useTabs())
+      await waitFor(() => expect(result.current.isReady).toBe(true))
+
+      let returnValue
+      await act(async () => { returnValue = await result.current.runAI({ entryPoint: 'TAB_NEW_CARD', userPrompt: '' }) })
+
+      expect(returnValue).toBe(false)
     })
   })
 

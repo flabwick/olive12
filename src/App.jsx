@@ -15,7 +15,6 @@ import { FolderPanel } from './layout/FolderPanel'
 import { supabase } from './lib/supabaseClient'
 import { Dock } from './tab/Dock'
 import { DockCardPanel } from './tab/DockCardPanel'
-import { DockPrompt } from './prompt/DockPrompt'
 import { Tab } from './tab/Tab'
 import { TabHeader } from './tab/TabHeader'
 import { TabSwitcher } from './tab/TabSwitcher'
@@ -71,9 +70,7 @@ function AppShell({ userId }) {
     bulkMoveCards,
     bulkDeleteCards,
     bulkMoveTabs,
-    runDockPrompt,
-    promptLoading,
-    promptError,
+    runAI,
     allTabCards,
     cardsById,
     brainFeedItems,
@@ -93,12 +90,13 @@ function AppShell({ userId }) {
   } = useTabs({ userId })
 
   const embedEditorRef = useRef(null)
+  const savedEditorRef = useRef(null)
   const [folderPanelOpen, setFolderPanelOpen] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
+  const [aiEntryPoint, setAiEntryPoint] = useState(null)
   const [embedOpen, setEmbedOpen] = useState(false)
   const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false)
   const [indexDebugOpen, setIndexDebugOpen] = useState(false)
-  const [lightningActive, setLightningActive] = useState(false)
   const [vaultTab, setVaultTab] = useState('shelf')
   const [highlightedCardId, setHighlightedCardId] = useState(null)
   const [selectedVaultItem, setSelectedVaultItem] = useState(null)
@@ -448,9 +446,39 @@ function AppShell({ userId }) {
     createAndPinCard(addToCardsById)
   }
 
-  async function handlePromptSubmit(text) {
-    const ok = await runDockPrompt(text)
-    if (ok) setPromptOpen(false)
+  function handleOpenAIPrompt(entryPoint) {
+    if (entryPoint === 'DOCK_PROMPT') {
+      savedEditorRef.current = activeEditor
+    }
+    setAiEntryPoint(entryPoint)
+    setPromptOpen(true)
+  }
+
+  function handlePromptSubmit(text) {
+    const entryPoint = aiEntryPoint
+    const editor = savedEditorRef.current
+    savedEditorRef.current = null
+    setPromptOpen(false)
+    setAiEntryPoint(null)
+    if (entryPoint === 'DOCK_PROMPT') {
+      runAI({
+        entryPoint: 'DOCK_PROMPT',
+        userPrompt: text,
+        onCardCreated: (cardId) => {
+          editor?.chain().focus().insertContent({ type: 'embeddedCard', attrs: { cardId } }).run()
+        },
+      })
+    } else {
+      runAI({ entryPoint, userPrompt: text })
+    }
+  }
+
+  function handlePromptDismiss() {
+    const editor = savedEditorRef.current
+    savedEditorRef.current = null
+    setPromptOpen(false)
+    setAiEntryPoint(null)
+    setTimeout(() => editor?.commands.focus(), 0)
   }
 
   function handleEmbedOpen() {
@@ -537,6 +565,7 @@ function AppShell({ userId }) {
           onDissolveStack={dissolveStack}
           onAddCard={addCard}
           onMoveToDock={handleMoveToDock}
+          onAIPrompt={() => handleOpenAIPrompt('TAB_NEW_CARD')}
         />
       </div>
       <div className="app-shell__dock-area">
@@ -570,14 +599,6 @@ function AppShell({ userId }) {
             renamingItemId={renamingItemId}
             onInlineRenameCommit={handleInlineRenameCommit}
             onInlineRenameCancel={handleInlineRenameCancel}
-          />
-        )}
-        {promptOpen && (
-          <DockPrompt
-            onSubmit={handlePromptSubmit}
-            onDismiss={() => setPromptOpen(false)}
-            loading={promptLoading}
-            error={promptError}
           />
         )}
         {embedOpen && (
@@ -626,8 +647,10 @@ function AppShell({ userId }) {
           onFolderOpen={handleFolderOpen}
           onSettings={handleSettings}
           onEmbedOpen={handleEmbedOpen}
-          lightningActive={lightningActive}
-          onLightningToggle={() => setLightningActive((v) => !v)}
+          onAIPrompt={handleOpenAIPrompt}
+          promptOpen={promptOpen}
+          onPromptSubmit={handlePromptSubmit}
+          onPromptDismiss={handlePromptDismiss}
           vaultOpen={folderPanelOpen}
           vaultTab={vaultTab}
           onVaultTabChange={handleVaultTabChange}

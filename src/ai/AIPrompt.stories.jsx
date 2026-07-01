@@ -1,8 +1,8 @@
-import { DockPrompt } from './DockPrompt'
+import { AIPrompt } from './AIPrompt'
 
 export default {
-  title: 'Prompt/DockPrompt',
-  component: DockPrompt,
+  title: 'AI/AIPrompt',
+  component: AIPrompt,
   parameters: { layout: 'fullscreen' },
   args: {
     onSubmit: () => {},

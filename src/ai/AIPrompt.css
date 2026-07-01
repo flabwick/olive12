@@ -1,4 +1,4 @@
-.dock-prompt {
+.ai-prompt {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -15,7 +15,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .dock-prompt {
+  .ai-prompt {
     background: #1c1a14;
     border-color: #3a3830;
     box-shadow:
@@ -24,7 +24,7 @@
   }
 }
 
-.dock-prompt__input {
+.ai-prompt__input {
   width: 100%;
   resize: none;
   border: 2px solid var(--olive-border, #b89868);
@@ -40,29 +40,29 @@
   transition: border-color 0.12s, box-shadow 0.12s;
 }
 
-.dock-prompt__input:focus {
+.ai-prompt__input:focus {
   border-color: var(--olive-border-dark, #2c1810);
   box-shadow: 0 0 0 2px rgba(44, 24, 16, 0.1);
 }
 
-.dock-prompt__input:disabled {
+.ai-prompt__input:disabled {
   opacity: 0.5;
 }
 
 @media (prefers-color-scheme: dark) {
-  .dock-prompt__input {
+  .ai-prompt__input {
     background: #242218;
     border-color: #383528;
     color: #e4e0d0;
   }
 
-  .dock-prompt__input:focus {
+  .ai-prompt__input:focus {
     border-color: #706850;
     box-shadow: 0 0 0 2px rgba(112, 104, 80, 0.14);
   }
 }
 
-.dock-prompt__error {
+.ai-prompt__error {
   margin: 0;
   font-size: 0.75rem;
   font-weight: 600;
@@ -71,19 +71,19 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .dock-prompt__error {
+  .ai-prompt__error {
     color: var(--olive-terracotta, #906a30);
   }
 }
 
-.dock-prompt__actions {
+.ai-prompt__actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.375rem;
 }
 
-.dock-prompt__cancel,
-.dock-prompt__submit {
+.ai-prompt__cancel,
+.ai-prompt__submit {
   height: 1.875rem;
   padding: 0 0.75rem;
   border: 1.5px solid var(--olive-border, #b89868);
@@ -99,21 +99,21 @@
   transition: background 0.1s, color 0.1s, border-color 0.1s;
 }
 
-.dock-prompt__cancel:hover:not(:disabled),
-.dock-prompt__submit:hover:not(:disabled) {
+.ai-prompt__cancel:hover:not(:disabled),
+.ai-prompt__submit:hover:not(:disabled) {
   background: var(--olive-surface, #dfd0b4);
   border-color: var(--olive-border-dark, #2c1810);
   color: var(--olive-text, #2c1810);
 }
 
-.dock-prompt__submit {
+.ai-prompt__submit {
   background: var(--olive-terracotta, #a84830);
   border-color: #8a3018;
   color: #fef8ee;
   box-shadow: 2px 2px 0 #6a2010;
 }
 
-.dock-prompt__submit:hover:not(:disabled) {
+.ai-prompt__submit:hover:not(:disabled) {
   background: #8a3018;
   border-color: #6a2010;
   color: #fef8ee;
@@ -121,32 +121,32 @@
   box-shadow: 3px 3px 0 #6a2010;
 }
 
-.dock-prompt__cancel:disabled,
-.dock-prompt__submit:disabled {
+.ai-prompt__cancel:disabled,
+.ai-prompt__submit:disabled {
   opacity: 0.35;
   cursor: default;
 }
 
 @media (prefers-color-scheme: dark) {
-  .dock-prompt__cancel {
+  .ai-prompt__cancel {
     background: #201e16;
     border-color: #383528;
     color: #908870;
   }
 
-  .dock-prompt__cancel:hover:not(:disabled) {
+  .ai-prompt__cancel:hover:not(:disabled) {
     background: #2c2a20;
     border-color: #706850;
     color: #e4e0d0;
   }
 
-  .dock-prompt__submit {
+  .ai-prompt__submit {
     background: var(--olive-terracotta, #906a30);
     border-color: #705020;
     box-shadow: 2px 2px 0 #0a0a08;
   }
 
-  .dock-prompt__submit:hover:not(:disabled) {
+  .ai-prompt__submit:hover:not(:disabled) {
     background: #705020;
     transform: translate(-1px, -1px);
     box-shadow: 3px 3px 0 #080806;

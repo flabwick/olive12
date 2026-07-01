@@ -1,30 +1,55 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { DockPrompt } from './DockPrompt'
+import { AIPrompt } from './AIPrompt'
 
-describe('DockPrompt', () => {
+describe('AIPrompt', () => {
   it('renders the prompt textarea and action buttons', () => {
-    render(<DockPrompt />)
+    render(<AIPrompt />)
     expect(screen.getByRole('textbox', { name: 'Prompt input' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Send →' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
   })
 
-  it('Send button is disabled when input is empty', () => {
-    render(<DockPrompt />)
-    expect(screen.getByRole('button', { name: 'Send →' })).toBeDisabled()
+  it('placeholder text matches expected copy', () => {
+    render(<AIPrompt />)
+    expect(screen.getByRole('textbox', { name: 'Prompt input' })).toHaveAttribute(
+      'placeholder',
+      'Optional — add instructions…',
+    )
   })
 
-  it('Send button enables after typing', async () => {
-    render(<DockPrompt />)
+  it('Submit button is enabled when textarea is empty', () => {
+    render(<AIPrompt />)
+    expect(screen.getByRole('button', { name: 'Send →' })).not.toBeDisabled()
+  })
+
+  it('Submit button remains enabled after typing', async () => {
+    render(<AIPrompt />)
     await userEvent.type(screen.getByRole('textbox', { name: 'Prompt input' }), 'hello')
     expect(screen.getByRole('button', { name: 'Send →' })).not.toBeDisabled()
   })
 
-  it('calls onSubmit with trimmed text when Send is clicked', async () => {
+  it('calls onSubmit with empty string when textarea is empty', async () => {
     const onSubmit = vi.fn()
-    render(<DockPrompt onSubmit={onSubmit} />)
+    render(<AIPrompt onSubmit={onSubmit} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Send →' }))
+    expect(onSubmit).toHaveBeenCalledOnce()
+    expect(onSubmit).toHaveBeenCalledWith('')
+  })
+
+  it('calls onSubmit with empty string when input is whitespace-only', async () => {
+    const onSubmit = vi.fn()
+    render(<AIPrompt onSubmit={onSubmit} />)
+    await userEvent.type(screen.getByRole('textbox', { name: 'Prompt input' }), '   ')
+    await userEvent.click(screen.getByRole('button', { name: 'Send →' }))
+    expect(onSubmit).toHaveBeenCalledOnce()
+    expect(onSubmit).toHaveBeenCalledWith('')
+  })
+
+  it('calls onSubmit with trimmed text when textarea has content', async () => {
+    const onSubmit = vi.fn()
+    render(<AIPrompt onSubmit={onSubmit} />)
     await userEvent.type(screen.getByRole('textbox', { name: 'Prompt input' }), '  my prompt  ')
     await userEvent.click(screen.getByRole('button', { name: 'Send →' }))
     expect(onSubmit).toHaveBeenCalledOnce()
@@ -33,46 +58,38 @@ describe('DockPrompt', () => {
 
   it('calls onDismiss when Cancel is clicked', async () => {
     const onDismiss = vi.fn()
-    render(<DockPrompt onDismiss={onDismiss} />)
+    render(<AIPrompt onDismiss={onDismiss} />)
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onDismiss).toHaveBeenCalledOnce()
   })
 
-  it('does not call onSubmit when input is whitespace-only', async () => {
-    const onSubmit = vi.fn()
-    render(<DockPrompt onSubmit={onSubmit} />)
-    await userEvent.type(screen.getByRole('textbox', { name: 'Prompt input' }), '   ')
-    await userEvent.click(screen.getByRole('button', { name: 'Send →' }))
-    expect(onSubmit).not.toHaveBeenCalled()
-  })
-
   it('shows loading state: button text changes and inputs are disabled', () => {
-    render(<DockPrompt loading={true} />)
+    render(<AIPrompt loading={true} />)
     expect(screen.getByRole('button', { name: 'Thinking…' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Prompt input' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
   })
 
   it('shows spinner in submit button when streaming=true and loading=true', () => {
-    render(<DockPrompt loading={true} streaming={true} />)
-    const spinner = document.querySelector('.dock-prompt__spinner')
+    render(<AIPrompt loading={true} streaming={true} />)
+    const spinner = document.querySelector('.ai-prompt__spinner')
     expect(spinner).toBeInTheDocument()
     expect(spinner).toHaveAttribute('aria-busy', 'true')
   })
 
   it('shows Thinking… when loading=true and streaming=false', () => {
-    render(<DockPrompt loading={true} streaming={false} />)
+    render(<AIPrompt loading={true} streaming={false} />)
     expect(screen.getByRole('button', { name: 'Thinking…' })).toBeInTheDocument()
-    expect(document.querySelector('.dock-prompt__spinner')).not.toBeInTheDocument()
+    expect(document.querySelector('.ai-prompt__spinner')).not.toBeInTheDocument()
   })
 
   it('displays error text with alert role', () => {
-    render(<DockPrompt error="Something went wrong" />)
+    render(<AIPrompt error="Something went wrong" />)
     expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong')
   })
 
   it('does not render error element when error is empty', () => {
-    render(<DockPrompt error="" />)
+    render(<AIPrompt error="" />)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

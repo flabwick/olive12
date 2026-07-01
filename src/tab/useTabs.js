@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { isFlipped as isFlippedFn, toggleFlip } from '../card/flipLogic'
-import { parseStreamChunk } from '../prompt/streamParser'
+import { parseStreamChunk } from '../ai/streamParser'
+import { parseCardStream } from '../ai/parseCardStream'
 import { deleteCard, getAllCards, putCard } from '../card/cardStorage'
 import { deleteLinksForSource, rebuildLinksForCard } from '../card/linkStorage'
 import { createCard, updateCardFields } from '../card/createCard'
@@ -13,7 +14,7 @@ import { deleteFolder as deleteFolderStorage, getAllFolders, putFolder } from '.
 import { supabase } from '../lib/supabaseClient'
 import { createStack as makeStackCard } from '../stack/createStack'
 import { addMember, flattenIds, isStackCard, removeMember, reorderMembers, setTopCard } from '../stack/stackLogic'
-import { assembleContext } from '../prompt/assembleContext'
+import { assembleContext } from '../ai/assembleContext'
 import { createCardSyncScheduler } from '../sync/cardSync'
 import { makeCardSupabaseStorage } from '../sync/cardSupabaseStorage'
 import { makeFolderSupabaseStorage } from '../sync/folderSupabaseStorage'
@@ -66,8 +67,8 @@ export function useTabs({ userId } = {}) {
   const [allLinks, setAllLinks] = useState([])
   const [flippedCardIds, setFlippedCardIds] = useState(() => new Set())
   const [selectedCardIds, setSelectedCardIds] = useState(() => new Set())
-  const [promptLoading, setPromptLoading] = useState(false)
-  const [promptError, setPromptError] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
   const schedulerRef = useRef(null)
   const storageRef = useRef(null)
   const folderStorageRef = useRef(null)
@@ -1180,14 +1181,24 @@ export function useTabs({ userId } = {}) {
   const libraryTabs = tabs.filter((t) => t.savedLocation === 'library')
 
   const runDockPrompt = useCallback(
-    async (promptText) => {
-      setPromptLoading(true)
-      setPromptError('')
+    async (promptText, onCardCreated = null, entryPoint = 'TAB_NEW_CARD') => {
+      setAiLoading(true)
+      setAiError('')
       try {
         const contextCards = assembleContext(entries)
 
-        // Create the card immediately so it appears in the tab before streaming starts.
-        const initialCard = await addCard({ title: '', body: '' })
+        let initialCard
+        if (onCardCreated) {
+          // Embed mode: save card to DB only, don't add it as a tab entry.
+          const card = createCard({ title: '', body: '' })
+          setCardsById((prev) => ({ ...prev, [card.id]: card }))
+          await putCard(card)
+          initialCard = card
+          onCardCreated(card.id)
+        } else {
+          // Tab mode: create card and add it as a new tab entry.
+          initialCard = await addCard({ title: '', body: '' })
+        }
         const cardId = initialCard.id
         // Track the card locally to avoid stale cardsById closure during streaming.
         let currentCard = initialCard
@@ -1213,7 +1224,7 @@ export function useTabs({ userId } = {}) {
             Authorization: `Bearer ${authToken}`,
             apikey: supabaseKey,
           },
-          body: JSON.stringify({ prompt: promptText, contextCards }),
+          body: JSON.stringify({ prompt: promptText, contextCards, entryPoint }),
         })
 
         if (!fetchResponse.ok) {
@@ -1224,45 +1235,31 @@ export function useTabs({ userId } = {}) {
         const reader = fetchResponse.body.getReader()
         const decoder = new TextDecoder()
         let accumulated = ''
-        let titleLine = ''
-        let titleResolved = false
         let rafHandle = null
 
-        const scheduleBodyUpdate = () => {
+        const scheduleUpdate = () => {
           if (rafHandle !== null) return
           rafHandle = requestAnimationFrame(async () => {
             rafHandle = null
-            const nlIdx = accumulated.indexOf('\n')
-            const body = accumulated.slice(nlIdx + 1).replace(/^\n+/, '').trimEnd()
-            await applyUpdate(titleLine, body)
+            const parsed = parseCardStream(accumulated)
+            await applyUpdate(parsed.title ?? '', parsed.body ?? '')
           })
         }
-
-        let rawText = ''
 
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
 
           const text = decoder.decode(value, { stream: true })
-          rawText += text
 
           for (const line of text.split('\n')) {
             const delta = parseStreamChunk(line.trim())
             if (delta !== null) accumulated += delta
           }
 
-          if (!titleResolved) {
-            const nlIdx = accumulated.indexOf('\n')
-            if (nlIdx !== -1) {
-              titleLine = accumulated.slice(0, nlIdx).trim() || 'Response'
-              titleResolved = true
-              const body = accumulated.slice(nlIdx + 1).replace(/^\n+/, '').trimEnd()
-              await applyUpdate(titleLine, body)
-            }
-          } else {
-            scheduleBodyUpdate()
-          }
+          const parsed = parseCardStream(accumulated)
+          if (parsed.title !== null || parsed.body !== null) scheduleUpdate()
+          if (parsed.done) break
         }
 
         if (rafHandle !== null) {
@@ -1270,33 +1267,45 @@ export function useTabs({ userId } = {}) {
           rafHandle = null
         }
 
-        // If no SSE deltas were parsed, try a JSON fallback (legacy function format).
-        if (!accumulated.trim()) {
-          try {
-            const parsed = JSON.parse(rawText.trim())
-            await applyUpdate((parsed.title || '').trim() || 'Response', (parsed.body || '').trim())
-          } catch {
-            await applyUpdate('Response', '')
-          }
-        } else if (!titleResolved) {
-          await applyUpdate(accumulated.trim() || 'Response', '')
-        } else {
-          const nlIdx = accumulated.indexOf('\n')
-          let bodyStart = nlIdx + 1
-          while (bodyStart < accumulated.length && accumulated[bodyStart] === '\n') bodyStart++
-          await applyUpdate(titleLine, accumulated.slice(bodyStart).trim())
-        }
+        const finalParsed = parseCardStream(accumulated)
+        await applyUpdate(finalParsed.title ?? 'Response', finalParsed.body ?? '')
 
-        setPromptLoading(false)
+        setAiLoading(false)
         return true
       } catch (err) {
         console.error('[useTabs] runDockPrompt error:', err)
-        setPromptError(err.message || 'Something went wrong')
-        setPromptLoading(false)
+        setAiError(err.message || 'Something went wrong')
+        setAiLoading(false)
         return false
       }
     },
     [entries, addCard],
+  )
+
+  /**
+   * @typedef {{ entryPoint: 'TAB_NEW_CARD' | 'DOCK_NEW_CARD' | 'DOCK_PROMPT', userPrompt: string, onCardCreated?: (cardId: string) => void }} AIRequest
+   */
+
+  const runAI = useCallback(
+    async (request) => {
+      const { entryPoint, userPrompt, onCardCreated = null } = request
+      let resolvedPrompt
+      if (userPrompt) {
+        resolvedPrompt = userPrompt
+      } else if (entryPoint === 'TAB_NEW_CARD') {
+        resolvedPrompt = 'Create a useful new card that fits the theme of the existing cards in this tab.'
+      } else if (entryPoint === 'DOCK_NEW_CARD') {
+        resolvedPrompt = 'Create a useful reference card to pin to the dock.'
+      } else if (onCardCreated) {
+        // DOCK_PROMPT one-click with embed target: generate something contextually useful.
+        resolvedPrompt = 'Create a useful card to embed here.'
+      } else {
+        // DOCK_PROMPT with no text and no embed target is a no-op.
+        return false
+      }
+      return runDockPrompt(resolvedPrompt, onCardCreated, entryPoint)
+    },
+    [runDockPrompt],
   )
 
   return {
@@ -1346,8 +1355,9 @@ export function useTabs({ userId } = {}) {
     bulkDeleteCards,
     bulkMoveTabs,
     runDockPrompt,
-    promptLoading,
-    promptError,
+    runAI,
+    aiLoading,
+    aiError,
     brainFeedItems,
     reindexCard,
     flipCard,

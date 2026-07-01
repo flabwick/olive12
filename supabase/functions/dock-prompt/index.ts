@@ -10,10 +10,24 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Mirrors src/prompt/buildPrompt.js — keep both in sync if the prompt changes.
+// Mirrors src/ai/buildPrompt.js — keep both in sync if the prompt changes.
+
+const FORMAT_RULE =
+  'Respond using exactly this format and no other text:\n\n<card>\n<type>text</type>\n<title>Your title here (max 80 characters)</title>\n<body>\nYour full response here as plain text.\n</body>\n</card>'
+
+const SYSTEM_MESSAGES: Record<string, string> = {
+  TAB_NEW_CARD:
+    `You are Olive, an AI assistant embedded in a note-taking app. The user wants a new card for their current tab. Study the context cards to understand what this tab is about, then create content that fits and extends it — something genuinely useful given what's already there. ${FORMAT_RULE}`,
+  DOCK_NEW_CARD:
+    `You are Olive, an AI assistant embedded in a note-taking app. The user wants a compact reference card to keep pinned at the bottom of their screen while they work. Look at the context cards to understand what they're working on, then create a focused, reusable reference — something worth keeping at hand. Keep it concise. ${FORMAT_RULE}`,
+  DOCK_PROMPT:
+    `You are Olive, an AI assistant embedded in a note-taking app. The user is editing a card and wants to embed a new card inline within it. Create content that works as a self-contained embedded reference — something that enriches the surrounding card when read in context. ${FORMAT_RULE}`,
+}
+
 function buildMessages(
   prompt: string,
   contextCards: Array<{ id?: string; title?: string; body?: string }>,
+  entryPoint: string = 'TAB_NEW_CARD',
 ): Array<{ role: string; content: string }> {
   const contextBlock =
     contextCards.length > 0
@@ -25,11 +39,12 @@ function buildMessages(
           .join('\n\n---\n\n')
       : '(no cards in the current tab)'
 
+  const systemContent = SYSTEM_MESSAGES[entryPoint] ?? SYSTEM_MESSAGES.TAB_NEW_CARD
+
   return [
     {
       role: 'system',
-      content:
-        'You are an AI assistant embedded in a note-taking app. Write a short title on the first line (max 80 characters). Leave one blank line. Then write your complete response as plain text — write the full answer, do not stop mid-sentence, and include all relevant detail. No JSON, no markdown, no labels — just the title, a blank line, then the content.',
+      content: systemContent,
     },
     {
       role: 'user',
@@ -46,7 +61,7 @@ Deno.serve(async (req: Request) => {
   try {
     const body = await req.json()
     console.log('[dock-prompt] received body:', JSON.stringify(body))
-    const { prompt, contextCards } = body
+    const { prompt, contextCards, entryPoint = 'TAB_NEW_CARD' } = body
 
     if (!prompt || typeof prompt !== 'string') {
       console.log('[dock-prompt] missing or invalid prompt')
@@ -65,7 +80,7 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    const messages = buildMessages(prompt, contextCards ?? [])
+    const messages = buildMessages(prompt, contextCards ?? [], entryPoint)
     console.log('[dock-prompt] sending streaming request to OpenRouter, model:', MODEL_CONFIG.model)
 
     const openRouterRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {

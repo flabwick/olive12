@@ -1,41 +1,40 @@
 import { useState } from 'react'
-import './DockPrompt.css'
+import './AIPrompt.css'
 
-export function DockPrompt({ onSubmit, onDismiss, loading = false, streaming = false, error = '' }) {
+export function AIPrompt({ onSubmit, onDismiss, loading = false, streaming = false, error = '' }) {
   const [text, setText] = useState('')
 
   function handleSubmit(e) {
     e.preventDefault()
-    const trimmed = text.trim()
-    if (trimmed) onSubmit?.(trimmed)
+    onSubmit?.(text.trim())
   }
 
   return (
     <form
-      className="dock-prompt"
+      className="ai-prompt"
       onSubmit={handleSubmit}
       role="region"
       aria-label="Prompt"
     >
       <textarea
-        className="dock-prompt__input"
+        className="ai-prompt__input"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Ask a question or give a task…"
+        placeholder="Optional — add instructions…"
         aria-label="Prompt input"
         rows={2}
         disabled={loading}
         autoFocus
       />
       {error && (
-        <p className="dock-prompt__error" role="alert">
+        <p className="ai-prompt__error" role="alert">
           {error}
         </p>
       )}
-      <div className="dock-prompt__actions">
+      <div className="ai-prompt__actions">
         <button
           type="button"
-          className="dock-prompt__cancel"
+          className="ai-prompt__cancel"
           onClick={onDismiss}
           disabled={loading}
         >
@@ -43,11 +42,11 @@ export function DockPrompt({ onSubmit, onDismiss, loading = false, streaming = f
         </button>
         <button
           type="submit"
-          className="dock-prompt__submit"
-          disabled={loading || !text.trim()}
+          className="ai-prompt__submit"
+          disabled={loading}
         >
           {loading && streaming ? (
-            <span className="dock-prompt__spinner" aria-label="Streaming" aria-busy="true" />
+            <span className="ai-prompt__spinner" aria-label="Streaming" aria-busy="true" />
           ) : loading ? (
             'Thinking…'
           ) : (

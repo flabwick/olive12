@@ -41,6 +41,7 @@ export function Tab({
   onDissolveStack,
   onAddCard,
   onMoveToDock,
+  onAIPrompt,
 }) {
   const [focusCardId, setFocusCardId] = useState(null)
 
@@ -62,10 +63,10 @@ export function Tab({
 
   const tabActions = onAddCard ? (
     <div className="tab__actions-row">
-      <AddCardButton onClick={handleAddCard} />
-      <button type="button" className="tab__ai-btn" aria-label="AI prompt">
+      <button type="button" className="tab__ai-btn" aria-label="AI prompt" onClick={onAIPrompt}>
         <LightningIcon />
       </button>
+      <AddCardButton onClick={handleAddCard} />
     </div>
   ) : null
 

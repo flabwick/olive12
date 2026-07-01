@@ -22,6 +22,14 @@ function MenuIcon() {
   )
 }
 
+function TickIcon() {
+  return (
+    <svg width="13" height="11" viewBox="0 0 13 11" fill="none" aria-hidden="true">
+      <path d="M1.5 5.5L5 9L11.5 1.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function LightningIcon() {
   return (
     <svg width="13" height="15" viewBox="0 0 13 15" fill="none" aria-hidden="true">
@@ -207,12 +215,13 @@ function IconWithPlus({ Icon }) {
   )
 }
 
-function DockBtn({ active, danger, primary, label, title, onMouseDown, onClick, children, ariaExpanded }) {
+function DockBtn({ active, danger, primary, lightning, label, title, onMouseDown, onClick, children, ariaExpanded }) {
   const cls = [
     'dock__btn',
     active && 'dock__btn--active',
     danger && 'dock__btn--danger',
     primary && 'dock__btn--primary',
+    lightning && 'dock__lightning-btn',
   ].filter(Boolean).join(' ')
   return (
     <button
@@ -236,8 +245,7 @@ const VAULT_TAB_LABELS = { shelf: 'Inbox', library: 'Vault', brain: 'Index' }
 
 function FormattingToolbar({
   activeEditor,
-  lightningActive,
-  onLightningToggle,
+  onAIPrompt,
   onEmbedOpen,
 }) {
   const [headingOpen, setHeadingOpen] = useState(false)
@@ -272,6 +280,14 @@ function FormattingToolbar({
   return (
     <div className="dock__scroll">
       <DockBtn
+        label="AI prompt"
+        lightning
+        onMouseDown={(e) => { e.preventDefault(); onAIPrompt?.('DOCK_PROMPT') }}
+      >
+        <LightningIcon />
+      </DockBtn>
+
+      <DockBtn
         label="Exit editor"
         onClick={() => activeEditor?.commands.blur()}
       >
@@ -279,14 +295,6 @@ function FormattingToolbar({
       </DockBtn>
 
       <span className="dock__sep" aria-hidden="true" />
-
-      <DockBtn
-        active={lightningActive}
-        label="AI prompt"
-        onMouseDown={(e) => { e.preventDefault(); onLightningToggle?.() }}
-      >
-        <LightningIcon />
-      </DockBtn>
 
       <DockBtn label="Embed card" title="Embed card [[ ]]" onMouseDown={(e) => { e.preventDefault(); onEmbedOpen?.() }}>
         {'[[]]'}
@@ -364,8 +372,10 @@ export function Dock({
   onSettings,
   onEmbedOpen,
   onUploadFile,
-  lightningActive = false,
-  onLightningToggle,
+  onAIPrompt,
+  promptOpen = false,
+  onPromptSubmit,
+  onPromptDismiss,
   vaultOpen = false,
   vaultTab = 'shelf',
   onVaultTabChange,
@@ -395,9 +405,16 @@ export function Dock({
 }) {
   const fileInputRef = useRef(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [localPromptText, setLocalPromptText] = useState('')
   const { activeEditor } = useRichTextEditorContext()
 
   useEffect(() => { setConfirmDelete(false) }, [selectedVaultItem])
+  useEffect(() => { if (!promptOpen) setLocalPromptText('') }, [promptOpen])
+
+  function handleAIConfirm() {
+    onPromptSubmit?.(localPromptText)
+    setLocalPromptText('')
+  }
 
   function handleFileChange(e) {
     const file = e.target.files?.[0]
@@ -417,13 +434,48 @@ export function Dock({
     return 'Vault'
   }
 
+  if (promptOpen) {
+    return (
+      <div className="dock dock--ai-prompt" role="region" aria-label="AI prompt">
+        <button
+          type="button"
+          className="dock__btn dock__btn--active dock__ai-confirm"
+          aria-label="Generate"
+          onClick={handleAIConfirm}
+        >
+          <TickIcon />
+        </button>
+        <input
+          className="dock__ai-input"
+          type="text"
+          placeholder="Optional — add instructions…"
+          aria-label="AI instructions"
+          value={localPromptText}
+          onChange={(e) => setLocalPromptText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleAIConfirm()
+            if (e.key === 'Escape') onPromptDismiss?.()
+          }}
+          autoFocus
+        />
+        <button
+          type="button"
+          className="dock__btn dock__ai-cancel"
+          aria-label="Cancel"
+          onClick={onPromptDismiss}
+        >
+          ✕
+        </button>
+      </div>
+    )
+  }
+
   if (dockState === DOCK_STATE.DOCK_EDITOR || dockState === DOCK_STATE.TAB_EDITOR) {
     return (
       <div className="dock dock--formatting" role="toolbar" aria-label="Formatting options">
         <FormattingToolbar
           activeEditor={activeEditor}
-          lightningActive={lightningActive}
-          onLightningToggle={onLightningToggle}
+          onAIPrompt={onAIPrompt}
           onEmbedOpen={onEmbedOpen}
         />
       </div>
@@ -473,7 +525,7 @@ export function Dock({
             <StackCardsIcon />
           </DockBtn>
         )}
-        <DockBtn label="AI prompt">
+        <DockBtn label="AI prompt" lightning onClick={() => onAIPrompt?.('DOCK_PROMPT')}>
           <LightningIcon />
         </DockBtn>
         <span className="dock__sep" aria-hidden="true" />
@@ -609,6 +661,14 @@ export function Dock({
   // BASE state
   return (
     <div className="dock dock--base" role="toolbar" aria-label="Tab actions">
+      <button
+        type="button"
+        className="dock__btn dock__lightning-btn"
+        aria-label="AI prompt"
+        onClick={() => onAIPrompt?.('DOCK_NEW_CARD')}
+      >
+        <LightningIcon />
+      </button>
       <div className="dock__pills">
         {dockCardEntries.map((entry, i) => {
           const isActive = activeDockCardId === entry.cardId
@@ -634,13 +694,6 @@ export function Dock({
         onClick={onAddDockCard}
       >
         +
-      </button>
-      <button
-        type="button"
-        className="dock__btn dock__lightning-btn"
-        aria-label="AI prompt"
-      >
-        <LightningIcon />
       </button>
       <span className="dock__divider" aria-hidden="true" />
       <div className="dock__actions">
