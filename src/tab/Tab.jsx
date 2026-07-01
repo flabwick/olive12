@@ -38,7 +38,6 @@ export function Tab({
   onExitMoveMode,
   setStackTopCard,
   onReorderStackMember,
-  onDissolveStack,
   onAddCard,
   onMoveToDock,
   onAIPrompt,
@@ -145,7 +144,6 @@ export function Tab({
                 onReorderMember={onReorderStackMember
                   ? (from, to) => onReorderStackMember(entry.card.id, from, to)
                   : undefined}
-                onDissolve={onDissolveStack ? () => onDissolveStack(entry.card.id) : undefined}
               />
             )
           } else if (entry.card.type === 'portal') {

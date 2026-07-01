@@ -82,7 +82,6 @@ function AppShell({ userId }) {
     stackSelectedFlat,
     nestMoveCardInTarget,
     addToStack,
-    dissolveStack,
     setStackTopCard,
     reorderStackMembers,
     toggleCardSelection,
@@ -562,7 +561,6 @@ function AppShell({ userId }) {
           onExitMoveMode={() => setMoveCardId(null)}
           setStackTopCard={setStackTopCard}
           onReorderStackMember={reorderStackMembers}
-          onDissolveStack={dissolveStack}
           onAddCard={addCard}
           onMoveToDock={handleMoveToDock}
           onAIPrompt={() => handleOpenAIPrompt('TAB_NEW_CARD')}

@@ -68,26 +68,26 @@ describe('StackCard', () => {
   })
 
   it('renders cycle prev and next buttons', () => {
-    render(<StackCard stack={makeStack()} cardsById={cardsById} />)
+    render(<StackCard stack={makeStack()} cardsById={cardsById} onCyclePrev={() => {}} onCycleNext={() => {}} />)
     expect(screen.getByRole('button', { name: 'Previous card' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Next card' })).toBeInTheDocument()
   })
 
   it('renders "N/M" cycle count', () => {
-    render(<StackCard stack={makeStack()} cardsById={cardsById} />)
+    render(<StackCard stack={makeStack()} cardsById={cardsById} onCyclePrev={() => {}} onCycleNext={() => {}} />)
     expect(screen.getByLabelText('Card 1 of 3')).toBeInTheDocument()
   })
 
   it('calls onCyclePrev when previous button is clicked', async () => {
     const onCyclePrev = vi.fn()
-    render(<StackCard stack={makeStack()} cardsById={cardsById} onCyclePrev={onCyclePrev} />)
+    render(<StackCard stack={makeStack()} cardsById={cardsById} onCyclePrev={onCyclePrev} onCycleNext={() => {}} />)
     await userEvent.click(screen.getByRole('button', { name: 'Previous card' }))
     expect(onCyclePrev).toHaveBeenCalledOnce()
   })
 
   it('calls onCycleNext when next button is clicked', async () => {
     const onCycleNext = vi.fn()
-    render(<StackCard stack={makeStack()} cardsById={cardsById} onCycleNext={onCycleNext} />)
+    render(<StackCard stack={makeStack()} cardsById={cardsById} onCyclePrev={() => {}} onCycleNext={onCycleNext} />)
     await userEvent.click(screen.getByRole('button', { name: 'Next card' }))
     expect(onCycleNext).toHaveBeenCalledOnce()
   })
@@ -165,24 +165,10 @@ describe('StackCard', () => {
   })
 
   it('clicking expand toggle twice returns to collapsed view', async () => {
-    render(<StackCard stack={makeStack()} cardsById={cardsById} />)
+    render(<StackCard stack={makeStack()} cardsById={cardsById} onCyclePrev={() => {}} onCycleNext={() => {}} />)
     await userEvent.click(screen.getByRole('button', { name: 'Expand stack' }))
     await userEvent.click(screen.getByRole('button', { name: 'Collapse stack' }))
     expect(screen.getByRole('button', { name: 'Previous card' })).toBeInTheDocument()
-  })
-
-  it('renders dissolve button in expanded view when onDissolve is provided', async () => {
-    render(<StackCard stack={makeStack()} cardsById={cardsById} onDissolve={() => {}} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Expand stack' }))
-    expect(screen.getByRole('button', { name: 'Dissolve stack' })).toBeInTheDocument()
-  })
-
-  it('calls onDissolve when dissolve button is clicked', async () => {
-    const onDissolve = vi.fn()
-    render(<StackCard stack={makeStack()} cardsById={cardsById} onDissolve={onDissolve} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Expand stack' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Dissolve stack' }))
-    expect(onDissolve).toHaveBeenCalledOnce()
   })
 
   it('renders "No cards" when stack has no members', () => {

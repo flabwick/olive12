@@ -2,11 +2,19 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.4375rem 0.625rem;
   background: #e8d4a0;
   border: 1.5px solid #c8ae78;
   border-radius: 0.4375rem;
   margin-bottom: 0.5rem;
+}
+
+@media (pointer: coarse) {
+  .selection-bar {
+    min-height: 3.125rem;
+    padding: 0.5rem 0.6875rem;
+  }
 }
 
 .selection-bar__count {
@@ -18,15 +26,25 @@
 }
 
 .selection-bar__btn {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  padding: 0.2rem 0.6rem;
+  min-height: 1.875rem;
+  padding: 0.3125rem 0.6875rem;
   border: 1px solid rgba(44, 24, 16, 0.3);
   border-radius: 0.25rem;
   background: rgba(255, 255, 255, 0.5);
   color: #2c1810;
   cursor: pointer;
   transition: background 0.1s, border-color 0.1s;
+  touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+  .selection-bar__btn {
+    min-height: 2.125rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+  }
 }
 
 .selection-bar__btn:hover:not(:disabled) {

@@ -12,12 +12,12 @@
 /* ProseMirror's h3 rule (specificity 0,2,1) overrides .card-header__title (0,1,0).
    Three-class selector (0,3,0) wins and restores the compact header title style. */
 .embedded-card-view .card-header .card-header__title {
-  font-size: 0.625rem;
+  font-size: var(--ch-title, 0.75rem);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   margin: 0;
-  line-height: 1.3;
+  line-height: 1.25;
 }
 
 .embedded-card-view__body {

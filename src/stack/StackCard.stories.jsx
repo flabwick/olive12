@@ -50,7 +50,6 @@ export default {
     onCyclePrev: () => {},
     onCycleNext: () => {},
     onReorderMember: () => {},
-    onDissolve: () => {},
   },
 }
 

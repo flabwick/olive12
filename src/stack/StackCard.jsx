@@ -5,6 +5,20 @@ import { CardBack } from '../card/CardBack'
 import { CardHeader } from '../card/CardHeader'
 import './StackCard.css'
 
+function ChevronIcon({ direction = 'left' }) {
+  const paths = {
+    left: 'M6 1L2 5l4 4',
+    right: 'M2 1l4 4-4 4',
+    up: 'M1 6l4-4 4 4',
+    down: 'M1 1l4 4 4-4',
+  }
+  return (
+    <svg viewBox="0 0 8 10" width="7" height="9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={paths[direction]} />
+    </svg>
+  )
+}
+
 // Renders a single member card (Card, FileCard, or nested StackCard) with its full UI.
 function MemberCard({
   card,
@@ -91,7 +105,6 @@ export function StackCard({
   onCyclePrev,
   onCycleNext,
   onReorderMember,
-  onDissolve,
   // Member card callbacks — passed from Tab
   onUpdateMember,
   onSaveToShelfMember,
@@ -144,12 +157,14 @@ export function StackCard({
   const topCardId = stack.config.topCardId
   const topCard = topCardId ? cardsById[topCardId] : null
   const topIndex = memberIds.indexOf(topCardId)
+  const showStackNav = !foldState && !flipped && memberIds.length > 0
 
   const classNames = [
     'stack-card',
     hiddenState && 'stack-card--hidden',
     flipped && 'stack-card--flipped',
     expanded && 'stack-card--expanded',
+    selected && 'stack-card--selected',
   ].filter(Boolean).join(' ')
 
   return (
@@ -174,6 +189,12 @@ export function StackCard({
         onToggleHide={onToggleHide}
         onFlip={onFlip}
         onClose={onClose}
+        cycleIndex={topIndex + 1}
+        cycleTotal={memberIds.length}
+        onCyclePrev={showStackNav && !expanded && memberIds.length > 1 ? onCyclePrev : undefined}
+        onCycleNext={showStackNav && !expanded && memberIds.length > 1 ? onCycleNext : undefined}
+        stackExpanded={expanded}
+        onToggleStackExpand={showStackNav ? () => setExpanded((e) => !e) : undefined}
       />
 
       {!foldState && (
@@ -221,89 +242,44 @@ export function StackCard({
                               onClick={() => onReorderMember(index, index - 1)}
                               disabled={index === 0}
                               aria-label="Move up"
-                            >▲</button>
+                            >
+                              <ChevronIcon direction="up" />
+                            </button>
                             <button
                               type="button"
                               className="stack-card__reorder-btn"
                               onClick={() => onReorderMember(index, index + 1)}
                               disabled={index === memberIds.length - 1}
                               aria-label="Move down"
-                            >▼</button>
+                            >
+                              <ChevronIcon direction="down" />
+                            </button>
                           </div>
                         )}
                       </div>
                     )
                   })}
-                  {onDissolve && (
-                    <button
-                      type="button"
-                      className="stack-card__dissolve"
-                      onClick={onDissolve}
-                      aria-label="Dissolve stack"
-                    >
-                      Dissolve
-                    </button>
-                  )}
                 </div>
               ) : topCard ? (
-                <>
-                  <div className="stack-card__embed">
-                    <MemberCard
-                      card={topCard}
-                      cardsById={cardsById}
-                      foldState={memberFoldStates[topCardId] ?? false}
-                      onToggleFold={() => toggleMemberFold(topCardId)}
-                      onUpdate={onUpdateMember ? (fields) => onUpdateMember(topCardId, fields) : undefined}
-                      onSaveToShelf={onSaveToShelfMember ? () => onSaveToShelfMember(topCardId) : undefined}
-                      flipped={isFlipped ? isFlipped(topCardId) : false}
-                      onFlip={flipCard ? () => flipCard(topCardId) : undefined}
-                      onUpdateMember={onUpdateMember}
-                      onSaveToShelfMember={onSaveToShelfMember}
-                      flipCard={flipCard}
-                      isFlipped={isFlipped}
-                    />
-                  </div>
-                  {memberIds.length > 0 && (
-                    <div className="stack-card__cycle-controls">
-                      <button
-                        type="button"
-                        className="stack-card__cycle-btn"
-                        onClick={onCyclePrev}
-                        aria-label="Previous card"
-                        disabled={memberIds.length <= 1}
-                      >
-                        ‹
-                      </button>
-                      <span
-                        className="stack-card__cycle-count"
-                        aria-label={`Card ${topIndex + 1} of ${memberIds.length}`}
-                      >
-                        {topIndex + 1}/{memberIds.length}
-                      </span>
-                      <button
-                        type="button"
-                        className="stack-card__cycle-btn"
-                        onClick={onCycleNext}
-                        aria-label="Next card"
-                        disabled={memberIds.length <= 1}
-                      >
-                        ›
-                      </button>
-                    </div>
-                  )}
-                </>
+                <div className="stack-card__embed">
+                  <MemberCard
+                    card={topCard}
+                    cardsById={cardsById}
+                    foldState={memberFoldStates[topCardId] ?? false}
+                    onToggleFold={() => toggleMemberFold(topCardId)}
+                    onUpdate={onUpdateMember ? (fields) => onUpdateMember(topCardId, fields) : undefined}
+                    onSaveToShelf={onSaveToShelfMember ? () => onSaveToShelfMember(topCardId) : undefined}
+                    flipped={isFlipped ? isFlipped(topCardId) : false}
+                    onFlip={flipCard ? () => flipCard(topCardId) : undefined}
+                    onUpdateMember={onUpdateMember}
+                    onSaveToShelfMember={onSaveToShelfMember}
+                    flipCard={flipCard}
+                    isFlipped={isFlipped}
+                  />
+                </div>
               ) : (
                 <p className="stack-card__empty">No cards</p>
               )}
-
-              <button
-                type="button"
-                className="stack-card__expand-toggle"
-                onClick={() => setExpanded((e) => !e)}
-                aria-label={expanded ? 'Collapse stack' : 'Expand stack'}
-              >
-                {expanded ? 'Collapse' : `${memberIds.length} card${memberIds.length !== 1 ? 's' : ''}`}
-              </button>
             </>
           )}
         </>
